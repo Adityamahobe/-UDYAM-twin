@@ -270,6 +270,14 @@ Every run is **seeded**, so Reset → Replay gives the identical curve.
 - **Time-box: 4 hours on D1.** If conversion fights back, build the mill from primitives in Blender (base, column, table, head, spindle). Judges score behaviour, not bolts.
 - **Don't borrow TseNC's specs.** It has a 1 kW router spindle, while our operating envelope follows the AI4I scenario (≈1,200–2,900 rpm, up to ~9 kW). Label the model a **"representative 3-axis VMC (geometry: TseNC)"**.
 
+### 4.6 What we ship: a local web app
+
+- **Form:** a browser-based web app. The Python/FastAPI backend serves the Three.js frontend and the WebSocket from the same laptop (`http://localhost:8000`). It is not a native desktop app and not a cloud-hosted website. This matches both submissions ("browser-accessible", "runs on any laptop or mobile browser").
+- **Feels like an app:** `start.bat` / `start.sh` starts the server and opens the browser in full-screen kiosk mode. Everything is bundled locally (three.js, fonts, model, glb), so it runs **with no internet**.
+- **Phone as operator screen:** the laptop runs a hotspot and a phone opens `http://<laptop-ip>:8000/operator`. In the demo, a judge holds the operator view while we inject faults on the laptop. This proves the "mobile browser" claim live.
+- **Not before the event:** a public hosted link is optional, for after the conclave (a free-tier host, or a GitHub Pages copy running REPLAY only) to put on the QR code and in the paper. Don't let the demo depend on venue Wi-Fi.
+- **Later (Route 6):** the same app installs on a ₹4–6k mini-PC or Raspberry Pi beside the machine as an on-premise edge box. No code changes, which is the advantage of choosing the web route.
+
 ---
 
 ## 5. Eight-day sprint (18 → 26 Oct)
