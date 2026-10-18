@@ -2,7 +2,7 @@
 
 **Team:** Tech Titans (NIT Raipur) · **Event:** INAE Youth Conclave 2026 (YEISS-2026), Hackathon, 26–27 Oct 2026
 **Theme:** HT14 — Digital Twin Applications for MSMEs and Smart Factories (also touches HT4 and HT13)
-**Plan written:** 17 Oct 2026, which leaves **9 days** until the event
+**Plan written:** 17 Oct 2026 · **Revised:** 18 Oct 2026 to add the hybrid self-calibrating twin, the CNC workshop target and the TseNC asset (8 days to go)
 
 ---
 
@@ -18,6 +18,19 @@ There are two submissions:
 | Tone | Vision, impact, Viksit Bharat | Evidence, safety, honest limits |
 | Says | Self-healing auto-throttle, RUL, ₹ & CO₂ savings, < ₹2,500 node, < 3-month ROI, 60 FPS | Advisory-only, risk instead of RUL, savings stay hypotheses until measured, staged A→D roadmap |
 
+### Locked decisions (18 Oct)
+
+| Decision | Choice | Why it doesn't drift from what we submitted |
+|---|---|---|
+| Target MSME | **Small CNC machining job-shop** (auto-ancillary / fabrication supplier) | The PPT already names CNC machining and automotive ancillaries; AI4I is a machining/tool-wear scenario |
+| Physical asset | **One 3-axis CNC milling machine**, plus a small job (workpiece → parts) | The report's focus is "one machine, few signals, clear workflow" |
+| Primary objective | **Predictive maintenance**; production KPIs (parts, cycle time, OEE, ₹) are secondary | PS = "monitor, simulate faults, AI predictive maintenance" |
+| Twin type | **Hybrid, self-calibrating**: reduced-order physics + AI4I risk model + residual-based calibration | The PPT's "coupled physics engine" + AI4I; the report's "validate before trusting" |
+| 3D geometry | **TseNC** open-source CNC mill (STEP, CERN-OHL-W), simplified to glb; fallback is a primitive-built mill | Reuse instead of modelling from scratch |
+| Data | SIM (plant simulator) → REPLAY (AI4I) → LIVE (ESP32 on a desk motor, stretch) | Same three sources as the report's Layer 1 |
+
+The new core idea: **the twin predicts, compares its prediction with what it observes, and recalibrates itself, and the drift in its calibrated parameters is itself a health signal** (§4.3). This is the strongest version of the PPT's "AI that gets smarter" and stays inside the report's guardrails.
+
 They look like they disagree, but they don't. **The PPT describes where the product is going. The report describes how we get there safely.** The merge keeps every PPT feature and passes each one through the report's guardrails. The device that ties them together is the **Source-Mode + Claim-Status system** in §2.
 
 ---
@@ -29,6 +42,7 @@ Use the right-hand column on the slides, in the demo voice-over and in Q&A. Unde
 | PPT claim | Report position | **Merged wording (use this)** | How the demo proves it |
 |---|---|---|---|
 | "AI-Driven Self-Healing: automatically adjusts machine speed" | No auto control; advisory only | **"Supervised Self-Healing."** In **SIM mode**, the virtual PLC auto-derates RPM (closed loop in software-in-the-loop, which is safe because nothing physical moves). In **LIVE mode**, the same logic only *proposes* a derate, and a human approves it. The actuation path is locked off until Stage D. | Toggle *Auto (SIM)* vs *Advisory (LIVE)*. In LIVE the button shows a lock icon with "requires safety review". |
+| "AI Predictive Maintenance" (AI4I-trained) | AI4I is synthetic; validate per machine | **"Hybrid self-calibrating twin."** Physics predicts expected behaviour, AI4I-trained model scores risk, and residuals between prediction and observation recalibrate a few bounded parameters. | Predicted-vs-observed chart, residual band, parameter history with versions (v1.0 → v1.3). |
 | "Predicts failures and estimates RUL" | Show risk/inspection priority; RUL needs run-to-failure data | **"Failure-risk + Remaining Tool Life."** Machine-level output is a *risk category*. RUL is shown only for the **cutting tool**, from the tool-wear model (AI4I tool-wear failure window ≈ 200–240 min), and labelled as an estimate. | Tool-life gauge counts down. Machine RUL is shown as "planned (needs pilot data)". |
 | "Tracks ₹ savings, CO₂ reductions in real time" | Estimates only, editable assumptions, cited emission factor | **"Telemetry-to-₹ exposure calculator."** It shows the ₹ at risk and the ₹ exposure avoided *in this scenario*, from factory-entered values. CO₂ = kWh × CEA grid factor (cited with year). | Assumptions panel is editable live. Every number has an ⓘ showing its formula. |
 | "< ₹2,500 sensor node per machine" | Itemise, confirm with quotes | **"Indicative BOM ≈ ₹1,500–2,500 (Oct 2026 retail quotes)."** Show the itemised table (§6). | One slide or backup slide with the itemised BOM and quote dates. |
@@ -60,99 +74,111 @@ Build these into the product itself, not just the slides. They make the honesty 
 
 ## 3. What we demo on 26–27 Oct (Stage A, fully software)
 
-### 3.1 The 4-minute demo script
+### 3.1 The 5-minute demo script
 
-This is the backbone, and everything we build serves it. The report itself says a convincing demo is *normal → controlled fault → explained alert → 3D change → ₹ consequence*. The PPT adds *self-healing → work order*.
+This is the backbone, and everything we build serves it. The report says a convincing demo is *normal → controlled fault → explained alert → 3D change → ₹ consequence*. The PPT adds *self-healing → work order*. The hybrid twin adds the beat most teams won't have: **the twin catches itself being wrong and recalibrates.**
 
 | t | Screen | What we say |
 |---|---|---|
-| 0:00 | 3D lathe/CNC spinning, all green, `SIM` badge | "This is a 200-machine MSME problem on one screen: an old machine with no sensors. We start virtual." |
-| 0:30 | Click **Inject Fault → Coolant loss** | "We can't break a real machine to learn, so the virtual PLC lets us break this one safely." |
-| 0:45 | Temperature climbs, spindle housing shader goes amber→red, trend graph | "The twin reacts the way the physics says it should." |
-| 1:15 | Alert card: Measured / Inferred / Suggested | "No raw probability dump. It says what changed, which part, why, and what to check." |
-| 1:45 | **Supervised self-healing:** auto-derate in SIM → temperature stabilises, risk drops | "In simulation the PLC derates itself. On a live machine this button needs the operator's approval. That's our safety-by-design." |
-| 2:15 | **Generate Work Order** → Open → Acknowledged | "Every alert becomes traceable maintenance, not a forgotten beep." |
-| 2:35 | ₹ panel: exposure avoided, kWh, CO₂ with assumptions shown | "Here's what that event would have cost *this* factory. These are their inputs, and the formula is open." |
-| 3:05 | Switch source **SIM → REPLAY (AI4I)** | "Same twin, now replaying an open industrial dataset. Here are our model metrics: precision, recall, confusion matrix." |
-| 3:30 | (Stretch) **LIVE**: ESP32 on a desk fan/motor shakes → vibration rises | "And the same schema takes a ₹2k sensor node. Read-only, non-invasive, no PLC changes." |
-| 3:50 | Roadmap slide A→B→C→D | "Start virtual, earn trust, then connect." |
+| 0:00 | 3D CNC mill cutting a job (spindle spinning, part counter 12/50), all green, `SIM` badge | "A small CNC job-shop. One machine, no sensors, no budget for a ₹5-lakh suite. We start virtual." |
+| 0:30 | Engineer view: **Predicted vs Observed** spindle temperature, residual inside the band | "The twin predicts what the machine *should* do, then checks what it *does*. Right now they agree." |
+| 0:50 | Click **Inject → Gradual coolant degradation** (slow drift in the *plant*, not the twin) | "Coolant is slowly getting worse. Nobody told the twin." |
+| 1:10 | Residual creeps out of band → **"Model mismatch: sustained, +6 °C"** | "The twin notices it's wrong before any alarm limit is hit." |
+| 1:30 | Calibration fires: cooling coefficient `h` 1.00 → 0.78 (bounded, versioned v1.0 → v1.1); predicted curve snaps back onto observed | "It recalibrates, within physical limits, and logs every change. And the parameter drift *is* the diagnosis: cooling capacity is down 22%." |
+| 2:00 | Forecast: **"At current settings, process-temperature warning in ~14 min"** | "Because it's calibrated, it can forecast. That's the 'predictive' in predictive maintenance." |
+| 2:20 | Alert card: Measured / Inferred / Suggested + AI4I-model risk | "What changed, which part, why, what to check: coolant flow and pump filter." |
+| 2:45 | **Supervised self-healing:** auto-derate in SIM → forecast pushes out, risk drops | "In simulation the PLC derates itself. On a live machine this needs the operator's approval." |
+| 3:05 | Click **Inject → Bearing spike** (abrupt) → flagged **ANOMALY, calibration frozen** | "Sudden jumps are *not* learned. A faulty bearing or sensor must never teach the twin that broken is normal." |
+| 3:25 | **Generate Work Order** → Open → Acknowledged; operator enters measured tool wear at tool change → wear-rate recalibrates | "Every alert becomes traceable maintenance, and the operator's own measurements make the twin better. That's human-centric Industry 5.0." |
+| 3:50 | ₹ panel: exposure avoided, parts lost, kWh, CO₂ with assumptions shown | "What that event would have cost *this* shop, with their numbers and an open formula." |
+| 4:15 | Switch source **SIM → REPLAY (AI4I)**, metrics panel | "Same twin on an open industrial dataset: precision, recall, confusion matrix, rule baseline vs model." |
+| 4:35 | (Stretch) **LIVE**: ESP32 on a desk motor; hold a hand over the fan → real residual → real calibration | "And this is real data from a ₹2k node, recalibrating live." |
+| 4:50 | Roadmap slide A→B→C→D | "Start virtual, earn trust, then connect." |
 
-**Backup:** record a screen video of the full script by 24 Oct. If the Wi-Fi or laptop fails, play it.
+**Backup:** record a screen video of the full script by 24 Oct. If the Wi-Fi or laptop fails, play it. If the slot is 3 minutes, cut the 0:30, 3:05 and 4:15 beats.
 
 ### 3.2 Feature list, prioritised (MoSCoW)
 
 **Must (demo breaks without it)**
-- M1 3D machine (`.glb`) with spindle rotation ← RPM, housing heat shader ← temp, mesh jitter ← vibration
-- M2 Virtual PLC + physics simulator with 4 fault injectors and Reset/Replay (seeded)
-- M3 FastAPI + WebSocket stream at 500 ms ticks, using the common JSON schema (§4.2)
-- M4 Rule-based alert engine with Measured/Inferred/Suggested cards
-- M5 Supervised self-healing: auto-derate in SIM, approve-gate in LIVE
-- M6 Dashboard: health, temp, vibration, RPM, energy, risk, source badge, trend sparkline
+- M1 3D CNC mill (`.glb`, named parts: spindle, head, table, column, workpiece) with spindle rotation ← RPM, head heat shader ← temp, jitter ← vibration, table motion during the cutting cycle
+- M2 **Plant simulator** (hidden "true" machine with its own parameters) + virtual PLC + fault injectors + Reset/Replay (seeded)
+- M3 **Twin model** (same equations, nominal parameters) running in parallel → predicted vs observed + residuals
+- M4 **Calibration loop**: residual detector (EWMA/CUSUM) → bounded RLS update of 2–3 parameters → versioned parameter log, with a freeze when an anomaly or data-quality fault is present
+- M5 FastAPI + WebSocket stream at 500 ms ticks, using the common JSON schema (§4.2)
+- M6 Rule-based alert engine with Measured/Inferred/Suggested cards
+- M7 Supervised self-healing: auto-derate in SIM, approve-gate in LIVE
+- M8 Dashboard: health, temp, vibration, RPM, energy, risk, part counter, source badge, trend sparkline
 
 **Should (wins points)**
-- S1 Random Forest on AI4I with a metrics panel (vs the rule baseline)
-- S2 Remaining Tool Life gauge
+- S1 Random Forest on AI4I with a metrics panel (vs the rule baseline), scoring both observed and *forecast* state
+- S2 Forecast "time to warning at current settings" + Remaining Tool Life gauge
 - S3 ₹/energy/CO₂ calculator with editable assumptions and payback
-- S4 Work orders + event log (SQLite)
+- S4 Work orders + event log (SQLite); operator-entered tool-wear measurement feeds calibration
 - S5 Operator view ↔ Engineer view toggle
 - S6 REPLAY mode (AI4I rows streamed as telemetry)
 
 **Could (stretch)**
-- C1 ESP32 LIVE node (MPU6050 + DS18B20) over MQTT/WebSocket
-- C2 Order-surge scenario → OEE/bottleneck view
+- C1 ESP32 LIVE node on a desk motor/fan (DS18B20 on the housing + MPU6050 + ACS712/SCT-013), which enables real-data calibration
+- C2 Job view: order surge → cycle time / OEE / bottleneck
 - C3 Hindi labels toggle for the operator view
-- C4 What-if: baseline vs scenario side-by-side
+- C4 What-if: baseline vs scenario side-by-side using the calibrated twin
 
-**Won't (say "planned")**: real-machine actuation, machine-level RUL, OPC UA/AAS connectors, multi-machine factory floor.
+**Won't (say "planned")**: real-machine actuation, machine-level RUL, OPC UA/AAS connectors, multi-machine factory floor, self-retraining of the failure classifier (needs real labels).
 
 ---
 
-## 4. Architecture (merged from PPT slide 3 + Report §5/§7)
+## 4. Architecture (merged from PPT slide 3 + Report §5/§7 + hybrid twin)
 
 ```
- ┌──────────────── Layer 1: Telemetry Sources ────────────────┐
- │  SIM: Virtual PLC + physics  │ REPLAY: AI4I 2020 │ LIVE: ESP32→MQTT (read-only) │
- └──────────────┬─────────────────────────────────────────────┘
-                │  common JSON @ 500 ms  (source_mode tagged)
- ┌──────────────▼────── Layer 2: Sync & Analytics (Python/FastAPI) ──────┐
- │ validate units/timestamps → data-quality flag                        │
- │ rules (ISO-20816-referenced vib zones, ΔT, power, wear×torque)       │
- │ RandomForest (AI4I features only) → risk + contributing signals      │
- │ tool-life estimator · OEE/energy/CO₂/₹ calculator · SQLite event log │
- │ Virtual PLC supervisor: derate proposal  ──► SIM: auto apply         │
- │                                          ──► LIVE: needs human OK    │
- └──────────────┬───────────────────────────────────────────────────────┘
-                │  WebSocket state sync
- ┌──────────────▼────── Layer 3: 3D Twin (Blender → glTF → Three.js) ───┐
- │ RPM→spindle · temp→shader · vibration→jitter · fault→component glow  │
- └──────────────┬───────────────────────────────────────────────────────┘
- ┌──────────────▼────── Layer 4: Industry 5.0 Operator & Decision Layer ┐
- │ Operator view (status, 1-line reason, safe next step, ACK)           │
- │ Engineer view (trends, raw, model metrics, DQ, scenario params)      │
- │ Work orders · ₹ calculator · fault-injection panel                   │
- └──────────────────────────────────────────────────────────────────────┘
+ ┌──────────────── Layer 1: Telemetry Sources (the "observed" side) ─────────────┐
+ │ SIM: Plant simulator + Virtual PLC │ REPLAY: AI4I 2020 │ LIVE: ESP32→MQTT (read-only) │
+ └──────────────┬────────────────────────────────────────────────────────────────┘
+                │  observed JSON @ 500 ms  (source_mode + dq_flag tagged)
+ ┌──────────────▼────── Layer 2: Hybrid Twin Core (Python/FastAPI) ──────────────┐
+ │ ① validate units/timestamps → data-quality flag                               │
+ │ ② TWIN MODEL (physics, calibrated params θ) → predicted state ŷ               │
+ │ ③ residual e = y − ŷ → EWMA band · CUSUM (drift) · z-spike (anomaly)          │
+ │ ④ CALIBRATOR: if drift ∧ DQ ok ∧ no anomaly → bounded RLS update θ (versioned)│
+ │ ⑤ FORECAST: roll calibrated twin forward → time-to-warning at current setpoint│
+ │ ⑥ RISK: rules (AI4I failure definitions, ISO-20816-referenced vib zones)      │
+ │        + RandomForest (AI4I features) on observed AND forecast state          │
+ │ ⑦ PLC supervisor: derate proposal ─► SIM: auto apply ─► LIVE: human OK        │
+ │ ⑧ ₹ / kWh / CO₂ / OEE calculator · SQLite event + parameter log               │
+ └──────────────┬────────────────────────────────────────────────────────────────┘
+                │  WebSocket state sync (observed + twin + residuals + θ)
+ ┌──────────────▼────── Layer 3: 3D Twin (TseNC STEP → Blender → glTF → Three.js) ┐
+ │ RPM→spindle · temp→shader · vibration→jitter · job→table motion · fault→glow    │
+ └──────────────┬────────────────────────────────────────────────────────────────┘
+ ┌──────────────▼────── Layer 4: Industry 5.0 Operator & Decision Layer ─────────┐
+ │ Operator view (status, 1-line reason, safe next step, ACK, enter tool wear)    │
+ │ Engineer view (predicted vs observed, residuals, θ history, model metrics, DQ) │
+ │ Work orders · ₹ calculator · fault-injection panel                             │
+ └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.1 Repo layout
 
 ```
 udyam-twin/
-├── sim/        # virtual PLC + physics model + fault injectors (pure Python, seeded)
-├── api/        # FastAPI app, WebSocket /ws/telemetry, REST for faults/work-orders/config
+├── sim/        # plant.py (hidden "true" machine), plc.py, faults.py (pure Python, seeded)
+├── twin/       # model.py (same physics, params θ), residuals.py, calibrate.py (RLS), forecast.py
+├── api/        # FastAPI app, WebSocket /ws/telemetry, REST for faults/work-orders/config/params
 ├── ml/         # AI4I download, train.py, metrics.json, model.joblib, rules.py
 ├── web/        # index.html, Three.js scene, dashboard (vanilla JS or Vite)
-├── assets/     # machine.blend, machine.glb (named parts: spindle, housing, bearing, motor)
+├── assets/     # machine.glb (from TseNC, CERN-OHL-W) + ATTRIBUTION.md; fallback primitive mill
 ├── edge/       # ESP32 firmware (stretch)
 ├── docs/       # this plan, schema, demo script, BOM, test log
-└── tests/      # schema, replay determinism, fault state transitions
+└── tests/      # schema, replay determinism, fault transitions, calibration converges/freezes
 ```
 
-### 4.2 Telemetry schema (single source of truth; freeze on Day 1)
+### 4.2 Message schema (single source of truth; freeze on Day 1)
+
+**Observed** (from SIM / REPLAY / LIVE):
 
 ```json
 {
   "ts": "2026-10-26T10:15:30.500Z",
-  "machine_id": "LATHE-01",
+  "machine_id": "VMC-01",
   "source_mode": "SIM",
   "air_temp_k": 300.1,
   "process_temp_k": 310.4,
@@ -164,23 +190,66 @@ udyam-twin/
   "power_kw": 6.64,
   "plc_state": "RUN",
   "derate_pct": 0,
+  "parts_done": 12,
   "active_fault": null,
   "dq_flag": "OK"
 }
 ```
 
-The first six process fields deliberately match **AI4I 2020's columns** (air temp K, process temp K, rotational speed, torque, tool wear). The ML model can therefore score SIM data, REPLAY data and (partially) LIVE data with no remapping. `vibration_rms_mm_s` and `current_a` go to the **rule engine only**, never to the AI4I model (the report is explicit about this).
+**Twin state** (computed by the core and pushed alongside):
 
-### 4.3 Simulator + Virtual PLC (keep it simple and explainable)
+```json
+{
+  "ts": "2026-10-26T10:15:30.500Z",
+  "predicted": { "process_temp_k": 309.1, "tool_wear_min": 117.6 },
+  "residual":  { "process_temp_k": 1.3, "ewma": 0.9, "cusum": 2.1, "state": "IN_BAND" },
+  "params":    { "version": "v1.1", "h_cool": 0.78, "k_heat": 1.02, "k_wear": 1.00, "frozen": false },
+  "forecast":  { "minutes_to_warning": 14, "warning": "HDF_RISK" },
+  "risk":      { "rules": "MEDIUM", "model": 0.41, "top_signals": ["delta_t", "rpm"] }
+}
+```
 
-- **Thermal:** `dT/dt = (a·P_loss − b·(T − T_air) − coolant)/C`, where heat goes up with torque × rpm.
-- **Power:** `P = torque × rpm × 2π / 60`
-- **Tool wear:** grows each tick in proportion to rpm, with a faster rate for the "tool wear" fault.
-- **Vibration:** `base + k·rpm² · imbalance + bearing_defect(t)` (grows exponentially after injection).
-- **Current:** roughly proportional to torque, plus noise.
-- **PLC scan (every tick):** `IDLE → RUN → DERATE → TRIP` with interlocks. For example, `vib > zone_D or T > T_trip → TRIP`, and `risk ≥ HIGH → propose derate 20%`.
-- **Fault injectors:** `bearing_defect`, `overload`, `coolant_loss`, `tool_wear_accel`, `order_surge`, `sensor_dropout` (the last one tests data-quality handling).
-- Every run is **seeded**, so Reset → Replay gives the identical curve (report validation item "deterministic replay").
+The first six process fields deliberately match **AI4I 2020's columns** (air temp K, process temp K, rotational speed, torque, tool wear). The ML model can therefore score SIM data, REPLAY data and (partially) LIVE data with no remapping. `vibration_rms_mm_s` and `current_a` go to the **rule engine only**, never to the AI4I model (the report is explicit about this). `source_mode`, `dq_flag` and `params.frozen` are what keep the calibrator honest.
+
+### 4.3 Hybrid twin core: physics + AI4I + residual calibration
+
+The twin needs **two simulators with different parameters**. Without that, SIM mode has nothing to calibrate against:
+
+- **Plant** (`sim/plant.py`) stands in for the real machine. It has "true" parameters the twin can't see, plus noise and faults. In LIVE mode, the ESP32 replaces it.
+- **Twin model** (`twin/model.py`) uses the *same equations* with *its own estimate* θ, starting at nominal values.
+
+**Reduced-order physics** (deliberately simple and documented, no FEA/CFD):
+- Power: `P = torque × rpm × 2π / 60`
+- Thermal: `dT/dt = k_heat·P_loss − h_cool·(T − T_air)` (first order, with the process temp above air)
+- Tool wear: `dW/dt = k_wear · f(rpm, torque)`, where AI4I's wear range is 0–~250 min
+- Vibration: `v = v0 + c·rpm²·imbalance + bearing(t)`, rule engine only
+- Job: cycle time from a fixed part program; `parts_done` increments per cycle; scrap is flagged when wear passes a quality limit
+
+**The learning loop (what "gets better over time" means, precisely):**
+1. **Predict** ŷ with the current θ.
+2. **Residual** `e = y − ŷ`. Track the EWMA (noise band) and CUSUM (sustained drift), and a z-score for spikes.
+3. **Decide what kind of error it is:**
+   - *Inside the band* → do nothing.
+   - *Sustained, smooth drift* (CUSUM) → **calibrate**.
+   - *Abrupt spike* or `dq_flag ≠ OK` → **anomaly or sensor fault: freeze calibration** and alert instead.
+4. **Calibrate** with recursive least squares (forgetting factor ≈ 0.98) on the 2–3 identifiable parameters (`h_cool`, `k_heat`, `k_wear`). Clamp each to physical bounds and limit its rate of change.
+5. **Version** every update (v1.0 → v1.1 …) with its reason and the residual before and after. Provide a one-click rollback.
+6. **Parameter drift = health indicator.** `h_cool` falling 22% *is* the finding "cooling capacity degraded". Trend it like any other signal.
+7. **Human-in-the-loop calibration:** at a tool change, the operator enters the measured wear (or a yes/no on edge wear), which updates `k_wear`. This is the only kind of "label" the stage-A system has, and it is real.
+
+**What is deliberately *not* claimed:** recalibrating the physics makes *state prediction* better. It does **not** make the *failure classifier* better. Improving failure prediction needs real outcome labels (maintenance records, failures), so it is Stage C+. Say this distinction out loud; it's the most credible sentence in the pitch.
+
+**Virtual PLC (scan every tick):** `IDLE → RUN → DERATE → TRIP` with interlocks. For example, `vib > zone_D or T > T_trip → TRIP`, and `forecast warning < 10 min or risk ≥ HIGH → propose derate 20%`.
+
+**Fault injectors (applied to the plant only):**
+- `coolant_degradation` (gradual, so it calibrates)
+- `bearing_defect` (abrupt then growing, so it raises an anomaly)
+- `overload` (torque step)
+- `tool_wear_accel`
+- `sensor_stuck` / `sensor_dropout` (a DQ fault, so calibration must freeze)
+- `order_surge`
+
+Every run is **seeded**, so Reset → Replay gives the identical curve.
 
 ### 4.4 AI / analytics (honest and strong)
 
@@ -189,38 +258,45 @@ The first six process fields deliberately match **AI4I 2020's columns** (air tem
   - PWF: power < 3.5 kW or > 9 kW
   - OSF: wear × torque above the type limit (11k/12k/13k min·Nm for L/M/H)
   - TWF: wear in the 200–240 min window
-- **Random Forest** on AI4I features plus engineered `power` and `ΔT`, with `class_weight="balanced"` and a stratified split with a fixed seed. Report **precision, recall, F1, PR-AUC and the confusion matrix**, never plain accuracy.
+- **Random Forest** on AI4I features plus engineered `power` and `ΔT`, with `class_weight="balanced"` and a stratified split with a fixed seed. Report **precision, recall, F1, PR-AUC and the confusion matrix**, never plain accuracy. (A "time-aware" split adds nothing here: AI4I rows are independent synthetic samples, not one machine's history. Say so if asked.)
+- The model scores **both the observed state and the twin's forecast state**. Risk *now* and risk *if nothing changes* make a stronger story than a single number.
 - **Judge-proof honesty point:** AI4I failure modes are themselves generated by rules, so a strong score is expected and **is not proof of real-world accuracy**. Say this before a judge does. It shows maturity.
 - Output = risk category + **top contributing signals** (feature importance / rule hit), shown in the alert card.
 
+### 4.5 3D asset: TseNC, used properly
+
+- **Source:** [TseNC](https://github.com/fab-machines/TseNC), an open-source desktop CNC mill (Rhine-Waal University), with STEP/IGES/Fusion files, released under **CERN-OHL-W**. Keep attribution in `assets/ATTRIBUTION.md` and publish our simplified model under the same licence.
+- **Pipeline:** STEP → FreeCAD (or Blender STEP importer) → remove fasteners, merge into ~6 named parts → decimate → Blender pivots → export `.glb` (target < 5 MB).
+- **Time-box: 4 hours on D1.** If conversion fights back, build the mill from primitives in Blender (base, column, table, head, spindle). Judges score behaviour, not bolts.
+- **Don't borrow TseNC's specs.** It has a 1 kW router spindle, while our operating envelope follows the AI4I scenario (≈1,200–2,900 rpm, up to ~9 kW). Label the model a **"representative 3-axis VMC (geometry: TseNC)"**.
+
 ---
 
-## 5. Nine-day sprint (17 → 26 Oct)
+## 5. Eight-day sprint (18 → 26 Oct)
 
 Five people, five workstreams. Each person owns one, and two pair on integration days.
 
 | Workstream | Owns | Suggested |
 |---|---|---|
-| **W1 3D Twin** | Blender model, glb export, Three.js scene & bindings | modeller/frontend |
-| **W2 Sim + Virtual PLC** | physics, faults, PLC state machine, determinism tests | Python |
-| **W3 Backend + ML** | FastAPI, WebSocket, SQLite, AI4I model + metrics | Python/ML |
-| **W4 Dashboard + UX** | operator/engineer views, alert cards, ₹ calculator, work orders | frontend |
+| **W1 3D Twin** | TseNC → glb (time-boxed), Three.js scene & bindings, job motion | modeller/frontend |
+| **W2 Plant + Virtual PLC** | plant physics, faults, PLC state machine, determinism tests | Python |
+| **W3 Twin Core + ML** | twin model, residuals, RLS calibrator, forecast; AI4I model + metrics | Python/ML (strongest math person) |
+| **W4 Backend + Dashboard** | FastAPI/WebSocket/SQLite; operator/engineer views, predicted-vs-observed chart, alert cards, ₹ calc, work orders | full-stack |
 | **W5 Pitch + Evidence + Edge** | slides v2, demo script, video, BOM quotes, ESP32 stretch, Q&A drill | presenter |
 
 | Day | Date | Goal (end-of-day check) |
 |---|---|---|
-| D1 | Sat 17 Oct | Schema frozen; repo scaffold; glb with named parts loads in browser; AI4I downloaded |
-| D2 | Sun 18 Oct | Sim streams over WebSocket; 3D spindle spins from live RPM |
-| D3 | Mon 19 Oct | 4 fault injectors + PLC states; dashboard tiles live; rule engine alerts |
-| D4 | Tue 20 Oct | RF trained + metrics.json; alert cards Measured/Inferred/Suggested; self-heal loop in SIM |
-| D5 | Wed 21 Oct | ₹/energy/CO₂ calculator; work orders + SQLite log; REPLAY mode |
-| D6 | Thu 22 Oct | **Feature freeze.** Full demo script runs end-to-end 3× without touching code |
-| D7 | Fri 23 Oct | Polish: operator/engineer toggle, labels, FPS measured; ESP32 stretch (only if D6 passed) |
-| D8 | Sat 24 Oct | Slides v2 (merged wording); **backup demo video recorded**; BOM quotes captured |
-| D9 | Sun 25 Oct | Offline packaging (no CDN dependency; local copy of three.js), 3 timed rehearsals, Q&A drill |
+| D1 | Sun 18 Oct | Schema frozen; repo scaffold; TseNC glb **or** fallback mill loads in browser; AI4I downloaded; physics equations written on one page |
+| D2 | Mon 19 Oct | Plant streams over WebSocket; 3D spindle spins from live RPM; twin model runs alongside, residual computed |
+| D3 | Tue 20 Oct | Fault injectors + PLC states; rule-engine alerts; predicted-vs-observed chart live |
+| D4 | Wed 21 Oct | **Calibration loop**: CUSUM drift → RLS update → versioned θ; freeze on spike/DQ fault; RF trained + metrics.json |
+| D5 | Thu 22 Oct | Forecast time-to-warning; self-heal loop; alert cards; ₹/energy/CO₂; work orders + tool-wear entry; REPLAY mode |
+| D6 | Fri 23 Oct | **Feature freeze.** Full demo script runs end-to-end 3× without touching code; calibration tests pass |
+| D7 | Sat 24 Oct | Polish + FPS measured; **backup video recorded**; slides v2; ESP32 stretch only if D6 passed |
+| D8 | Sun 25 Oct | Offline packaging (local three.js, no CDN), 3 timed rehearsals, Q&A drill, BOM quotes captured |
 | — | 26–27 Oct | Conclave. Arrive early, test projector/HDMI, run on battery + hotspot fallback |
 
-**Kill rule:** if something isn't working by its day, cut it to "planned" and don't sink the demo for it. ESP32 is the first thing to cut.
+**Kill rule:** if something isn't working by its day, cut it to "planned" and don't sink the demo for it. Cut order: ESP32 → REPLAY → job/OEE view → forecast. **Never cut the calibration loop**; it is now the differentiator.
 
 ---
 
@@ -256,6 +332,11 @@ Five people, five workstreams. Each person owns one, and two pair on integration
 | "How is it different from commercial DT?" | "Brownfield-first, simulation-first, ₹0 licence, explainable alerts, ₹ impact in the factory's own numbers. It's built for a 10-machine unit, not a 1,000-machine plant." |
 | "What's the ROI proof?" | "Our calculator shows the formula and assumptions. A real payback number comes from a baseline-vs-pilot comparison on one machine, which is our next step." |
 | "Which standards?" | "Architecture maps to ISO 23247 concepts (no conformity claim). Vibration zones reference ISO 20816 and are configured per machine class." |
+| "How does it 'learn'? Isn't that just retraining?" | "No. It compares its own prediction with what it observes. Sustained, smooth errors recalibrate a few physical parameters within bounds, and every change is versioned and can be rolled back. The drift in those parameters is itself the diagnosis." |
+| "What if a sensor is faulty? Won't it learn garbage?" | "Spikes and data-quality faults freeze calibration and raise an anomaly instead. Watch: we inject a stuck sensor and the parameters don't move." |
+| "Does calibration make failure prediction better?" | "Not by itself. It makes *state* prediction better. Better *failure* prediction needs real outcome labels from a pilot, and we keep those two claims separate." |
+| "Why did you start from AI4I instead of pure physics?" | "Both from day 0. Physics gives behaviour you can explain from the first minute; AI4I gives a reproducible failure-risk baseline. Neither is trusted alone." |
+| "Is the 3D model your own?" | "Geometry is adapted from TseNC, an open-source CNC mill under CERN-OHL-W, credited in the app. Our contribution is the behaviour: physics, calibration, PLC, analytics." |
 | "Why will MSMEs adopt it?" | "Zero risk to start: no sensor, no downtime, no PLC change. They try it on a virtual copy, then a ₹2k read-only node on one machine." |
 
 ---
@@ -297,7 +378,8 @@ Each route keeps the same core (schema + twin + analytics), so none of them is a
 - Revenue idea: free sim tier → paid per-machine monitoring + support.
 
 ### Route 7 — Research depth
-- Sim-to-real calibration: tune physics params from pilot data (this is what makes it a *true* digital twin).
+- Sim-to-real calibration on real machines: the stage-A calibrator (RLS on 2–3 parameters) carries straight into the pilot. Next steps are more parameters, a Kalman-filter state estimator, and cluster-level priors (a new machine starts from the fleet's calibrated θ).
+- Learn failure prediction from pilot labels: maintenance records + operator tool-wear entries → fine-tune the risk model away from AI4I.
 - Machine-level RUL once run-to-failure data exists (or via public datasets like NASA bearing/IMS for the bearing template).
 - Federated/cluster models: share learning across MSMEs without sharing raw data.
 
@@ -311,9 +393,22 @@ Each route keeps the same core (schema + twin + analytics), so none of them is a
 - [ ] Every number on screen has a source-mode badge or an ⓘ formula
 - [ ] Slides v2 use the merged wording (§1); no "TRL 6", no "verified savings"
 - [ ] Metrics panel shows rule baseline vs RF (precision/recall/F1/confusion matrix)
+- [ ] Calibration demo: gradual fault → residual drift → θ update → curves re-converge; abrupt fault and stuck sensor → calibration freezes
+- [ ] TseNC attribution (CERN-OHL-W) visible in the app and in `assets/ATTRIBUTION.md`
 - [ ] Backup video on 2 laptops + a pen drive
 - [ ] Everyone can answer every question in §7
 
 ---
 
-*Note: the shared ChatGPT conversation the team referenced couldn't be loaded from this environment. Paste its text in and its ideas can be folded into this plan.*
+## 10. What we took from the ChatGPT advice, and what we changed
+
+| Advice | Decision |
+|---|---|
+| Target a small CNC machining workshop, one milling machine | **Adopted** (§0). It is what the PPT and report already imply. |
+| Hybrid twin: physics + AI4I + residual-based calibration | **Adopted as the core** (§4.3). Physics and AI4I both run from day 0. |
+| "Recalibration ≠ learning to predict failures" | **Adopted**, and turned into a pitch line (§4.3, §7). |
+| Don't update on every reading; faulty sensors can poison the twin | **Adopted**: freeze rules + versioned, bounded, reversible updates. |
+| Reuse TseNC geometry | **Adopted with limits**: CERN-OHL-W attribution, 4-hour time-box, our own operating envelope (TseNC's 1 kW router specs don't match AI4I). |
+| Time-aware holdout on AI4I | **Changed**: AI4I rows aren't a time series; use a stratified, seeded split and say why. |
+| Production optimisation vs maintenance | **Maintenance primary**; parts/OEE/₹ secondary, matching the submitted problem statement. |
+| Its constraint questions | Answered: predictive maintenance primary · 8 days · ESP32 + desk motor, no industrial machine. |
