@@ -23,7 +23,7 @@ There are two submissions:
 | Decision | Choice | Why it doesn't drift from what we submitted |
 |---|---|---|
 | Target MSME | **Small CNC machining job-shop** (auto-ancillary / fabrication supplier) | The PPT already names CNC machining and automotive ancillaries; AI4I is a machining/tool-wear scenario |
-| Physical asset | **One 3-axis CNC milling machine**, plus a small job (workpiece → parts) | The report's focus is "one machine, few signals, clear workflow" |
+| Physical asset | **A 4-machine mini line**: bar saw → CNC lathe → **CNC mill (hero)** → shared air compressor. The hero gets the full twin; the other three run the same core with a lighter UI (§3.3) | The report's "one machine first" is kept as the hero; the PPT's order-surge and cluster story gets a real line |
 | Primary objective | **Predictive maintenance**; production KPIs (parts, cycle time, OEE, ₹) are secondary | PS = "monitor, simulate faults, AI predictive maintenance" |
 | Twin type | **Hybrid, self-calibrating**: reduced-order physics + AI4I risk model + residual-based calibration | The PPT's "coupled physics engine" + AI4I; the report's "validate before trusting" |
 | 3D geometry | **TseNC** open-source CNC mill (STEP, CERN-OHL-W), simplified to glb; fallback is a primitive-built mill | Reuse instead of modelling from scratch |
@@ -113,9 +113,40 @@ This is the backbone, and everything we build serves it. The report says a convi
 
 **Backup:** record a screen video of the full script by 24 Oct. If the Wi-Fi or laptop fails, play it. If the slot is 3 minutes, cut the 0:30, 3:05 and 4:15 beats.
 
+### 3.3 The 4-machine line: one hero, three supporting
+
+**Line (a typical CNC job-shop flow):**
+
+```
+ [Bar saw] ──buffer──► [CNC lathe] ──buffer──► [CNC mill ★ hero] ──► finished parts
+      ▲                     ▲                        ▲
+      └──────────── compressed air from [Air compressor] (shared utility) ─┘
+```
+
+- **Why these four:** three process steps plus a *shared utility* show both kinds of dependency. Material flows step to step, and one utility failure hits every machine. They also use **three different templates** (cutting machine, rotating CNC, compressor), which proves the twin-builder story from §0.
+- **How they "communicate":** each machine publishes on its own topic (`udyam/<machine_id>/observed`, `/twin`). The **line model** subscribes to all four and simulates parts moving through buffers: upstream down → downstream *starved*; downstream down → upstream *blocked*; low air pressure → lathe and mill derate.
+- **Honesty line:** legacy machines don't talk to each other. **The twin connects them in software.** Never claim machine-to-machine communication on real equipment.
+- **Fidelity split (this keeps it buildable in 8 days):**
+
+| | CNC mill ★ | Lathe, saw, compressor |
+|---|---|---|
+| Plant sim + twin core + calibration | Full, demoed in detail | Same code, runs automatically, not demoed in depth |
+| 3D | Detailed TseNC-based model | Simple primitive models on the floor view |
+| UI | Full engineer view | Status tile + key signals; click to open |
+| Faults | All injectors | 1–2 each (saw blade wear, lathe overload, compressor pressure drop) |
+
+- **What the line adds that one machine can't:** *ripple effects in ₹*. A coolant fault on the mill → derate → lathe output piles up in the buffer → line throughput −30% → ₹ per hour of line loss. Or the compressor drops pressure → two machines derate at once → the twin points to the compressor, not the machines, as the root cause. That cross-machine diagnosis is the strongest "smart factory" moment.
+
+**Demo beats (add to §3.1; ~60 s):**
+1. **Open on the floor view** with 3 machines running and parts flowing, rather than the single mill.
+2. **Onboard the 4th live:** "Add your machine" → *Air compressor* template → nameplate values → it appears on the floor and starts calibrating. This proves the builder story.
+3. **Compressor pressure drop** → lathe and mill derate together → root-cause card: "Common cause: compressed-air supply". Then the throughput and ₹ ripple.
+4. **Drill into the mill** for the calibration story as scripted.
+
 ### 3.2 Feature list, prioritised (MoSCoW)
 
 **Must (demo breaks without it)**
+- M0 **Multi-machine from day 1:** `machine_id` everywhere, a machine registry, one plant + twin core instance per machine. This is cheap now and painful to retrofit.
 - M1 3D CNC mill (`.glb`, named parts: spindle, head, table, column, workpiece) with spindle rotation ← RPM, head heat shader ← temp, jitter ← vibration, table motion during the cutting cycle
 - M2 **Plant simulator** (hidden "true" machine with its own parameters) + virtual PLC + fault injectors + Reset/Replay (seeded)
 - M3 **Twin model** (same equations, nominal parameters) running in parallel → predicted vs observed + residuals
@@ -136,11 +167,12 @@ This is the backbone, and everything we build serves it. The report says a convi
 
 **Could (stretch)**
 - C1 ESP32 LIVE node on a desk motor/fan (DS18B20 on the housing + MPU6050 + ACS712/SCT-013), which enables real-data calibration
-- C2 Job view: order surge → cycle time / OEE / bottleneck
+- S8 **Floor view with 4 machines + line model** (buffers, starved/blocked states, throughput, line ₹/hour) and a common-cause rule for the shared compressor
+- C2 Order surge across the line → bottleneck shift / OEE per machine
 - C3 Hindi labels toggle for the operator view
 - C4 What-if: baseline vs scenario side-by-side using the calibrated twin
 
-**Won't (say "planned")**: real-machine actuation, machine-level RUL, OPC UA/AAS connectors, multi-machine factory floor, self-retraining of the failure classifier (needs real labels).
+**Won't (say "planned")**: real-machine actuation, machine-level RUL, OPC UA/AAS connectors, full factory layout editor, more than one line, self-retraining of the failure classifier (needs real labels).
 
 ---
 
@@ -312,16 +344,16 @@ Five people, five workstreams. Each person owns one, and two pair on integration
 | Day | Date | Goal (end-of-day check) |
 |---|---|---|
 | D1 | Sun 18 Oct | Schema frozen; repo scaffold; TseNC glb **or** fallback mill loads in browser; AI4I downloaded; physics equations written on one page |
-| D2 | Mon 19 Oct | Plant streams over WebSocket; 3D spindle spins from live RPM; twin model runs alongside, residual computed |
-| D3 | Tue 20 Oct | Fault injectors + PLC states; rule-engine alerts; predicted-vs-observed chart live |
+| D2 | Mon 19 Oct | Machine registry + 4 plant instances (3 templates); hero plant streams over WebSocket; 3D spindle spins from live RPM; twin model runs alongside, residual computed |
+| D3 | Tue 20 Oct | Line model (buffers, starved/blocked); floor view with 4 primitive machines + part tokens; fault injectors + PLC states; rule-engine alerts; predicted-vs-observed chart live |
 | D4 | Wed 21 Oct | **Calibration loop**: CUSUM drift → RLS update → versioned θ; freeze on spike/DQ fault; RF trained + metrics.json |
-| D5 | Thu 22 Oct | Forecast time-to-warning; self-heal loop; alert cards; ₹/energy/CO₂; work orders + tool-wear entry; REPLAY mode |
+| D5 | Thu 22 Oct | Onboarding wizard adds the compressor live; common-cause rule; line ₹/hour; forecast time-to-warning; self-heal loop; alert cards; ₹/energy/CO₂; work orders + tool-wear entry; REPLAY mode |
 | D6 | Fri 23 Oct | **Feature freeze.** Full demo script runs end-to-end 3× without touching code; calibration tests pass |
 | D7 | Sat 24 Oct | Polish + FPS measured; **backup video recorded**; slides v2; ESP32 stretch only if D6 passed |
 | D8 | Sun 25 Oct | Offline packaging (local three.js, no CDN), 3 timed rehearsals, Q&A drill, BOM quotes captured |
 | — | 26–27 Oct | Conclave. Arrive early, test projector/HDMI, run on battery + hotspot fallback |
 
-**Kill rule:** if something isn't working by its day, cut it to "planned" and don't sink the demo for it. Cut order: ESP32 → REPLAY → job/OEE view → forecast. **Never cut the calibration loop**; it is now the differentiator.
+**Kill rule:** if something isn't working by its day, cut it to "planned" and don't sink the demo for it. Cut order: ESP32 → REPLAY → order surge/OEE → forecast → *line degrades to 1 hero + 3 status tiles in 2D* (still shows the ripple, without 3D). **Never cut the calibration loop**; it is now the differentiator.
 
 ---
 
