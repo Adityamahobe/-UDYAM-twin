@@ -276,7 +276,7 @@ Every run is **seeded**, so Reset → Replay gives the identical curve.
 - **Feels like an app:** `start.bat` / `start.sh` starts the server and opens the browser in full-screen kiosk mode. Everything is bundled locally (three.js, fonts, model, glb), so it runs **with no internet**.
 - **Phone as operator screen:** the laptop runs a hotspot and a phone opens `http://<laptop-ip>:8000/operator`. In the demo, a judge holds the operator view while we inject faults on the laptop. This proves the "mobile browser" claim live.
 - **Not before the event:** a public hosted link is optional, for after the conclave (a free-tier host, or a GitHub Pages copy running REPLAY only) to put on the QR code and in the paper. Don't let the demo depend on venue Wi-Fi.
-- **Later (Route 6):** the same app installs on a ₹4–6k mini-PC or Raspberry Pi beside the machine as an on-premise edge box. No code changes, which is the advantage of choosing the web route.
+- **Later (Route 6):** the same app installs on a low-cost mini-PC or Raspberry Pi beside the machine as an on-premise edge box. No code changes, which is the advantage of choosing the web route.
 
 ---
 
