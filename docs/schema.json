@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/krishhcodes/udyam-twin/docs/schema.json",
+  "title": "UDYAM-TWIN stream message (v1.0)",
+  "description": "Every WebSocket message from the backend is one of these objects, discriminated by `type`. Frozen 18 Oct 2026; changes need R1's approval and a version bump.",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/registry" },
+    { "$ref": "#/$defs/observed" },
+    { "$ref": "#/$defs/twin" },
+    { "$ref": "#/$defs/line" },
+    { "$ref": "#/$defs/event" }
+  ],
+  "$defs": {
+    "ts": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC with milliseconds, e.g. 2026-10-26T10:15:30.500Z" },
+    "machine_id": { "type": "string", "pattern": "^[A-Z0-9-]{2,20}$" },
+    "template": { "enum": ["cnc_mill", "cnc_lathe", "bar_saw", "air_compressor"] },
+    "source_mode": { "enum": ["SIM", "REPLAY", "LIVE"] },
+    "num_or_null": { "type": ["number", "null"] },
+    "fault": {
+      "enum": [
+        "coolant_degradation", "bearing_defect", "overload", "tool_wear_accel",
+        "sensor_stuck", "sensor_dropout", "order_surge", "pressure_drop", "blade_wear"
+      ]
+    },
+
+    "hello": {
+      "type": "object",
+      "required": ["type", "schema_version", "generator", "tick_ms"],
+      "properties": {
+        "type": { "const": "hello" },
+        "schema_version": { "const": "1.0" },
+        "generator": { "type": "string", "description": "'fake_stream' or 'udyam_core'" },
+        "tick_ms": { "type": "integer" }
+      }
+    },
+
+    "registry": {
+      "type": "object",
+      "required": ["type", "schema_version", "machines"],
+      "properties": {
+        "type": { "const": "registry" },
+        "schema_version": { "const": "1.0" },
+        "machines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["machine_id", "template", "name", "hero", "layout", "nameplate"],
+            "properties": {
+              "machine_id": { "$ref": "#/$defs/machine_id" },
+              "template": { "$ref": "#/$defs/template" },
+              "name": { "type": "string" },
+              "hero": { "type": "boolean", "description": "true only for the detailed demo machine (the CNC mill)" },
+              "layout": {
+                "type": "object",
+                "required": ["x", "y", "order"],
+                "properties": {
+                  "x": { "type": "number", "description": "floor position, metres" },
+                  "y": { "type": "number" },
+                  "order": { "type": "integer", "description": "position in the line; utilities use -1" }
+                }
+              },
+              "nameplate": {
+                "type": "object",
+                "properties": {
+                  "rated_kw": { "type": "number" },
+                  "max_rpm": { "type": "number" },
+                  "rated_pressure_bar": { "type": "number" },
+                  "make": { "type": "string" },
+                  "year": { "type": "integer" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "observed": {
+      "type": "object",
+      "description": "What the machine (or its simulator / replay / sensor) reports. CNC fields 'air_temp_k'..'tool_wear_min' match AI4I 2020 columns; vibration and current go to the rule engine only.",
+      "required": ["type", "schema_version", "ts", "machine_id", "template", "source_mode", "plc_state", "dq_flag", "power_kw", "current_a", "vibration_rms_mm_s", "derate_pct", "active_fault"],
+      "properties": {
+        "type": { "const": "observed" },
+        "schema_version": { "const": "1.0" },
+        "ts": { "$ref": "#/$defs/ts" },
+        "machine_id": { "$ref": "#/$defs/machine_id" },
+        "template": { "$ref": "#/$defs/template" },
+        "source_mode": { "$ref": "#/$defs/source_mode" },
+        "plc_state": { "enum": ["IDLE", "RUN", "DERATE", "TRIP"] },
+        "dq_flag": { "enum": ["OK", "MISSING", "STALE", "OUT_OF_RANGE", "STUCK"] },
+        "power_kw": { "$ref": "#/$defs/num_or_null" },
+        "current_a": { "$ref": "#/$defs/num_or_null" },
+        "vibration_rms_mm_s": { "$ref": "#/$defs/num_or_null" },
+        "derate_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "active_fault": { "anyOf": [{ "$ref": "#/$defs/fault" }, { "type": "null" }] },
+        "parts_done": { "type": ["integer", "null"] },
+
+        "air_temp_k": { "$ref": "#/$defs/num_or_null", "description": "cnc_mill, cnc_lathe" },
+        "process_temp_k": { "$ref": "#/$defs/num_or_null", "description": "cnc_mill, cnc_lathe" },
+        "rpm": { "$ref": "#/$defs/num_or_null", "description": "cnc_mill, cnc_lathe, bar_saw (blade)" },
+        "torque_nm": { "$ref": "#/$defs/num_or_null", "description": "cnc_mill, cnc_lathe" },
+        "tool_wear_min": { "$ref": "#/$defs/num_or_null", "description": "cnc_mill, cnc_lathe" },
+
+        "blade_wear_pct": { "$ref": "#/$defs/num_or_null", "description": "bar_saw" },
+
+        "pressure_bar": { "$ref": "#/$defs/num_or_null", "description": "air_compressor" },
+        "discharge_temp_c": { "$ref": "#/$defs/num_or_null", "description": "air_compressor" },
+        "duty_pct": { "$ref": "#/$defs/num_or_null", "description": "air_compressor, % time loaded" }
+      }
+    },
+
+    "twin": {
+      "type": "object",
+      "description": "What the twin computes for one machine each tick: prediction, residual, calibrated parameters, forecast and risk.",
+      "required": ["type", "schema_version", "ts", "machine_id", "predicted", "residual", "params", "forecast", "risk"],
+      "properties": {
+        "type": { "const": "twin" },
+        "schema_version": { "const": "1.0" },
+        "ts": { "$ref": "#/$defs/ts" },
+        "machine_id": { "$ref": "#/$defs/machine_id" },
+        "predicted": {
+          "type": "object",
+          "description": "Same keys and units as `observed`, only for signals the twin models.",
+          "additionalProperties": { "type": "number" }
+        },
+        "residual": {
+          "type": "object",
+          "required": ["signal", "value", "ewma", "cusum", "band", "state"],
+          "properties": {
+            "signal": { "type": "string", "description": "which observed key the residual is on, e.g. process_temp_k" },
+            "value": { "type": "number", "description": "observed - predicted" },
+            "ewma": { "type": "number" },
+            "cusum": { "type": "number" },
+            "band": { "type": "number", "description": "half-width of the normal band, same unit as value" },
+            "state": { "enum": ["IN_BAND", "DRIFT", "ANOMALY"] }
+          }
+        },
+        "params": {
+          "type": "object",
+          "required": ["version", "values", "frozen", "freeze_reason"],
+          "properties": {
+            "version": { "type": "string", "pattern": "^v\\d+\\.\\d+$" },
+            "values": { "type": "object", "additionalProperties": { "type": "number" }, "description": "e.g. h_cool, k_heat, k_wear (multipliers, nominal = 1.0)" },
+            "frozen": { "type": "boolean" },
+            "freeze_reason": { "type": ["string", "null"], "description": "'anomaly' | 'data_quality' | 'manual' | null" }
+          }
+        },
+        "forecast": {
+          "type": "object",
+          "required": ["minutes_to_warning", "warning"],
+          "properties": {
+            "minutes_to_warning": { "type": ["number", "null"] },
+            "warning": { "type": ["string", "null"], "description": "e.g. HDF_RISK, OSF_RISK, TWF_RISK, PRESSURE_LOW" }
+          }
+        },
+        "risk": {
+          "type": "object",
+          "required": ["rules", "model", "top_signals"],
+          "properties": {
+            "rules": { "enum": ["LOW", "MEDIUM", "HIGH"] },
+            "model": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "AI4I RF failure probability; null for non-CNC templates" },
+            "top_signals": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+
+    "line": {
+      "type": "object",
+      "description": "Whole-line state from the line model.",
+      "required": ["type", "schema_version", "ts", "throughput_parts_per_hr", "line_loss_inr_per_hr", "bottleneck", "air_supply_ok", "stations"],
+      "properties": {
+        "type": { "const": "line" },
+        "schema_version": { "const": "1.0" },
+        "ts": { "$ref": "#/$defs/ts" },
+        "throughput_parts_per_hr": { "type": "number" },
+        "line_loss_inr_per_hr": { "type": "number", "description": "ESTIMATE vs nominal throughput, from user-entered ₹ assumptions" },
+        "bottleneck": { "anyOf": [{ "$ref": "#/$defs/machine_id" }, { "type": "null" }] },
+        "air_supply_ok": { "type": "boolean" },
+        "stations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["machine_id", "state", "buffer_in", "buffer_cap"],
+            "properties": {
+              "machine_id": { "$ref": "#/$defs/machine_id" },
+              "state": { "enum": ["RUNNING", "STARVED", "BLOCKED", "DERATED", "DOWN", "IDLE"] },
+              "buffer_in": { "type": "integer", "description": "parts waiting in front of this station" },
+              "buffer_cap": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+
+    "event": {
+      "type": "object",
+      "description": "Discrete happenings for the event log, alert cards and work orders.",
+      "required": ["type", "schema_version", "ts", "event_id", "machine_id", "kind", "severity", "title"],
+      "properties": {
+        "type": { "const": "event" },
+        "schema_version": { "const": "1.0" },
+        "ts": { "$ref": "#/$defs/ts" },
+        "event_id": { "type": "string" },
+        "machine_id": { "anyOf": [{ "$ref": "#/$defs/machine_id" }, { "type": "null" }] },
+        "kind": { "enum": ["ALERT", "DRIFT", "CALIBRATION", "ANOMALY", "WORK_ORDER", "MACHINE_ADDED", "FAULT_INJECTED", "RESET", "COMMON_CAUSE"] },
+        "severity": { "enum": ["INFO", "WARN", "CRITICAL"] },
+        "title": { "type": "string" },
+        "measured": { "type": "string", "description": "alert card: the fact" },
+        "inferred": { "type": "string", "description": "alert card: the model's interpretation" },
+        "suggested": { "type": "string", "description": "alert card: advisory next step" },
+        "data": { "type": "object" }
+      }
+    }
+  }
+}

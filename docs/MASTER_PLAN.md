@@ -220,7 +220,7 @@ udyam-twin/
 └── tests/      # schema, replay determinism, fault transitions, calibration converges/freezes
 ```
 
-### 4.2 Message schema (single source of truth; freeze on Day 1)
+### 4.2 Message schema (**frozen 18 Oct: [`docs/schema.json`](schema.json) is the source of truth, [`docs/SCHEMA.md`](SCHEMA.md) the readable guide**; the examples below are illustrative)
 
 **Observed** (from SIM / REPLAY / LIVE):
 
@@ -251,9 +251,9 @@ udyam-twin/
 {
   "ts": "2026-10-26T10:15:30.500Z",
   "predicted": { "process_temp_k": 309.1, "tool_wear_min": 117.6 },
-  "residual":  { "process_temp_k": 1.3, "ewma": 0.9, "cusum": 2.1, "state": "IN_BAND" },
-  "params":    { "version": "v1.1", "h_cool": 0.78, "k_heat": 1.02, "k_wear": 1.00, "frozen": false },
-  "forecast":  { "minutes_to_warning": 14, "warning": "HDF_RISK" },
+  "residual":  { "signal": "process_temp_k", "value": 1.3, "ewma": 0.9, "cusum": 2.1, "band": 0.6, "state": "IN_BAND" },
+  "params":    { "version": "v1.1", "values": { "h_cool": 0.78, "k_heat": 1.0, "k_wear": 1.0 }, "frozen": false, "freeze_reason": null },
+  "forecast":  { "minutes_to_warning": 14, "warning": "OVERTEMP" },
   "risk":      { "rules": "MEDIUM", "model": 0.41, "top_signals": ["delta_t", "rpm"] }
 }
 ```
@@ -303,7 +303,7 @@ Every run is **seeded**, so Reset → Replay gives the identical curve.
 ### 4.4 AI / analytics (honest and strong)
 
 - **Rule baseline first**, mirroring the AI4I failure definitions:
-  - HDF: ΔT < 8.6 K and rpm < 1,380
+  - HDF: ΔT < 8.6 K and rpm < 1,380. **Caution:** AI4I's HDF means a *small* temperature gap, while coolant loss makes the gap *bigger*. The coolant demo therefore uses the physics rule `OVERTEMP` (process temp vs a configurable limit), never "HDF".
   - PWF: power < 3.5 kW or > 9 kW
   - OSF: wear × torque above the type limit (11k/12k/13k min·Nm for L/M/H)
   - TWF: wear in the 200–240 min window

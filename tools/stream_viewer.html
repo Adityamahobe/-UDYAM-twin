@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fake Stream Viewer</title>
+<!-- Dev tool only: proves the stream works. The real dashboard is R4's job in web/. -->
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --muted:#6b7280; --line:#e3e6ea;
+          --ok:#1a7f4b; --warn:#a15c00; --crit:#b42318; --accent:#2457c5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151b; --card:#1b2029; --ink:#e7eaf0; --muted:#9aa3b2; --line:#2a313d;
+            --ok:#4cc38a; --warn:#f0a13a; --crit:#f26b5b; --accent:#7aa2ff; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--ink);
+         font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin-bottom:12px; }
+  .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  select, button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px;
+                   background:var(--card); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .card h2 { font-size:15px; margin:0 0 6px; display:flex; justify-content:space-between; gap:8px; }
+  .pill { font-size:11px; font-weight:600; padding:2px 6px; border-radius:999px; border:1px solid currentColor; }
+  .LOW, .IN_BAND, .RUNNING, .OK { color:var(--ok); }
+  .MEDIUM, .DRIFT, .DERATED, .STARVED, .BLOCKED, .WARN { color:var(--warn); }
+  .HIGH, .ANOMALY, .DOWN, .CRITICAL { color:var(--crit); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  td { padding:2px 0; border-bottom:1px solid var(--line); }
+  td:last-child { text-align:right; }
+  .line { margin:12px 0; }
+  #log { max-height:320px; overflow:auto; font-size:13px; }
+  #log div { padding:4px 0; border-bottom:1px solid var(--line); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+  <h1>UDYAM-TWIN fake stream viewer</h1>
+  <div class="sub">Schema v1.0 · <span id="status">connecting…</span> · dev tool, not the dashboard</div>
+
+  <div class="bar">
+    <select id="machine"></select>
+    <select id="fault">
+      <option>coolant_degradation</option><option>bearing_defect</option><option>overload</option>
+      <option>tool_wear_accel</option><option>sensor_stuck</option><option>sensor_dropout</option>
+      <option>pressure_drop</option><option>blade_wear</option>
+    </select>
+    <button class="primary" id="inject">Inject fault</button>
+    <button id="clear">Clear faults</button>
+    <button id="add">Add compressor</button>
+    <button id="auto">Auto demo: on</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="card line" id="line">Line: waiting…</div>
+  <div class="grid" id="cards"></div>
+  <div class="card" style="margin-top:12px"><h2>Events</h2><div id="log"></div></div>
+
+<script>
+const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + (location.host || "localhost:8765") + "/ws/telemetry";
+const state = { machines: {}, obs: {}, twin: {} };
+let ws, auto = true;
+
+const fmt = (v, d = 1) => v === null || v === undefined ? "—" : (typeof v === "number" ? v.toFixed(d) : v);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function connect() {
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => document.getElementById("status").textContent = "connected to " + wsUrl;
+  ws.onclose = () => { document.getElementById("status").textContent = "disconnected, retrying…"; setTimeout(connect, 1500); };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+}
+
+function handle(m) {
+  if (m.type === "registry") {
+    state.machines = Object.fromEntries(m.machines.map(x => [x.machine_id, x]));
+    document.getElementById("machine").innerHTML = m.machines.map(x => `<option>${esc(x.machine_id)}</option>`).join("");
+  } else if (m.type === "observed") state.obs[m.machine_id] = m;
+  else if (m.type === "twin") state.twin[m.machine_id] = m;
+  else if (m.type === "line") renderLine(m);
+  else if (m.type === "event") logEvent(m);
+  if (m.type === "twin") render();
+}
+
+function render() {
+  const rows = Object.values(state.machines).sort((a, b) => (a.layout.order < 0) - (b.layout.order < 0) || a.layout.order - b.layout.order);
+  document.getElementById("cards").innerHTML = rows.map(mc => {
+    const o = state.obs[mc.machine_id] || {}, t = state.twin[mc.machine_id];
+    if (!t) return "";
+    const r = t.residual, p = t.params, f = t.forecast;
+    const fields = mc.template.startsWith("cnc")
+      ? [["RPM", fmt(o.rpm, 0)], ["Torque Nm", fmt(o.torque_nm)], ["Process temp K", fmt(o.process_temp_k, 2)],
+         ["Predicted temp K", fmt(t.predicted.process_temp_k, 2)], ["Tool wear min", fmt(o.tool_wear_min)]]
+      : mc.template === "air_compressor"
+      ? [["Pressure bar", fmt(o.pressure_bar, 2)], ["Duty %", fmt(o.duty_pct)], ["Discharge °C", fmt(o.discharge_temp_c)]]
+      : [["Blade RPM", fmt(o.rpm, 0)], ["Blade wear %", fmt(o.blade_wear_pct)]];
+    fields.push(["Vibration mm/s", fmt(o.vibration_rms_mm_s, 2)], ["Power kW", fmt(o.power_kw, 2)],
+                ["PLC / derate", `${o.plc_state} / ${fmt(o.derate_pct, 0)}%`], ["Data quality", `<span class="${o.dq_flag}">${o.dq_flag}</span>`],
+                ["Residual (" + r.signal + ")", `${fmt(r.value, 2)} <span class="${r.state}">${r.state}</span>`],
+                ["Params " + p.version, Object.entries(p.values).map(([k, v]) => `${k}=${v}`).join(" ") + (p.frozen ? ` <span class="ANOMALY">frozen: ${p.freeze_reason}</span>` : "")],
+                ["Forecast", f.warning ? `${f.warning} in ${fmt(f.minutes_to_warning)} min` : "—"],
+                ["Model risk", t.risk.model === null ? "—" : fmt(t.risk.model, 2)], ["Fault", o.active_fault || "—"]);
+    return `<div class="card"><h2>${esc(mc.name)} <span class="muted">${esc(mc.machine_id)}${mc.hero ? " ★" : ""}</span>
+      <span class="pill ${t.risk.rules}">${t.risk.rules}</span></h2>
+      <div class="muted">${esc(o.source_mode || "")} · ${esc(mc.template)}</div>
+      <table>${fields.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</table></div>`;
+  }).join("");
+}
+
+function renderLine(l) {
+  const st = l.stations.map(s => `${esc(s.machine_id)} [buf ${s.buffer_in}/${s.buffer_cap}] <b class="${s.state}">${s.state}</b>`).join(" → ");
+  document.getElementById("line").innerHTML =
+    `<b>Line</b> ${st}<br>Throughput ${fmt(l.throughput_parts_per_hr, 2)} parts/h · est. loss ₹${fmt(l.line_loss_inr_per_hr, 0)}/h · ` +
+    `bottleneck ${esc(l.bottleneck)} · air supply <b class="${l.air_supply_ok ? "OK" : "CRITICAL"}">${l.air_supply_ok ? "OK" : "LOW"}</b>`;
+}
+
+function logEvent(e) {
+  const div = document.createElement("div");
+  const card = [e.measured && `<b>Measured:</b> ${esc(e.measured)}`, e.inferred && `<b>Inferred:</b> ${esc(e.inferred)}`,
+                e.suggested && `<b>Suggested:</b> ${esc(e.suggested)}`].filter(Boolean).join("<br>");
+  div.innerHTML = `<span class="muted">${e.ts.slice(11, 19)}</span> <b class="${e.severity}">${e.kind}</b> ${esc(e.machine_id || "")} — ${esc(e.title)}` +
+                  (card ? `<div class="muted" style="margin-left:16px">${card}</div>` : "");
+  const log = document.getElementById("log");
+  log.prepend(div);
+  while (log.children.length > 200) log.lastChild.remove();
+}
+
+const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+document.getElementById("inject").onclick = () => send({ cmd: "inject_fault", machine_id: machine.value, fault: fault.value });
+document.getElementById("clear").onclick = () => send({ cmd: "clear_faults", machine_id: machine.value });
+document.getElementById("add").onclick = () => send({ cmd: "add_machine", template: "air_compressor", name: "Air Compressor", nameplate: { rated_kw: 7.5 } });
+document.getElementById("reset").onclick = () => send({ cmd: "reset" });
+document.getElementById("auto").onclick = e => { auto = !auto; e.target.textContent = "Auto demo: " + (auto ? "on" : "off"); send({ cmd: "auto_demo", on: auto }); };
+connect();
+</script>
+</body>
+</html>
