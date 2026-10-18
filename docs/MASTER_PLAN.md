@@ -31,6 +31,22 @@ There are two submissions:
 
 The new core idea: **the twin predicts, compares its prediction with what it observes, and recalibrates itself, and the drift in its calibrated parameters is itself a health signal** (§4.3). This is the strongest version of the PPT's "AI that gets smarter" and stays inside the report's guardrails.
 
+### What we actually sell: a twin *builder*, not a twin
+
+A twin of *our* CNC is worth nothing to an MSME owner. They want a twin of *their* machine. So the product is:
+
+> **Machine-class templates + an onboarding wizard + self-calibration.** Pick your machine type, enter the nameplate data, clip on the sensor node, and within 1–2 weeks of normal running the twin calibrates itself to *your* machine. No custom code per client.
+
+| Piece | Built once per… | What the client does |
+|---|---|---|
+| **Template** (physics equations, fault set, inspection checklists, generic 3D model, rule thresholds) | machine *class* (VMC, lathe, compressor, motor-pump, press, welding set…) | Picks "VMC" from a list |
+| **Nameplate config** (rated kW, max rpm, make/year) + **shop economics** (₹/hour, tariff, scrap cost) | client | Fills in a form (~15 min) |
+| **Sensor kit** (read-only, clip-on) | client machine | A trained technician fits it in under an hour |
+| **Self-calibration** (§4.3) + learned "normal" baseline | automatic | Runs the machine normally for 1–2 weeks |
+| **Universal fallback template** ("any motor-driven asset": current + vibration + temperature vs its own learned baseline) | once | Used for odd or custom machines with no template |
+
+The 3D model is a *generic* model of the class, used for orientation, not exact geometry. The owner pays for early warnings, ₹ downtime avoided, idle-energy waste caught and a maintenance log; the twin is the engine underneath. Manual work only happens when a **new machine class** appears, and that work becomes a reusable template, which is an asset rather than a cost.
+
 They look like they disagree, but they don't. **The PPT describes where the product is going. The report describes how we get there safely.** The merge keeps every PPT feature and passes each one through the report's guardrails. The device that ties them together is the **Source-Mode + Claim-Status system** in §2.
 
 ---
@@ -116,6 +132,7 @@ This is the backbone, and everything we build serves it. The report says a convi
 - S4 Work orders + event log (SQLite); operator-entered tool-wear measurement feeds calibration
 - S5 Operator view ↔ Engineer view toggle
 - S6 REPLAY mode (AI4I rows streamed as telemetry)
+- S7 **"Add your machine" onboarding wizard**: pick a template → enter nameplate + ₹ values → the twin starts from the template's defaults and calibrates (shown at 60× speed in the demo). This answers "but it's not *my* machine" on screen.
 
 **Could (stretch)**
 - C1 ESP32 LIVE node on a desk motor/fan (DS18B20 on the housing + MPU6050 + ACS712/SCT-013), which enables real-data calibration
@@ -345,6 +362,8 @@ Five people, five workstreams. Each person owns one, and two pair on integration
 | "Does calibration make failure prediction better?" | "Not by itself. It makes *state* prediction better. Better *failure* prediction needs real outcome labels from a pilot, and we keep those two claims separate." |
 | "Why did you start from AI4I instead of pure physics?" | "Both from day 0. Physics gives behaviour you can explain from the first minute; AI4I gives a reproducible failure-risk baseline. Neither is trusted alone." |
 | "Is the 3D model your own?" | "Geometry is adapted from TseNC, an open-source CNC mill under CERN-OHL-W, credited in the app. Our contribution is the behaviour: physics, calibration, PLC, analytics." |
+| "This is a twin of one fixed machine. How does it help *my* factory?" | "The demo machine is just an example. The product is a VMC *template* that calibrates itself to your machine from your data. Watch: we add a new machine with different nameplate data and it converges in a minute (60× speed). New machine classes become new templates, built once and reused across every client." |
+| "So is your business doing custom work for every client?" | "Only for the first few pilots, on purpose, to learn. After that, onboarding is a form, a clip-on kit and two weeks of self-calibration. Custom work only happens for a new machine class, and that work becomes a template for everyone." |
 | "Why will MSMEs adopt it?" | "Zero risk to start: no sensor, no downtime, no PLC change. They try it on a virtual copy, then a ₹2k read-only node on one machine." |
 
 ---
@@ -380,6 +399,8 @@ Each route keeps the same core (schema + twin + analytics), so none of them is a
 | **HT13 / Industry 5.0** | Hindi/Chhattisgarhi operator UI, voice read-out of alerts, accessibility study |
 
 ### Route 6 — Startup / scale path (only after Route 1 gives real numbers)
+- **Scaling path:** (1) first 5–10 pilots done by hand, on purpose, to learn; (2) template library covering the machine classes common in one cluster; (3) self-serve wizard + local technicians (e.g. ITI-trained) who fit kits, so cost per new client = kit + one install hour + zero code.
+- **Start with the machine that hurts most:** onboard the 1–2 bottleneck machines whose breakdown stops the shop, not the whole factory. The factory view (Route 4) is just machine twins composed on a layout.
 - **"Twin-in-a-Box" kit:** sensor node + preconfigured template + 30-day trial on the virtual twin first.
 - **Cluster model:** sell or lease through MSME cluster associations and MSME Technology Centres/Tool Rooms; shared engineer per cluster.
 - **Explore alignment** (verify current scheme rules first): MSME ZED certification (quality/energy), SAMARTH Udyog Bharat 4.0 centres, college incubator / startup grants.
