@@ -331,15 +331,21 @@ Every run is **seeded**, so Reset → Replay gives the identical curve.
 
 ## 5. Eight-day sprint (18 → 26 Oct)
 
-Five people, five workstreams. Each person owns one, and two pair on integration days.
+Five people, divided by **interfaces**, not by features. The JSON schema (§4.2) is the contract, so everyone builds against it in parallel from Day 1, using fake data until the real stream arrives.
 
-| Workstream | Owns | Suggested |
-|---|---|---|
-| **W1 3D Twin** | TseNC → glb (time-boxed), Three.js scene & bindings, job motion | modeller/frontend |
-| **W2 Plant + Virtual PLC** | plant physics, faults, PLC state machine, determinism tests | Python |
-| **W3 Twin Core + ML** | twin model, residuals, RLS calibrator, forecast; AI4I model + metrics | Python/ML (strongest math person) |
-| **W4 Backend + Dashboard** | FastAPI/WebSocket/SQLite; operator/engineer views, predicted-vs-observed chart, alert cards, ₹ calc, work orders | full-stack |
-| **W5 Pitch + Evidence + Edge** | slides v2, demo script, video, BOM quotes, ESP32 stretch, Q&A drill | presenter |
+| Role | Owns | Who fits | Hands off to |
+|---|---|---|---|
+| **R1 Lead + Twin Core** (Shrikrishna) | plant sims (4 machines), twin model, residuals + RLS calibration, line model, PLC; **merges `main` daily**; final say on scope cuts | strongest Python/maths, knows the whole plan | R3 (stream), R4 (twin state) |
+| **R2 3D** | TseNC → glb (4-hr time-box) or primitive mill; 3 primitive machines; Three.js hero scene + floor view; bindings from state → animation | Blender/visual person, some JS | R4 (embeds the scene) |
+| **R3 Backend + ML** | FastAPI, WebSocket, machine registry, SQLite (events, work orders, param log); AI4I rules + RF + metrics.json; ₹/kWh/CO₂ formulas | Python, has touched scikit-learn | R4 (APIs), R5 (metrics) |
+| **R4 Dashboard** | engineer view (predicted vs observed, residual band, θ history), alert cards, onboarding wizard, fault panel, operator phone view | HTML/CSS/JS, eye for UI | R5 (screens for slides/video) |
+| **R5 Pitch + QA + Edge** | slides v2 (merged wording), demo script, BOM quotes, backup video; **from D4 the official "breaker"** who runs the demo and logs bugs; runs the Q&A drills; ESP32 only if D6 passes | best speaker, organised, doesn't need to code much | everyone (bug list), judges |
+
+**Working rules**
+- One repo with one branch per role; R1 merges into `main` every evening, and `main` must always run the demo.
+- A 15-minute stand-up each day: what's done, what's blocked, what's being cut.
+- **Presenting:** R5 pitches and R1 drives the demo, but **every member must be able to explain the calibration loop and their own part in 30 seconds**, because judges question whoever they like.
+- If one role finishes early, help R1's critical path (calibration/line), not new features.
 
 | Day | Date | Goal (end-of-day check) |
 |---|---|---|
