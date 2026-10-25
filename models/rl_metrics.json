@@ -1,0 +1,395 @@
+{
+ "label": "Simulation results on held-out seeds (not a real plant)",
+ "policy": {
+  "algorithm": "tabular Q-learning (\u03b5-greedy 1.0 \u2192 0.05, learning rate 1/(1+n)^0.6, \u03b3 = 0.9)",
+  "environment": "VMC plant physics from sim/plant.py; scenarios none, vibration_fault, over_temperature, tool_wear, overload; random injection time, severity, ambient, load and starting tool wear",
+  "episodes": 15000,
+  "seed": 7,
+  "trained_at": "2026-10-25T12:52:56Z",
+  "train_seconds": 104.1,
+  "decision_interval_s": 20.0
+ },
+ "actions": [
+  "continue",
+  "derate_20",
+  "derate_40",
+  "maintain"
+ ],
+ "reward": {
+  "inr": {
+   "inr_per_part": 450.0,
+   "over_temp_inr_per_s": 40.0,
+   "zone_c_inr_per_s": 5.0,
+   "zone_d_inr_per_s": 60.0,
+   "overload_inr_per_s": 10.0,
+   "worn_tool_inr_per_s": 15.0,
+   "maintenance_inr": 1500.0,
+   "trip_downtime_h": 4.0,
+   "downtime_cost_inr_per_hr": 2500.0
+  },
+  "basis": {
+   "inr_per_part": "config/machines.yaml site.inr_per_part",
+   "downtime_cost_inr_per_hr": "config/machines.yaml site.downtime_cost_inr_per_hr",
+   "trip": "trip_downtime_h \u00d7 downtime cost (unplanned breakdown)",
+   "maintenance": "maintenance_inr + no parts during the 20 s decision (planned stop)",
+   "penalty_rates": "illustrative assumptions for the simulation, not measured plant costs"
+  }
+ },
+ "eval_episodes_per_scenario": 100,
+ "per_episode": "means per 12-minute simulated shift",
+ "results": {
+  "always_continue": {
+   "none": {
+    "return_inr": 9333.0,
+    "parts": 24.0,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "vibration_fault": {
+    "return_inr": -12004.525,
+    "parts": 5.4,
+    "trips": 1.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 72.09,
+    "maintenance_stops": 0.0
+   },
+   "over_temperature": {
+    "return_inr": -6534.0,
+    "parts": 24.0,
+    "trips": 0.0,
+    "over_temp_s": 396.675,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "tool_wear": {
+    "return_inr": 9327.375,
+    "parts": 24.0,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "overload": {
+    "return_inr": -4230.5,
+    "parts": 24.0,
+    "trips": 0.0,
+    "over_temp_s": 196.685,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "all": {
+    "return_inr": -821.73,
+    "parts": 20.28,
+    "trips": 0.2,
+    "over_temp_s": 118.672,
+    "zone_d_s": 14.418,
+    "maintenance_stops": 0.0
+   }
+  },
+  "rule_based": {
+   "none": {
+    "return_inr": 9275.4,
+    "parts": 23.859,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "vibration_fault": {
+    "return_inr": 6828.675,
+    "parts": 23.212,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 10.42,
+    "maintenance_stops": 1.0
+   },
+   "over_temperature": {
+    "return_inr": 5877.525,
+    "parts": 20.7,
+    "trips": 0.0,
+    "over_temp_s": 49.02,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "tool_wear": {
+    "return_inr": 9262.8,
+    "parts": 23.859,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "overload": {
+    "return_inr": 5475.975,
+    "parts": 21.347,
+    "trips": 0.0,
+    "over_temp_s": 9.64,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "all": {
+    "return_inr": 7344.075,
+    "parts": 22.595,
+    "trips": 0.0,
+    "over_temp_s": 11.732,
+    "zone_d_s": 2.084,
+    "maintenance_stops": 0.2
+   }
+  },
+  "rl_policy": {
+   "none": {
+    "return_inr": 9321.75,
+    "parts": 23.977,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "vibration_fault": {
+    "return_inr": 6776.575,
+    "parts": 23.301,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 11.815,
+    "maintenance_stops": 1.0
+   },
+   "over_temperature": {
+    "return_inr": 7085.925,
+    "parts": 19.513,
+    "trips": 0.0,
+    "over_temp_s": 5.265,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "tool_wear": {
+    "return_inr": 9325.65,
+    "parts": 23.989,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0
+   },
+   "overload": {
+    "return_inr": 6417.325,
+    "parts": 19.749,
+    "trips": 0.0,
+    "over_temp_s": 1.725,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.01
+   },
+   "all": {
+    "return_inr": 7785.445,
+    "parts": 22.106,
+    "trips": 0.0,
+    "over_temp_s": 1.398,
+    "zone_d_s": 2.363,
+    "maintenance_stops": 0.202
+   }
+  }
+ },
+ "returns_curve": [
+  {
+   "episode": 300,
+   "mean_return_inr": -8332.5
+  },
+  {
+   "episode": 600,
+   "mean_return_inr": -7990.0
+  },
+  {
+   "episode": 900,
+   "mean_return_inr": -7333.3
+  },
+  {
+   "episode": 1200,
+   "mean_return_inr": -7028.7
+  },
+  {
+   "episode": 1500,
+   "mean_return_inr": -6369.1
+  },
+  {
+   "episode": 1800,
+   "mean_return_inr": -6603.1
+  },
+  {
+   "episode": 2100,
+   "mean_return_inr": -5947.5
+  },
+  {
+   "episode": 2400,
+   "mean_return_inr": -4913.9
+  },
+  {
+   "episode": 2700,
+   "mean_return_inr": -4472.3
+  },
+  {
+   "episode": 3000,
+   "mean_return_inr": -4300.9
+  },
+  {
+   "episode": 3300,
+   "mean_return_inr": -3844.8
+  },
+  {
+   "episode": 3600,
+   "mean_return_inr": -3287.4
+  },
+  {
+   "episode": 3900,
+   "mean_return_inr": -2579.7
+  },
+  {
+   "episode": 4200,
+   "mean_return_inr": -2543.0
+  },
+  {
+   "episode": 4500,
+   "mean_return_inr": -1532.2
+  },
+  {
+   "episode": 4800,
+   "mean_return_inr": -1496.2
+  },
+  {
+   "episode": 5100,
+   "mean_return_inr": -797.3
+  },
+  {
+   "episode": 5400,
+   "mean_return_inr": -4.3
+  },
+  {
+   "episode": 5700,
+   "mean_return_inr": 569.7
+  },
+  {
+   "episode": 6000,
+   "mean_return_inr": 615.5
+  },
+  {
+   "episode": 6300,
+   "mean_return_inr": 1275.7
+  },
+  {
+   "episode": 6600,
+   "mean_return_inr": 1796.1
+  },
+  {
+   "episode": 6900,
+   "mean_return_inr": 2844.6
+  },
+  {
+   "episode": 7200,
+   "mean_return_inr": 2508.9
+  },
+  {
+   "episode": 7500,
+   "mean_return_inr": 3501.7
+  },
+  {
+   "episode": 7800,
+   "mean_return_inr": 3391.5
+  },
+  {
+   "episode": 8100,
+   "mean_return_inr": 4410.9
+  },
+  {
+   "episode": 8400,
+   "mean_return_inr": 4479.4
+  },
+  {
+   "episode": 8700,
+   "mean_return_inr": 5095.4
+  },
+  {
+   "episode": 9000,
+   "mean_return_inr": 5497.4
+  },
+  {
+   "episode": 9300,
+   "mean_return_inr": 5634.2
+  },
+  {
+   "episode": 9600,
+   "mean_return_inr": 6118.1
+  },
+  {
+   "episode": 9900,
+   "mean_return_inr": 6874.9
+  },
+  {
+   "episode": 10200,
+   "mean_return_inr": 7152.1
+  },
+  {
+   "episode": 10500,
+   "mean_return_inr": 6992.1
+  },
+  {
+   "episode": 10800,
+   "mean_return_inr": 7306.3
+  },
+  {
+   "episode": 11100,
+   "mean_return_inr": 7301.4
+  },
+  {
+   "episode": 11400,
+   "mean_return_inr": 7141.6
+  },
+  {
+   "episode": 11700,
+   "mean_return_inr": 7326.7
+  },
+  {
+   "episode": 12000,
+   "mean_return_inr": 7294.1
+  },
+  {
+   "episode": 12300,
+   "mean_return_inr": 7278.8
+  },
+  {
+   "episode": 12600,
+   "mean_return_inr": 7155.5
+  },
+  {
+   "episode": 12900,
+   "mean_return_inr": 7482.0
+  },
+  {
+   "episode": 13200,
+   "mean_return_inr": 7244.6
+  },
+  {
+   "episode": 13500,
+   "mean_return_inr": 7035.9
+  },
+  {
+   "episode": 13800,
+   "mean_return_inr": 7312.2
+  },
+  {
+   "episode": 14100,
+   "mean_return_inr": 7092.7
+  },
+  {
+   "episode": 14400,
+   "mean_return_inr": 7289.7
+  },
+  {
+   "episode": 14700,
+   "mean_return_inr": 7454.2
+  },
+  {
+   "episode": 15000,
+   "mean_return_inr": 7183.7
+  }
+ ],
+ "states_learned": 206
+}

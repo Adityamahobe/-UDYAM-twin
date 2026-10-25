@@ -140,6 +140,29 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 residual_ewma REAL NOT NULL
             );
         """)
+        # One row per machine every 2 s (what the trend charts plot), kept for time-range exports.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS telemetry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                machine_id TEXT NOT NULL,
+                mode TEXT, state TEXT, rpm REAL, derate_pct REAL, vibration_rms_mm_s REAL, zone TEXT,
+                temp_c REAL, power_kw REAL, load_pct REAL, energy_kwh REAL, tool_wear_min REAL,
+                risk TEXT, failure_risk_pct REAL, active_scenario TEXT
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS telemetry_ts ON telemetry (ts);")
+        # Reinforcement-learning feedback loop: one row per evaluated 20 s decision (ml/maintenance_rl.py).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS rl_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts_start TEXT NOT NULL,
+                ts_end TEXT NOT NULL,
+                machine_id TEXT NOT NULL,
+                row_json TEXT NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS rl_decisions_ts ON rl_decisions (ts_start);")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS economics_config (
                 key TEXT PRIMARY KEY,
@@ -488,6 +511,63 @@ def delete_custom_machine(machine_id: str, db_path: Path = DB_PATH) -> None:
 def list_custom_machines(db_path: Path = DB_PATH) -> list[dict[str, Any]]:
     rows = get_connection(db_path).execute("SELECT spec_json FROM custom_machines ORDER BY created_at, machine_id;")
     return [json.loads(r["spec_json"]) for r in rows.fetchall()]
+
+
+TELEMETRY_COLUMNS = ("ts", "machine_id", "mode", "state", "rpm", "derate_pct", "vibration_rms_mm_s", "zone", "temp_c",
+                     "power_kw", "load_pct", "energy_kwh", "tool_wear_min", "risk", "failure_risk_pct", "active_scenario")
+
+
+def log_telemetry(rows: list[dict[str, Any]], db_path: Path = DB_PATH) -> None:
+    if not rows:
+        return
+    cols = ", ".join(TELEMETRY_COLUMNS)
+    marks = ", ".join("?" for _ in TELEMETRY_COLUMNS)
+    with _WRITE_LOCK:
+        conn = get_connection(db_path)
+        with conn:
+            conn.executemany(f"INSERT INTO telemetry ({cols}) VALUES ({marks});",
+                             [tuple(r.get(c) for c in TELEMETRY_COLUMNS) for r in rows])
+
+
+def prune_telemetry(before_ts: str, db_path: Path = DB_PATH) -> int:
+    with _WRITE_LOCK:
+        conn = get_connection(db_path)
+        with conn:
+            return conn.execute("DELETE FROM telemetry WHERE ts < ?;", (before_ts,)).rowcount
+
+
+def query_telemetry(start: str, end: str, machine_id: str | None = None, limit: int = 500_000,
+                    db_path: Path = DB_PATH) -> list[dict[str, Any]]:
+    """Telemetry rows with start <= ts <= end (UTC ISO strings in the stored format), oldest first."""
+    sql = f"SELECT {', '.join(TELEMETRY_COLUMNS)} FROM telemetry WHERE ts >= ? AND ts <= ?"
+    args: list[Any] = [start, end]
+    if machine_id:
+        sql += " AND machine_id = ?"
+        args.append(machine_id)
+    rows = get_connection(db_path).execute(sql + " ORDER BY ts, machine_id LIMIT ?;", (*args, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def log_rl_decision(row: dict[str, Any], db_path: Path = DB_PATH) -> None:
+    with _WRITE_LOCK:
+        conn = get_connection(db_path)
+        with conn:
+            conn.execute("INSERT INTO rl_decisions (ts_start, ts_end, machine_id, row_json) VALUES (?, ?, ?, ?);",
+                         (row["ts_start"], row["ts_end"], row["machine_id"], json.dumps(row)))
+
+
+def query_rl_decisions(start: str, end: str, limit: int = 100_000, db_path: Path = DB_PATH) -> list[dict[str, Any]]:
+    rows = get_connection(db_path).execute(
+        "SELECT row_json FROM rl_decisions WHERE ts_start >= ? AND ts_start <= ? ORDER BY ts_start, id LIMIT ?;",
+        (start, end, limit)).fetchall()
+    return [json.loads(r["row_json"]) for r in rows]
+
+
+def query_events(start: str, end: str, limit: int = 100_000, db_path: Path = DB_PATH) -> list[dict[str, Any]]:
+    rows = get_connection(db_path).execute(
+        "SELECT event_id, ts, machine_id, kind, severity, title, measured, inferred, suggested FROM events "
+        "WHERE ts >= ? AND ts <= ? ORDER BY ts, id LIMIT ?;", (start, end, limit)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def update_economics(updates: dict[str, float], db_path: Path = DB_PATH) -> dict[str, float]:

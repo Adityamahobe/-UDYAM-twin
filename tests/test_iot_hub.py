@@ -152,6 +152,9 @@ def client(monkeypatch):
 
     # Isolate from the real device registry in udyam_twin.sqlite: empty, in-memory only.
     monkeypatch.setattr(iot_hub, "devices", {})
+    # No background ticker: otherwise the twin can self-calibrate onto the live probe reading before the
+    # tare call, and the auto-tare offset legitimately comes out as ~0 (a timing-dependent failure).
+    monkeypatch.setenv("UDYAM_TICKER", "0")
     monkeypatch.setattr(iot_hub, "db_path", None)
     with TestClient(app) as c:
         yield c

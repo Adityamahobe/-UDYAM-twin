@@ -38,7 +38,7 @@ fi
 PY=.venv/bin/python
 
 # 2. Packages (skipped when already installed, so this works offline after the first run)
-if ! "$PY" -c 'import fastapi, uvicorn, numpy, pandas, sklearn, joblib, yaml, scipy, pytest, httpx, jsonschema, google.genai' 2>/dev/null; then
+if ! "$PY" -c 'import fastapi, uvicorn, numpy, pandas, sklearn, joblib, yaml, scipy, pytest, httpx, jsonschema, google.genai, openpyxl' 2>/dev/null; then
   say "Installing Python packages (needs internet once)"
   "$PY" -m pip install --quiet --upgrade pip || true
   "$PY" -m pip install --quiet -r requirements-dev.txt || die "pip install failed; check your internet connection"
@@ -69,6 +69,12 @@ if [ ! -f "$MODEL" ]; then
   else
     warn "No $MODEL and no AI4I data: the failure-risk panel will say 'unavailable'."
   fi
+fi
+
+# 5. RL maintenance policy (trained in simulation; about 2 min, once)
+if [ ! -f models/rl_policy.json ]; then
+  say "Training the RL maintenance policy in simulation (about 2 min, only once)"
+  "$PY" -m ml.train_rl
 fi
 
 case "${1:-}" in

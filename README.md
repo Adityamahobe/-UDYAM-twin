@@ -78,7 +78,21 @@ Each alert card has: what happened · fact (the measured or simulated value and 
 - **Energy** = ∑ power × 0.5 s (site total = sum over the machines). **CO₂** = kWh × grid factor (default 0.716 kg/kWh, CEA CO₂ Baseline Database v20, 2024-25). **₹** = kWh × tariff (default ₹8.5/kWh). Both factors are editable at `POST /api/economics`.
 - **Projection and ROI** are labelled *illustrative estimate* and list every assumption (operating hours, baseline downtime, an *assumed* downtime reduction, sensor cost).
 
-`GET /api/reports` returns short trends, alert history, the work-order log and the energy/CO₂/OEE summary; `GET /api/reports/export.csv?section=summary|energy|oee|trends|alerts|work_orders` downloads CSV.
+`GET /api/reports` returns short trends, alert history, the work-order log and the energy/CO₂/OEE summary.
+
+**Export (CSV and Excel).** The dashboard's *Reports & Export* panel picks a time range (last 15 min / 1 h / 8 h / 24 h, or any from–to) and downloads:
+- `GET /api/reports/export.csv?section=telemetry|alerts|work_orders|events|rl_decisions&start=…&end=…` (or `&minutes=60`): one section for that range; `section=summary|energy|oee|trends` keeps the since-reset figures.
+- `GET /api/reports/export.xlsx?start=…&end=…&tz=Asia/Kolkata`: one workbook with About, Summary, Telemetry, Energy & OEE, Alerts, Work orders, Events, RL decisions and RL policy evaluation sheets (bold frozen headers, a note on what each sheet is).
+
+Times are ISO 8601 (a time without a zone is UTC), at most 31 days per export; files store UTC and the workbook adds a local-time column (IST by default). Telemetry is saved every 2 s per machine in SQLite and kept `UDYAM_TELEMETRY_RETENTION_H` hours (default 168), so ranges are not limited to the in-memory trend window.
+
+## Reinforcement learning (maintenance policy)
+
+A tabular **Q-learning** policy for VMC-01 chooses, every 20 s, between *continue*, *derate 20 %*, *derate 40 %* and *stop for maintenance*. It is trained in simulation (`python -m ml.train_rl`, ~2 min; `run.sh` does it once) on the VMC plant physics with the four fault-lab scenarios at random times and severities. Reward = parts × ₹/part minus penalties for over-temperature, vibration zone C/D, overload, a worn tool, a trip and maintenance; the penalty rates are illustrative assumptions and are listed with every result.
+
+Held-out simulation seeds, mean ₹ per 12-minute shift: always continue {r('always_continue','all')}, rule-based (the twin's behaviour today) {r('rule_based','all')}, **RL {r('rl_policy','all')}**. RL is clearly better on over-temperature ({r('rl_policy','over_temperature')} vs {r('rule_based','over_temperature')}) and overload ({r('rl_policy','overload')} vs {r('rule_based','overload')}), about equal on no fault and tool wear, and slightly behind on the bearing fault ({r('rl_policy','vibration_fault')} vs {r('rule_based','vibration_fault')}). Neither RL nor the rules trip the spindle; always-continue does.
+
+Live, the **feedback loop** runs on the stream: predicted risk + recommended action → simulated outcome in the virtual factory → evaluation (prediction correct?, reward ₹) → Q-table update (SIM mode only). The *Reinforcement Learning* panel shows the recommendation with its Q-values, the loop's statistics and each evaluated decision; `GET /api/rl`, `GET /api/rl/metrics`. The policy **only recommends**: *Send for operator approval* (`POST /api/rl/{machine_id}/propose`) creates a proposal that is applied only through the authorized approval endpoint, in the simulator. Details in [`docs/RL.md`](docs/RL.md).
 
 ## Add your machine
 
@@ -126,7 +140,7 @@ Retrain with `python -m ml.train_ai4i`. Rebuild our simulation dataset and its m
 ./run.sh --test
 ```
 
-The suite covers config validation and ISO zones, derate maths, the snapshot and WebSocket schema, the calibration throttle and cooling alert, alert and work-order lifecycles (always on a temporary database), the AI4I pipeline and RUL, every fault-lab scenario and its resolution, reset completeness, three identical Auto Demo cycles, OEE/energy/CO₂/₹ maths, REPLAY and the LIVE guard, reports and CSV, Add Your Machine, and the offline rule.
+The suite covers config validation and ISO zones, derate maths, the snapshot and WebSocket schema, the calibration throttle and cooling alert, alert and work-order lifecycles (always on a temporary database), the AI4I pipeline and RUL, every fault-lab scenario and its resolution, reset completeness, three identical Auto Demo cycles, OEE/energy/CO₂/₹ maths, REPLAY and the LIVE guard, reports, time-range CSV and Excel export, the RL policy and its feedback loop, Add Your Machine, and the offline rule.
 
 ## Limitations (say these out loud to judges)
 
@@ -136,6 +150,7 @@ The suite covers config validation and ISO zones, derate maths, the snapshot and
 - **OEE quality** is a rule-based quality hold, not inspection data. **ROI** depends on an assumed downtime reduction, not a measured one.
 - **Time scales**: readings, forecasts and RUL use real time; the simulator runs tool wear faster than real life so the demo fits in minutes, and the line's parts-per-hour figure keeps the simulator's 30× time compression.
 - **Derates** are simulated; on a real machine any derate needs operator approval.
+- **RL policy** is trained and updated in our simulator with illustrative penalty costs; it is not a validated maintenance policy for a real plant, and it only recommends.
 - **UDYAM-SIM** is synthetic data from our own simulator: its scores show the model learned our physics, not real machines (and they drop on unseen heavier machines). The **Advisor** explains tool outputs; it never actuates, and its what-if covers thermal behaviour only.
 
 ## Layout

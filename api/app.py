@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from api import alerts as alert_store
 from api.advisor import ChatError, ChatRequest, TwinAdvisor, _env_secret
 from api.demo import AutoDemo
+from api import export as exporter
 from api.db import (
     DB_PATH,
     LifecycleError,
@@ -50,6 +51,12 @@ from api.db import (
     list_work_orders,
     log_event,
     log_parameter_change,
+    log_rl_decision,
+    log_telemetry,
+    prune_telemetry,
+    query_events,
+    query_rl_decisions,
+    query_telemetry,
     update_economics,
     update_work_order_status,
 )
@@ -59,6 +66,7 @@ from ml.vibration.severity import SeverityAssessor
 from api.vibration import build_router as build_vibration_router
 from hub import IoTHub
 from hub.mqtt_bridge import MqttBridge
+from ml.maintenance_rl import ACTION_DERATE, METRICS_PATH as RL_METRICS_PATH, FeedbackAgent
 from ml.vibration.monitor import VibrationMonitor
 from sim.analytics import Analytics
 from sim.factory import FactoryEngine, TICK_S
@@ -101,6 +109,10 @@ analytics = Analytics()
 # Decision-support chatbot grounded in the live twin (Gemini via the Google Gen AI SDK, with an offline fallback)
 advisor = TwinAdvisor(factory_engine, economics=get_economics, events=lambda n: get_events(limit=n),
                       analytics=analytics.summary, telemetry_mode=lambda: mode_status()["mode"])
+# Reinforcement-learning maintenance policy: recommends, then learns from the simulated outcome (SIM only)
+rl_agent = FeedbackAgent(sink=log_rl_decision)
+# Telemetry history (every 2 s per machine) for time-range CSV / Excel exports
+telemetry_recorder = exporter.TelemetryRecorder(write=log_telemetry, prune=prune_telemetry)
 
 
 class FaultInjectRequest(BaseModel):
@@ -193,10 +205,11 @@ async def broadcast_messages(messages: List[Dict[str, Any]]) -> None:
         return
     vibration_monitor.observe(messages)  # sees every frame, including RESET from a manual reset
     analytics.observe(messages)
-    try:
-        advisor.observe(messages)
-    except Exception as err:  # the chatbot must never break telemetry
-        print(f"[advisor observe error]: {err}")
+    for name, observer in (("advisor", advisor), ("rl", rl_agent), ("telemetry", telemetry_recorder)):
+        try:
+            observer.observe(messages)
+        except Exception as err:  # decision support and history must never break telemetry
+            print(f"[{name} observe error]: {err}")
     messages = list(messages) + alert_store.ingest(messages)
 
     # Persist events and parameter records to SQLite
@@ -953,14 +966,167 @@ def api_get_report(trend_minutes: float = Query(default=10.0, gt=0, le=30)):
     return build_report(trend_minutes)
 
 
+RANGE_SECTIONS = ("telemetry", "events", "rl_decisions")
+TELEMETRY_COLS = ["ts", "machine_id", "mode", "state", "rpm", "derate_pct", "vibration_rms_mm_s", "zone", "temp_c",
+                  "power_kw", "load_pct", "energy_kwh", "tool_wear_min", "risk", "failure_risk_pct", "active_scenario"]
+EVENT_COLS = ["ts", "event_id", "machine_id", "kind", "severity", "title", "measured", "inferred", "suggested"]
+ALERT_COLS = ["alert_id", "machine_id", "severity", "status", "title", "measured", "inferred", "suggested",
+              "raised_at", "acknowledged_at", "resolved_at", "resolution", "occurrences", "wo_id"]
+WO_COLS = ["wo_id", "machine_id", "title", "status", "priority", "cause", "evidence", "recommended_action", "alert_id",
+           "created_at", "acknowledged_at", "started_at", "closed_at", "operator_notes"]
+RL_COLS = ["ts_start", "ts_end", "machine_id", "mode", "state", "risk_rules", "failure_risk_pct", "adverse_expected",
+           "recommended_action", "action_taken", "followed", "outcome_parts", "outcome_over_temp_s", "outcome_zone_c_s",
+           "outcome_zone_d_s", "outcome_overload_s", "outcome_worn_tool_s", "outcome_trip", "outcome_max_temp_c",
+           "outcome_max_vib_mm_s", "outcome_adverse", "parts_done_delta", "reward_inr", "prediction_correct",
+           "policy_updated", "q_before", "q_after"]
+
+
+def _export_range(start: Optional[str], end: Optional[str], minutes: Optional[float]) -> tuple[str, str]:
+    try:
+        s, e = exporter.parse_range(start, end, minutes)
+    except exporter.RangeError as err:
+        raise HTTPException(status_code=422, detail={"error": "invalid_range", "message": str(err)})
+    return exporter.iso_ms(s), exporter.iso_ms(e)
+
+
+def range_rows(section: str, start: str, end: str) -> tuple[List[Dict[str, Any]], List[str]]:
+    """Rows of one time-filtered section (UTC ISO bounds)."""
+    if section == "telemetry":
+        return query_telemetry(start, end), TELEMETRY_COLS
+    if section == "events":
+        return query_events(start, end), EVENT_COLS
+    if section == "rl_decisions":
+        return query_rl_decisions(start, end), RL_COLS
+    if section == "alerts":
+        rows = [a for a in list_alerts(include_resolved=True, limit=100_000)
+                if any(exporter.in_range(a.get(k), start, end) for k in ("raised_at", "acknowledged_at", "resolved_at"))]
+        return rows, ALERT_COLS
+    rows = [w for w in list_work_orders()
+            if any(exporter.in_range(w.get(k), start, end) for k in ("created_at", "updated_at", "closed_at"))]
+    return rows, WO_COLS
+
+
+def _filename(stem: str, start: str, end: str, ext: str) -> str:
+    fmt = lambda t: t[:16].replace("-", "").replace(":", "")  # 20261025T1000
+    return f"udyam-twin-{stem}-{fmt(start)}Z-to-{fmt(end)}Z.{ext}"
+
+
 @app.get("/api/reports/export.csv")
-def api_export_report(section: str = Query(default="summary"), trend_minutes: float = Query(default=10.0, gt=0, le=30)):
-    if section not in REPORT_SECTIONS:
-        raise HTTPException(status_code=422, detail=f"section must be one of {REPORT_SECTIONS}")
-    body = report_csv(section, build_report(trend_minutes))
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%MZ")
+def api_export_report(section: str = Query(default="summary"), trend_minutes: float = Query(default=10.0, gt=0, le=30),
+                      start: Optional[str] = None, end: Optional[str] = None,
+                      minutes: Optional[float] = Query(default=None, gt=0)):
+    """One section as CSV. telemetry, events, rl_decisions, alerts and work_orders honour the time range
+    (`start`/`end` ISO 8601, or `minutes` back from now; default the last 60 min)."""
+    sections = REPORT_SECTIONS + RANGE_SECTIONS
+    if section not in sections:
+        raise HTTPException(status_code=422, detail=f"section must be one of {sections}")
+    ranged = section in RANGE_SECTIONS + ("alerts", "work_orders")
+    if ranged:
+        s, e = _export_range(start, end, minutes)
+        rows, cols = range_rows(section, s, e)
+        body, name = exporter.csv_text(rows, cols), _filename(section, s, e, "csv")
+    else:
+        body = report_csv(section, build_report(trend_minutes))
+        name = f"udyam-twin-{section}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%MZ')}.csv"
     return Response(content=body, media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="udyam-twin-{section}-{stamp}.csv"'})
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _csv_rows(text: str) -> tuple[List[Dict[str, Any]], List[str]]:
+    reader = csv.DictReader(io.StringIO(text))
+    return list(reader), list(reader.fieldnames or [])
+
+
+@app.get("/api/reports/export.xlsx")
+def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
+                        minutes: Optional[float] = Query(default=None, gt=0), tz: str = "Asia/Kolkata"):
+    """Excel workbook for a time range: About, Summary, Telemetry, Energy & OEE, Alerts, Work orders, Events,
+    RL decisions and RL policy evaluation. Times are UTC, with a local-time column in `tz`."""
+    s, e = _export_range(start, end, minutes)
+    try:
+        zone = exporter.zone(tz)
+    except exporter.RangeError as err:
+        raise HTTPException(status_code=422, detail={"error": "invalid_timezone", "message": str(err)})
+    rep = build_report()
+    summary_rows, summary_cols = _csv_rows(report_csv("summary", rep))
+    oee_rows, oee_cols = _csv_rows(report_csv("oee", rep))
+    sections = {name: range_rows(name, s, e) for name in ("telemetry", "alerts", "work_orders", "events", "rl_decisions")}
+    rl_eval: List[Dict[str, Any]] = []
+    if RL_METRICS_PATH.exists():
+        results = json.loads(RL_METRICS_PATH.read_text(encoding="utf-8")).get("results", {})
+        rl_eval = [{"policy": pol, "scenario": sc, **vals} for pol, by_sc in results.items() for sc, vals in by_sc.items()]
+    counts = {k: len(v[0]) for k, v in sections.items()}
+    about = [
+        {"field": "title", "value": "UDYAM-TWIN export"},
+        {"field": "range_start_utc", "value": s}, {"field": "range_end_utc", "value": e},
+        {"field": "local_time_zone", "value": tz},
+        {"field": "generated_at_utc", "value": rep["generated_at"]},
+        {"field": "telemetry_mode_now", "value": rep["mode"]},
+        {"field": "data", "value": rep["label"]},
+        {"field": "telemetry_resolution", "value": "one row per machine every 2 s"},
+        {"field": "summary_and_oee_window", "value": "since the last reset / since server start (not the range)"},
+        {"field": "rl", "value": "Simulation-trained Q-learning policy; recommendations only, applied by an operator"},
+        *({"field": f"rows_{k}", "value": n} for k, n in counts.items()),
+    ]
+    note = f"{rep['label']}. Range {s} → {e} (UTC)."
+    sheets = [
+        {"name": "About", "columns": ["field", "value"], "rows": about},
+        {"name": "Summary", "columns": summary_cols, "rows": summary_rows, "note": "Since the last reset (not the range)"},
+        {"name": "Telemetry", "columns": TELEMETRY_COLS, "rows": sections["telemetry"][0], "note": note, "time_columns": ["ts"]},
+        {"name": "Energy & OEE", "columns": oee_cols, "rows": oee_rows, "note": "Since the last reset and since server start"},
+        {"name": "Alerts", "columns": ALERT_COLS, "rows": sections["alerts"][0], "note": note,
+         "time_columns": ["raised_at", "acknowledged_at", "resolved_at"]},
+        {"name": "Work orders", "columns": WO_COLS, "rows": sections["work_orders"][0], "note": note,
+         "time_columns": ["created_at", "closed_at"]},
+        {"name": "Events", "columns": EVENT_COLS, "rows": sections["events"][0], "note": note, "time_columns": ["ts"]},
+        {"name": "RL decisions", "columns": RL_COLS, "rows": sections["rl_decisions"][0],
+         "note": "Each row: predicted risk + recommended action → simulated outcome → evaluation (reward ₹) → policy update (SIM only)",
+         "time_columns": ["ts_start"]},
+        {"name": "RL policy evaluation", "columns": ["policy", "scenario", "return_inr", "parts", "trips", "over_temp_s",
+                                                      "zone_d_s", "maintenance_stops"], "rows": rl_eval,
+         "note": "Held-out simulation seeds, mean per 12-minute shift (models/rl_metrics.json)"},
+    ]
+    body = exporter.xlsx_bytes(sheets, zone)
+    return Response(content=body, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{_filename("report", s, e, "xlsx")}"'})
+
+
+# -----------------------------------------------------------------------------
+# Reinforcement-learning maintenance policy (ml/maintenance_rl.py)
+# -----------------------------------------------------------------------------
+@app.get("/api/rl")
+def api_rl_status(recent: int = Query(default=20, ge=0, le=200)):
+    """Current recommendation per CNC mill, feedback-loop statistics and recent evaluated decisions."""
+    return rl_agent.status(recent)
+
+
+@app.get("/api/rl/metrics")
+def api_rl_metrics():
+    if not RL_METRICS_PATH.exists():
+        raise HTTPException(status_code=404, detail="Run python -m ml.train_rl")
+    return json.loads(RL_METRICS_PATH.read_text(encoding="utf-8"))
+
+
+@app.post("/api/rl/{machine_id}/propose")
+def api_rl_propose(machine_id: str):
+    """Turn the current RL recommendation into a pending proposal. Nothing is applied: an operator must
+    approve it through POST /api/chat/proposals/{id}/approve."""
+    rec = rl_agent.recommendation(machine_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail={"error": "no_recommendation",
+                                                     "message": f"No RL recommendation for {machine_id} yet."})
+    plant = factory_engine.plants.get(machine_id)
+    current = plant.derate_pct if plant else 0.0
+    action, why = rec["action"], f"RL policy ({rec['label']}) for state {rec['state']}; Q = {rec['q_values']}"
+    if action == "maintain":
+        p = advisor.tool_propose_action(machine_id, "work_order", why, title=f"Planned maintenance stop on {machine_id} (RL)")
+    elif ACTION_DERATE[action] != current:
+        kind = "derate" if ACTION_DERATE[action] > 0 else "clear_derate"
+        p = advisor.tool_propose_action(machine_id, kind, why, derate_pct=ACTION_DERATE[action] or None)
+    else:
+        raise HTTPException(status_code=409, detail={"error": "nothing_to_change",
+                                                     "message": f"{machine_id} is already at {current:g} % derate."})
+    return {"proposal": p, "recommendation": rec}
 
 
 @app.get("/api/metrics")

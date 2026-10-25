@@ -230,6 +230,51 @@
           </div>
         </section>
 
+        <!-- Reinforcement-learning maintenance policy (web/rl.js) -->
+        <section class="panel" id="rlPanel">
+          <div class="panel-header">
+            <h2>Reinforcement Learning · Maintenance Policy</h2>
+            <span class="badge-sim" style="font-size:10px;">SIM-TRAINED</span>
+          </div>
+          <div id="rlBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
+        </section>
+
+        <!-- Time-range export (web/reports.js) -->
+        <section class="panel" id="exportPanel">
+          <div class="panel-header">
+            <h2>Reports &amp; Export</h2>
+            <span class="badge-sim" style="font-size:10px;">CSV · EXCEL</span>
+          </div>
+          <div class="export-body">
+            <div class="export-quick" id="exportQuick">
+              <button type="button" class="btn btn-sm" data-min="15">Last 15 min</button>
+              <button type="button" class="btn btn-sm" data-min="60">Last 1 h</button>
+              <button type="button" class="btn btn-sm" data-min="480">Last 8 h</button>
+              <button type="button" class="btn btn-sm" data-min="1440">Last 24 h</button>
+            </div>
+            <div class="export-range">
+              <label>From <input type="datetime-local" id="exportStart" step="1"></label>
+              <label>To <input type="datetime-local" id="exportEnd" step="1"></label>
+            </div>
+            <div class="export-row">
+              <label>Section
+                <select id="exportSection">
+                  <option value="telemetry">Telemetry (every 2 s)</option>
+                  <option value="alerts">Alerts</option>
+                  <option value="work_orders">Work orders</option>
+                  <option value="events">Event log</option>
+                  <option value="rl_decisions">RL decisions &amp; feedback</option>
+                  <option value="summary">Summary (since reset)</option>
+                  <option value="oee">Energy &amp; OEE (since reset)</option>
+                </select>
+              </label>
+              <button type="button" class="btn btn-sm" id="exportCsv">⬇ CSV</button>
+              <button type="button" class="btn btn-sm btn-primary" id="exportXlsx">⬇ Excel (all sheets)</button>
+            </div>
+            <div class="formula-hint" id="exportHint">Times are your local time; files store UTC plus an India time (IST) column.</div>
+          </div>
+        </section>
+
         <!-- AI4I Research Intelligence & Benchmark Metrics Panel -->
         <section class="panel">
           <div class="panel-header">
@@ -378,5 +423,7 @@
 
   <script src="/static/app.js"></script>
   <script src="/static/chat.js"></script>
+  <script src="/static/rl.js"></script>
+  <script src="/static/reports.js"></script>
 </body>
 </html>

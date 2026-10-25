@@ -772,3 +772,31 @@ select {
 .chat-form input { flex: 1; min-width: 0; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; }
 .chat-form input:focus { outline: none; border-color: var(--border-focus); }
+
+/* ---- Reinforcement-learning panel (web/rl.js) ---- */
+.rl-body { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+.rl-rec { background: var(--bg-card); border-radius: var(--radius-sm); padding: 10px; border-left: 3px solid var(--accent-purple); }
+.rl-rec .rl-action { font-size: 15px; font-weight: 700; margin: 2px 0 4px; }
+.rl-rec .rl-meta { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.rl-q { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; }
+.rl-q div { background: var(--bg-primary); border-radius: 4px; padding: 4px; text-align: center; color: var(--text-secondary); }
+.rl-q div.best { color: var(--text-primary); outline: 1px solid var(--accent-purple); }
+.rl-loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.rl-loop .calc-card { padding: 8px; }
+.rl-table { width: 100%; border-collapse: collapse; font-size: 10.5px; font-family: var(--font-mono); }
+.rl-table th, .rl-table td { padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); text-align: left; white-space: nowrap; }
+.rl-table th { color: var(--text-muted); font-weight: 600; }
+.rl-ok { color: var(--status-ok); } .rl-bad { color: var(--status-crit); }
+.rl-table-wrap { max-height: 190px; overflow: auto; }
+.rl-eval td.win { color: var(--status-ok); font-weight: 700; }
+@media (max-width: 640px) { .rl-loop { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- Reports & export panel (web/reports.js) ---- */
+.export-body { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+.export-quick, .export-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+.export-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-body label { display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary); font-size: 11px; }
+.export-body input, .export-body select { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 6px 8px; font-size: 12px; color-scheme: dark; }
+.export-quick .btn.active { border-color: var(--border-focus); color: var(--text-primary); }
+@media (max-width: 640px) { .export-range { grid-template-columns: 1fr; } }
