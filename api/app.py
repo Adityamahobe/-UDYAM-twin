@@ -1048,6 +1048,21 @@ def _csv_rows(text: str) -> tuple[List[Dict[str, Any]], List[str]]:
     return list(reader), list(reader.fieldnames or [])
 
 
+def _cmapss_sheets() -> List[Dict[str, Any]]:
+    """C-MAPSS RUL results for the workbook (empty until python -m ml.cmapss has run)."""
+    if not CMAPSS_METRICS.exists():
+        return []
+    m = json.loads(CMAPSS_METRICS.read_text(encoding="utf-8"))
+    rows = [{"subset": sub["subset"], "description": sub["description"], "train_engines": sub["train_engines"],
+             "test_engines": sub["test_engines"], "model": name, **scores,
+             "cv_rmse_capped_target": sub["cv_rmse_capped_target"]["mean"] if name == "gradient_boosting" else None}
+            for sub in m["subsets"] for name, scores in sub["test"].items()]
+    cols = ["subset", "description", "train_engines", "test_engines", "model", "rmse", "rmse_true_capped_125",
+            "nasa_score", "mae", "cv_rmse_capped_target"]
+    return [{"name": "C-MAPSS RUL", "columns": cols, "rows": rows,
+             "note": f"{m['label']}. Official test engines at their last cycle; RMSE in cycles."}]
+
+
 def _ims_sheets() -> List[Dict[str, Any]]:
     """IMS run-to-failure results for the workbook (empty when the dataset has not been processed)."""
     if not IMS_METRICS.exists():
@@ -1123,6 +1138,7 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
                                                       "zone_d_s", "maintenance_stops"], "rows": rl_eval,
          "note": "Held-out simulation seeds, mean per 12-minute shift (models/rl_metrics.json)"},
         *_ims_sheets(),
+        *_cmapss_sheets(),
     ]
     body = exporter.xlsx_bytes(sheets, zone)
     return Response(content=body, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1171,6 +1187,22 @@ def api_rl_propose(machine_id: str):
 
 IMS_METRICS = ROOT / "ml" / "vibration" / "artifacts" / "ims_metrics.json"
 IMS_TRENDS = ROOT / "ml" / "vibration" / "artifacts" / "ims_trends.json"
+
+
+CMAPSS_METRICS = ROOT / "models" / "cmapss_metrics.json"
+
+
+@app.get("/api/datasets/cmapss")
+def api_cmapss_results(predictions: bool = False):
+    """NASA C-MAPSS turbofan RUL experiment (models/cmapss_metrics.json, written by `python -m ml.cmapss`).
+    A separate research module: it never feeds the CNC machines' RUL."""
+    if not CMAPSS_METRICS.exists():
+        raise HTTPException(status_code=404, detail="Run python -m ml.cmapss (data: ml/data/cmapss/raw)")
+    out = json.loads(CMAPSS_METRICS.read_text(encoding="utf-8"))
+    if not predictions:
+        for sub in out["subsets"]:
+            sub.pop("predictions", None)
+    return out
 
 
 @app.get("/api/datasets/ims")

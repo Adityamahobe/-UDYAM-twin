@@ -94,7 +94,8 @@ def test_excel_workbook(client):
     wb = load_workbook(io.BytesIO(r.content))
     assert wb.sheetnames[:9] == ["About", "Summary", "Telemetry", "Energy & OEE", "Alerts", "Work orders", "Events",
                                  "RL decisions", "RL policy evaluation"]
-    assert wb.sheetnames[9:] in ([], ["IMS zone progression", "IMS early warning"])  # present once IMS is processed
+    extra = wb.sheetnames[9:]  # dataset sheets appear once their results exist
+    assert [n for n in extra if n not in ("IMS zone progression", "IMS early warning", "C-MAPSS RUL")] == []
     tel = wb["Telemetry"]
     header = [c.value for c in tel[2]]
     assert header[:3] == ["ts", "ts (Asia/Kolkata)", "machine_id"]
