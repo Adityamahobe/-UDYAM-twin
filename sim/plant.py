@@ -93,6 +93,10 @@ class PlantMachine:
     load_scale: float = 1.0         # heavier or lighter jobs (cutting torque)
     noise_scale: float = 1.0        # sensor and process noise level
     fault_severity: float = 1.0     # how aggressive an injected fault is
+    # Testing-mode machine parameters (sim/controls.py); neutral defaults change nothing.
+    speed_scale: float = 1.0        # commanded spindle speed as a share of nominal
+    cooling_scale: float = 1.0      # coolant system capacity (multiplies h_true)
+    extra_vib_mm_s: float = 0.0     # added vibration at nominal speed
 
     def __post_init__(self):
         if not self.nameplate:
@@ -136,7 +140,7 @@ class PlantMachine:
         rpm_nominal = float(self.nameplate["rpm_nominal"])
         ns, sev = self.noise_scale, self.fault_severity
         surge = self.faults.is_active("order_surge")  # rush order: faster spindle, heavier feeds
-        rpm_set = rpm_nominal * (1.0 - effective_derate / 100.0)
+        rpm_set = rpm_nominal * self.speed_scale * (1.0 - effective_derate / 100.0)
         if surge:
             rpm_set *= 1.15
         torque_nominal = (40.0 if is_mill else 30.0) * self.load_scale
@@ -156,7 +160,7 @@ class PlantMachine:
             self.h_true = max(0.55, self.h_true - COOLANT_LOSS_PER_S * sev * TICK_S)
 
 
-        thermal_target = self.air_temp_k + 8.0 + 0.7 * power_kw / self.h_true
+        thermal_target = self.air_temp_k + 8.0 + 0.7 * power_kw / (self.h_true * self.cooling_scale)
         self.process_temp_k += (thermal_target - self.process_temp_k) * TICK_S / 20.0
 
         # Tool wear progression
@@ -182,7 +186,7 @@ class PlantMachine:
         else:
             self.vib_excess = _lag(self.vib_excess, 0.0, BEARING_TAU_OFF)
         speed = rpm / rpm_nominal
-        base_vib = CNC_VIB_BASE + 0.25 * speed ** 2 + self.vib_excess * speed
+        base_vib = CNC_VIB_BASE + 0.25 * speed ** 2 + (self.vib_excess + self.extra_vib_mm_s) * speed
         self.vibration = max(0.0, base_vib + rng.gauss(0.0, CNC_VIB_NOISE * ns)) if running else 0.3
 
         # Sensor readings and Data Quality (DQ) simulation
@@ -236,10 +240,10 @@ class PlantMachine:
         running = self.plc.is_running
 
         rpm_nominal = float(self.nameplate["rpm_nominal"])
-        rpm_set = rpm_nominal * (1.0 - self.derate_pct / 100.0)
+        rpm_set = rpm_nominal * self.speed_scale * (1.0 - self.derate_pct / 100.0)
         rpm = (rpm_set + rng.gauss(0.0, 5.0)) if running else 0.0
         power = (1.4 + 0.006 * self.blade_wear_pct + rng.gauss(0.0, 0.03)) if running else 0.05
-        self.vibration = (SAW_VIB_BASE + 0.028 * self.blade_wear_pct + rng.gauss(0.0, SAW_VIB_NOISE)) if running else 0.2
+        self.vibration = (SAW_VIB_BASE + 0.028 * self.blade_wear_pct + self.extra_vib_mm_s + rng.gauss(0.0, SAW_VIB_NOISE)) if running else 0.2
 
         return {
             "type": "observed",
@@ -273,7 +277,7 @@ class PlantMachine:
 
         rated_kw = float(self.nameplate.get("rated_kw", 7.5))
         power = rated_kw * (0.35 + 0.65 * duty / 100.0)
-        self.vibration = COMP_VIB_BASE + rng.gauss(0.0, COMP_VIB_NOISE)
+        self.vibration = COMP_VIB_BASE + self.extra_vib_mm_s + rng.gauss(0.0, COMP_VIB_NOISE)
         self.plc.state = PlcState.RUN
 
         return {

@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from config import get_config
 from ml.vibration.severity import SeverityAssessor
+from sim import controls
 from sim.line import ProductionLine
 from sim.plant import PlantMachine, TEMPLATE_PREFIX, NAMEPLATE_DEFAULTS
 from sim.scenarios import SCENARIOS
@@ -69,6 +70,13 @@ class FactoryEngine:
         self.custom_machines: list[dict] = []
         self.line = ProductionLine()
         self.rng = random.Random(self.seed)
+        # Testing-mode machine parameters (sim/controls.py), per machine; kept across resets.
+        self.sim_params: dict[str, dict[str, float]] = {}
+        # Run control: RUNNING, PAUSED (state frozen) or STOPPED (reset to baseline, not ticking).
+        # `run_until_t` ends a timed run ("run for N minutes") by pausing at that simulation time.
+        self.run_state = "RUNNING"
+        self.run_until_t: float | None = None
+        self.run_started_t: float | None = None
 
         self.reset(announce=False)
 
@@ -126,6 +134,8 @@ class FactoryEngine:
         twin = DigitalTwin(machine_id=mid, template=template, hero=hero)
 
         twin.rated_kw = plant.nameplate.get("rated_kw")
+        if mid in self.sim_params:
+            controls.apply(plant, self.sim_params[mid])
         self.plants[mid] = plant
         self.twins[mid] = twin
         return plant
@@ -152,7 +162,7 @@ class FactoryEngine:
 
     def remove_custom_machine(self, machine_id: str) -> list[dict]:
         self.custom_machines = [s for s in self.custom_machines if s["machine_id"] != machine_id]
-        for store in (self.plants, self.twins, self.snapshots, self.active_scenarios):
+        for store in (self.plants, self.twins, self.snapshots, self.active_scenarios, self.sim_params):
             store.pop(machine_id, None)
         self._emit_event(machine_id, "MACHINE_REMOVED", "INFO", f"{machine_id} removed")
         return [self.registry()] + self.flush_events()
@@ -307,8 +317,90 @@ class FactoryEngine:
             return _iso(datetime.now(timezone.utc))
         return _iso(self.start + timedelta(seconds=self.t))
 
+    # ------------------------------------------------------------------
+    # Testing-mode parameters and run control (simulation only)
+    # ------------------------------------------------------------------
+    def machine_params(self, machine_id: str) -> dict:
+        plant = self.plants[machine_id]
+        values = {**controls.defaults_for(plant.template), **self.sim_params.get(machine_id, {})}
+        return {"machine_id": machine_id, "name": plant.name, "template": plant.template,
+                "values": values, "default": controls.is_default(plant.template, values),
+                "specs": controls.specs_for(plant.template, plant.nameplate)}
+
+    def set_params(self, machine_id: str, changes: dict) -> list[dict]:
+        """Validate and apply parameters to one simulated machine (ParamError if outside the limits)."""
+        plant = self.plants.get(machine_id)
+        if plant is None:
+            raise controls.ParamError(f"Unknown machine {machine_id}")
+        before = {**controls.defaults_for(plant.template), **self.sim_params.get(machine_id, {})}
+        merged = controls.validate(plant.template, plant.nameplate, before, changes)
+        changed = {k: {"from": before[k], "to": v} for k, v in merged.items() if abs(before[k] - v) > 1e-9}
+        if controls.is_default(plant.template, merged):
+            self.sim_params.pop(machine_id, None)
+        else:
+            self.sim_params[machine_id] = merged
+        controls.apply(plant, merged)
+        if changed:
+            spec = controls.PARAMS
+            text = ", ".join(f"{spec[k].label.lower()} {c['from']:g} → {c['to']:g} {spec[k].unit}" for k, c in changed.items())
+            self._emit_event(machine_id, "SIM_PARAMS", "INFO", f"Simulation parameters on {plant.name}: {text}",
+                             data={"changed": changed, "values": merged, "simulation_only": True})
+        return self.flush_events()
+
+    def reset_params(self, machine_id: str | None = None) -> list[dict]:
+        out: list[dict] = []
+        for mid in [machine_id] if machine_id else list(self.sim_params):
+            if mid in self.plants and mid in self.sim_params:
+                out += self.set_params(mid, controls.defaults_for(self.plants[mid].template))
+        return out + self.flush_events()
+
+    @property
+    def running(self) -> bool:
+        return self.run_state == "RUNNING"
+
+    def run_status(self) -> dict:
+        left = None if self.run_until_t is None else max(0.0, self.run_until_t - self.t)
+        return {"state": self.run_state, "sim_time_s": round(self.t, 1),
+                "run_for_s": None if self.run_until_t is None or self.run_started_t is None
+                else round(self.run_until_t - self.run_started_t, 1),
+                "remaining_s": None if left is None else round(left, 1)}
+
+    def run_control(self, action: str, minutes: float | None = None) -> list[dict]:
+        """pause | resume | stop | start | run_for (minutes). Simulation only."""
+        if action == "pause":
+            if self.run_state == "RUNNING":
+                self.run_state = "PAUSED"
+                self._emit_event(None, "SIM_RUN", "INFO", "Simulation paused", data={"action": action})
+        elif action in ("resume", "start"):
+            if self.run_state != "RUNNING":
+                was = self.run_state
+                self.run_state = "RUNNING"
+                self._emit_event(None, "SIM_RUN", "INFO", "Simulation started" if was == "STOPPED" else "Simulation resumed",
+                                 data={"action": action})
+        elif action == "stop":
+            out = self.reset()  # clean baseline; parameters are kept
+            self.registry_dirty = False
+            self.run_state, self.run_until_t, self.run_started_t = "STOPPED", None, None
+            self._emit_event(None, "SIM_RUN", "INFO", "Simulation stopped and reset to a clean baseline",
+                             data={"action": action})
+            return [self.registry()] + out + self.flush_events()
+        elif action == "run_for":
+            if minutes is None or not (0 < float(minutes) <= controls.RUN_FOR_MAX_MIN):
+                raise controls.ParamError(f"Run time must be more than 0 and at most {controls.RUN_FOR_MAX_MIN:g} minutes")
+            self.run_state = "RUNNING"
+            self.run_started_t, self.run_until_t = self.t, self.t + float(minutes) * 60.0
+            self._emit_event(None, "SIM_RUN", "INFO", f"Simulation running for {float(minutes):g} min, then pausing",
+                             data={"action": action, "minutes": float(minutes)})
+        else:
+            raise controls.ParamError(f"Unknown run action '{action}'")
+        if action in ("pause", "stop", "resume", "start"):
+            self.run_until_t = self.run_started_t = None
+        return self.flush_events()
+
     def step(self) -> list[dict]:
-        """Advance the factory simulation by one 500ms tick."""
+        """Advance the factory simulation by one 500ms tick (nothing while paused or stopped)."""
+        if not self.running:
+            return []
         self.t += TICK_S
 
         comp = next((p for p in self.plants.values() if p.template == "air_compressor"), None)
@@ -330,6 +422,7 @@ class FactoryEngine:
                     obs, plant_events = self.replay.apply(obs), []  # the simulated plant runs on, unseen
                 obs = self._live(obs)
                 self.pending_events.extend(plant_events)
+                twin.auto_derate = self.auto_derate  # so its alert text says whether the derate is applied
                 twin_msg, twin_events, proposed_derate = twin.step_cnc(obs)
                 if proposed_derate is not None and self.auto_derate:
                     plant.derate_pct = proposed_derate
@@ -346,6 +439,12 @@ class FactoryEngine:
         # Step production line
         line_msg = self.line.step(self.plants, air_ok, ts_str)
         out.append(line_msg)
+
+        if self.run_until_t is not None and self.t >= self.run_until_t - 1e-9:
+            minutes = (self.run_until_t - (self.run_started_t or 0.0)) / 60.0
+            self.run_state, self.run_until_t, self.run_started_t = "PAUSED", None, None
+            self._emit_event(None, "SIM_RUN", "INFO", f"Timed run finished ({minutes:g} min); simulation paused",
+                             data={"action": "run_for_done", "minutes": minutes})
 
         return out + self.flush_events()
 

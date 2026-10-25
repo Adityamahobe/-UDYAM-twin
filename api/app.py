@@ -14,7 +14,7 @@ import io
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -30,6 +30,7 @@ from api import alerts as alert_store
 from api.advisor import ChatError, ChatRequest, TwinAdvisor, _env_secret
 from api.demo import AutoDemo
 from api import export as exporter
+from api.operating_mode import MODES as OPERATING_MODES, REAL_DATA, OperatingMode, ReadOnlyError, connection_state
 from api.db import (
     DB_PATH,
     LifecycleError,
@@ -46,6 +47,7 @@ from api.db import (
     save_custom_machine,
     get_economics,
     get_events,
+    max_event_seq,
     get_parameter_history,
     init_db,
     list_work_orders,
@@ -64,11 +66,21 @@ from api.iot import build_router
 from config import ConfigError, get_config
 from ml.vibration.severity import SeverityAssessor
 from api.vibration import build_router as build_vibration_router
+from api.synthetic import build_router as build_synthetic_router
+from ml.synthetic import SyntheticStore
+from ml.ai4i import FEATURES as FEATURES_AI4I, MODEL_PATH as AI4I_MODEL_PATH
+from ml.candidate import GATE as MODEL_GATE, CandidateError, TrainingJob
+from ml.model_registry import ModelRegistry, RegistryError
+from ml.adaptive import (DriftMonitor, LabelError, LabelStore, TrainingReference, ai4i_training_inputs,
+                         load_reference, MAX_LABEL_WINDOW)
+from twin.model import use_model_path
 from hub import IoTHub
 from hub.mqtt_bridge import MqttBridge
 from ml.maintenance_rl import ACTION_DERATE, METRICS_PATH as RL_METRICS_PATH, FeedbackAgent
 from ml.vibration.monitor import VibrationMonitor
 from sim.analytics import Analytics
+from sim.controls import ParamError
+from sim import whatif
 from sim.factory import FactoryEngine, TICK_S
 from sim.scenarios import SCENARIOS
 
@@ -111,6 +123,8 @@ advisor = TwinAdvisor(factory_engine, economics=get_economics, events=lambda n: 
                       analytics=analytics.summary, telemetry_mode=lambda: mode_status()["mode"])
 # Reinforcement-learning maintenance policy: recommends, then learns from the simulated outcome (SIM only)
 rl_agent = FeedbackAgent(sink=log_rl_decision)
+# TESTING (simulation, every control) or REAL DATA (read-only monitoring of real devices); see api/operating_mode.py
+operating_mode = OperatingMode()
 # Telemetry history (every 2 s per machine) for time-range CSV / Excel exports
 telemetry_recorder = exporter.TelemetryRecorder(write=log_telemetry, prune=prune_telemetry)
 
@@ -196,6 +210,14 @@ class EconomicsUpdateRequest(BaseModel):
     sensor_nodes: Optional[float] = Field(default=None, ge=1)
 
 
+def _testing_only(action: str) -> None:
+    """Simulator controls are refused in REAL DATA mode (read-only monitoring)."""
+    try:
+        operating_mode.guard(action)
+    except ReadOnlyError as err:
+        raise HTTPException(status_code=409, detail=err.detail())
+
+
 async def broadcast_messages(messages: List[Dict[str, Any]]) -> None:
     """Broadcast JSON payloads to all connected WebSocket clients and log events to SQLite.
 
@@ -205,12 +227,16 @@ async def broadcast_messages(messages: List[Dict[str, Any]]) -> None:
         return
     vibration_monitor.observe(messages)  # sees every frame, including RESET from a manual reset
     analytics.observe(messages)
-    for name, observer in (("advisor", advisor), ("rl", rl_agent), ("telemetry", telemetry_recorder)):
+    for name, observer in (("advisor", advisor), ("rl", rl_agent), ("telemetry", telemetry_recorder),
+                           ("drift", drift_monitor)):
         try:
             observer.observe(messages)
         except Exception as err:  # decision support and history must never break telemetry
             print(f"[{name} observe error]: {err}")
-    messages = list(messages) + alert_store.ingest(messages)
+    for ev in drift_monitor.take_events():  # information only: DATA_DRIFT never becomes an alert
+        factory_engine._emit_event(ev["machine_id"], "DATA_DRIFT", ev["severity"], ev["title"], data=ev["data"])
+    messages = list(messages) + factory_engine.flush_events()
+    messages = messages + alert_store.ingest(messages)
 
     # Persist events and parameter records to SQLite
     for m in messages:
@@ -293,7 +319,8 @@ async def engine_ticker_loop() -> None:
     next_at = loop.time()
     while True:
         try:
-            await auto_demo.tick()
+            if factory_engine.running:  # paused or stopped: the Auto Demo clock waits too
+                await auto_demo.tick()
             await broadcast_messages(factory_engine.step())
         except Exception as err:
             print(f"[ticker error]: {err}")
@@ -308,6 +335,8 @@ async def engine_ticker_loop() -> None:
 async def app_lifespan(app: FastAPI):
     # Startup: initialize database and launch ticker task
     init_db()
+    label_store.init()
+    factory_engine.event_seq = max(factory_engine.event_seq, max_event_seq())  # keep event ids unique across restarts
     _restore_custom_machines()
     # Simulation state does not survive a restart, so alerts left open by a previous run are stale.
     resolve_alerts("Server restart: simulation state reset")
@@ -356,6 +385,33 @@ async def revalidate_ui_files(request: Request, call_next):
 
 app.include_router(build_router(iot_hub, factory_engine, mqtt_ref))
 app.include_router(build_vibration_router(iot_hub, vibration_monitor, lambda: list(factory_engine.plants)))
+synthetic_store = SyntheticStore()
+app.include_router(build_synthetic_router(synthetic_store))
+model_registry = ModelRegistry()
+label_store = LabelStore(DB_PATH)
+training_job = TrainingJob(model_registry, synthetic_store, label_store)
+_references: Dict[str, TrainingReference] = {}
+
+
+def production_reference() -> TrainingReference:
+    """Training inputs of the deployed model, for the drift monitor (cached per version)."""
+    version = model_registry.production() if model_registry.index_path.is_file() else "shipped"
+    if version not in _references:
+        _references[version] = (load_reference(model_registry, version) if version != "shipped"
+                                else TrainingReference(ai4i_training_inputs(), "v001 (shipped)"))
+    return _references[version]
+
+
+drift_monitor = DriftMonitor(production_reference)
+whatif_jobs = whatif.WhatIfJobs()
+
+
+def _deployed_model_path() -> Path:
+    """The model the twin uses: the registry's production version, or the shipped file before the registry exists."""
+    return model_registry.production_model_path() if model_registry.index_path.is_file() else AI4I_MODEL_PATH
+
+
+use_model_path(_deployed_model_path)
 
 
 # -----------------------------------------------------------------------------
@@ -401,6 +457,7 @@ def get_registry():
 
 @app.post("/api/faults/inject")
 async def post_inject_fault(req: FaultInjectRequest):
+    _testing_only("Fault injection")
     msgs = factory_engine.command({
         "cmd": "inject_fault",
         "machine_id": req.machine_id,
@@ -412,6 +469,7 @@ async def post_inject_fault(req: FaultInjectRequest):
 
 @app.post("/api/faults/clear")
 async def post_clear_faults(req: FaultClearRequest):
+    _testing_only("Clearing simulated faults")
     msgs = factory_engine.command({
         "cmd": "clear_faults",
         "machine_id": req.machine_id,
@@ -422,6 +480,7 @@ async def post_clear_faults(req: FaultClearRequest):
 
 @app.post("/api/derate")
 async def post_set_derate(req: DerateRequest):
+    _testing_only("A simulator derate")
     msgs = factory_engine.command({
         "cmd": "set_derate",
         "machine_id": req.machine_id,
@@ -429,6 +488,69 @@ async def post_set_derate(req: DerateRequest):
     })
     await broadcast_messages(msgs)
     return {"status": "derate_applied", "machine_id": req.machine_id, "pct": req.pct}
+
+
+# -----------------------------------------------------------------------------
+# Testing-mode machine parameters and run control (simulation only; refused in REAL DATA mode)
+# -----------------------------------------------------------------------------
+class SimParamsRequest(BaseModel):
+    machine_id: str
+    params: Dict[str, Any]
+
+
+class SimRunRequest(BaseModel):
+    action: str = Field(pattern="^(pause|resume|stop|start|run_for)$")
+    minutes: Optional[float] = None
+
+
+def sim_controls_status() -> Dict[str, Any]:
+    return {"run": factory_engine.run_status(), "auto_demo": auto_demo.on, "simulation_only": True,
+            "machines": [factory_engine.machine_params(mid) for mid in factory_engine.plants]}
+
+
+@app.get("/api/sim/controls")
+def get_sim_controls():
+    """Run state and each simulated machine's parameters with their engineering limits."""
+    return sim_controls_status()
+
+
+@app.post("/api/sim/params")
+async def post_sim_params(req: SimParamsRequest):
+    """Change parameters of one simulated machine. Values outside the limits are refused (422), not clamped.
+    Only the simulation changes: nothing is sent to any device. The Auto Demo stops (its story assumes defaults)."""
+    _testing_only("Changing simulation parameters")
+    if req.machine_id not in factory_engine.plants:
+        raise HTTPException(status_code=404, detail=f"Unknown machine {req.machine_id}")
+    try:
+        msgs = factory_engine.set_params(req.machine_id, req.params)
+    except ParamError as err:
+        raise HTTPException(status_code=422, detail={"error": "parameter_out_of_limits", "message": str(err)})
+    if auto_demo.on:
+        await auto_demo.set(False)
+    await broadcast_messages(msgs)
+    return sim_controls_status()
+
+
+@app.post("/api/sim/params/reset")
+async def post_sim_params_reset(machine_id: Optional[str] = Query(default=None)):
+    """Back to the default parameters (one machine, or all)."""
+    _testing_only("Resetting simulation parameters")
+    await broadcast_messages(factory_engine.reset_params(machine_id))
+    return sim_controls_status()
+
+
+@app.post("/api/sim/run")
+async def post_sim_run(req: SimRunRequest):
+    """pause / resume / stop (reset to baseline) / start / run_for N minutes, then pause."""
+    _testing_only("Simulation run control")
+    if req.action == "stop" and auto_demo.on:
+        auto_demo.on = False  # stop resets the engine itself
+    try:
+        msgs = factory_engine.run_control(req.action, req.minutes)
+    except ParamError as err:
+        raise HTTPException(status_code=422, detail={"error": "invalid_run_request", "message": str(err)})
+    await broadcast_messages(msgs)
+    return sim_controls_status()
 
 
 def _machine_spec(req: AddMachineRequest, machine_id: str) -> tuple[Dict[str, Any], Dict[str, Any], Optional[Dict[str, Any]]]:
@@ -528,6 +650,7 @@ async def post_reset(auto_demo_on: Optional[bool] = Query(default=None, alias="a
 
     If the Auto Demo is on it restarts from 0 s; `?auto_demo=false|true` also switches it.
     """
+    _testing_only("Resetting the simulation")
     if auto_demo_on is False and auto_demo.on:
         await auto_demo.set(False)  # also resets
     else:
@@ -546,6 +669,9 @@ def get_auto_demo():
 @app.post("/api/auto_demo")
 async def post_auto_demo(on: bool):
     """Toggle the 90-second Auto Demo. Turning it off leaves a clean baseline."""
+    if on:
+        _testing_only("The Auto Demo")
+        await broadcast_messages(factory_engine.run_control("start"))  # a paused or stopped simulation runs again
     return await auto_demo.set(on)
 
 
@@ -558,6 +684,7 @@ def get_scenarios():
 
 @app.post("/api/scenarios/{scenario_id}/start")
 async def post_start_scenario(scenario_id: str):
+    _testing_only("Starting a fault scenario")
     sc = SCENARIOS.get(scenario_id)
     if sc is None:
         raise HTTPException(status_code=404, detail=f"Unknown scenario {scenario_id}")
@@ -570,6 +697,7 @@ async def post_start_scenario(scenario_id: str):
 @app.post("/api/scenarios/resolve")
 async def post_resolve(machine_id: Optional[str] = None):
     """Simulate resolution: clear faults, release SIM derates, resolve alerts, close their work orders."""
+    _testing_only("Simulated resolution")
     if machine_id is not None and machine_id not in factory_engine.plants:
         raise HTTPException(status_code=404, detail=f"Machine {machine_id} not found")
     await resolve_machine(machine_id)
@@ -874,6 +1002,8 @@ def get_mode():
 @app.post("/api/mode")
 async def post_mode(req: ModeRequest):
     """SIM, REPLAY (AI4I rows into a CNC mill), or LIVE (only if a real device is online; never faked)."""
+    if req.mode == "REPLAY":
+        _testing_only("REPLAY of the AI4I dataset")
     if req.mode == "LIVE":
         if not _live_devices():
             raise HTTPException(status_code=409, detail="No live device connected")
@@ -891,6 +1021,47 @@ async def post_mode(req: ModeRequest):
         raise HTTPException(status_code=409, detail=f"REPLAY unavailable: {err}")
     await broadcast_messages(msgs)
     return mode_status()
+
+
+class OperatingModeRequest(BaseModel):
+    mode: str = Field(pattern="^(TESTING|REAL_DATA)$")
+
+
+def real_connection() -> Dict[str, Any]:
+    bridge = mqtt_ref.get("mqtt")
+    return connection_state(bridge.status() if bridge else None, iot_hub.list())
+
+
+def operating_mode_status() -> Dict[str, Any]:
+    return {**operating_mode.public(), "connection": real_connection(), "telemetry_source": mode_status()["mode"],
+            "modes": list(OPERATING_MODES)}
+
+
+@app.get("/api/operating-mode")
+def get_operating_mode():
+    """TESTING or REAL DATA, plus the real-data connection state (MQTT broker, devices, last message)."""
+    return operating_mode_status()
+
+
+@app.post("/api/operating-mode")
+async def post_operating_mode(req: OperatingModeRequest):
+    """Switch between TESTING and REAL DATA. Entering REAL DATA stops the Auto Demo and REPLAY and resets the
+    background simulation to a clean healthy baseline, so earlier test faults cannot raise alerts that look real."""
+    if not operating_mode.set(req.mode):
+        return operating_mode_status()
+    if req.mode == REAL_DATA:
+        # Real readings reach the dashboard through the engine tick (IoT overlay), so it must be running.
+        await broadcast_messages(factory_engine.run_control("start"))
+        if factory_engine.mode == "REPLAY":
+            await broadcast_messages(factory_engine.command({"cmd": "set_mode", "mode": "SIM"}))
+        if auto_demo.on:
+            await auto_demo.set(False)  # also resets to a clean baseline
+        else:
+            await clean_reset()
+    factory_engine._emit_event(None, "MODE", "INFO", f"Operating mode: {operating_mode.public()['label']}",
+                               data={"operating_mode": req.mode})
+    await broadcast_messages(factory_engine.flush_events())
+    return operating_mode_status()
 
 
 @app.get("/api/analytics")
@@ -977,7 +1148,7 @@ def api_get_report(trend_minutes: float = Query(default=10.0, gt=0, le=30)):
     return build_report(trend_minutes)
 
 
-RANGE_SECTIONS = ("telemetry", "events", "rl_decisions")
+RANGE_SECTIONS = ("telemetry", "real_telemetry", "events", "rl_decisions")
 TELEMETRY_COLS = ["ts", "machine_id", "mode", "state", "rpm", "derate_pct", "vibration_rms_mm_s", "zone", "temp_c",
                   "power_kw", "load_pct", "energy_kwh", "tool_wear_min", "risk", "failure_risk_pct", "active_scenario"]
 EVENT_COLS = ["ts", "event_id", "machine_id", "kind", "severity", "title", "measured", "inferred", "suggested"]
@@ -1004,6 +1175,8 @@ def range_rows(section: str, start: str, end: str) -> tuple[List[Dict[str, Any]]
     """Rows of one time-filtered section (UTC ISO bounds)."""
     if section == "telemetry":
         return query_telemetry(start, end), TELEMETRY_COLS
+    if section == "real_telemetry":  # readings from real devices only (source LIVE)
+        return query_telemetry(start, end, source="real"), TELEMETRY_COLS
     if section == "events":
         return query_events(start, end), EVENT_COLS
     if section == "rl_decisions":
@@ -1020,6 +1193,52 @@ def range_rows(section: str, start: str, end: str) -> tuple[List[Dict[str, Any]]
 def _filename(stem: str, start: str, end: str, ext: str) -> str:
     fmt = lambda t: t[:16].replace("-", "").replace(":", "")  # 20261025T1000
     return f"udyam-twin-{stem}-{fmt(start)}Z-to-{fmt(end)}Z.{ext}"
+
+
+RECENT_KINDS = ("telemetry", "events", "alerts", "work_orders")
+
+
+def _telemetry_summary(r: Dict[str, Any]) -> str:
+    parts = [f"{r['rpm']:.0f} rpm" if isinstance(r.get("rpm"), (int, float)) else None,
+             f"{r['temp_c']:.1f} °C" if isinstance(r.get("temp_c"), (int, float)) else None,
+             f"{r['vibration_rms_mm_s']:.2f} mm/s" if isinstance(r.get("vibration_rms_mm_s"), (int, float)) else None,
+             f"zone {r['zone']}" if r.get("zone") else None,
+             f"{r['power_kw']:.2f} kW" if isinstance(r.get("power_kw"), (int, float)) else None,
+             r.get("state")]
+    return " · ".join(p for p in parts if p)
+
+
+@app.get("/api/reports/recent")
+def get_recent_entries(limit: int = Query(default=60, ge=1, le=300),
+                       kind: str = Query(default="all", pattern="^(all|telemetry|events|alerts|work_orders)$")):
+    """The newest records as stored in the database (what the exports contain), newest first: telemetry rows
+    (simulated and real, each tagged with its source), events, alerts and work orders."""
+    kinds = RECENT_KINDS if kind == "all" else (kind,)
+    out: List[Dict[str, Any]] = []
+    if "telemetry" in kinds:
+        now = datetime.now(timezone.utc)
+        start, end = exporter.iso_ms(now - timedelta(minutes=2)), exporter.iso_ms(now + timedelta(seconds=5))
+        for source in ("sim", "real"):
+            for r in query_telemetry(start, end, source=source)[-limit:]:
+                out.append({"ts": r["ts"], "kind": "telemetry", "machine_id": r["machine_id"], "source": r.get("mode") or "SIM",
+                            "severity": None, "summary": _telemetry_summary(r)})
+    if "events" in kinds:
+        for e in get_events(limit=limit):
+            out.append({"ts": e["ts"], "kind": "event", "machine_id": e.get("machine_id"), "source": None,
+                        "severity": e.get("severity"), "detail": e.get("kind"), "summary": e.get("title")})
+    if "alerts" in kinds:
+        for a in list_alerts(include_resolved=True, limit=limit):
+            out.append({"ts": a["last_seen_at"], "kind": "alert", "machine_id": a.get("machine_id"), "source": None,
+                        "severity": a.get("severity"), "detail": a.get("status"), "summary": a.get("title")})
+    if "work_orders" in kinds:
+        for w in list_work_orders()[:limit]:
+            out.append({"ts": w["created_at"], "kind": "work_order", "machine_id": w.get("machine_id"), "source": None,
+                        "severity": None, "detail": w.get("status"),
+                        "summary": f"{w['wo_id']} · {w.get('title')} · {w.get('priority')}"})
+    out.sort(key=lambda x: x["ts"] or "", reverse=True)
+    return {"entries": out[:limit], "generated_at": exporter.iso_ms(datetime.now(timezone.utc)),
+            "note": "Records as stored (what the exports contain). Telemetry is recorded every 2 s per machine; "
+                    "LIVE rows come from real devices, SIM and REPLAY rows from the simulation."}
 
 
 @app.get("/api/reports/export.csv")
@@ -1102,7 +1321,7 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
     rep = build_report()
     summary_rows, summary_cols = _csv_rows(report_csv("summary", rep))
     oee_rows, oee_cols = _csv_rows(report_csv("oee", rep))
-    sections = {name: range_rows(name, s, e) for name in ("telemetry", "alerts", "work_orders", "events", "rl_decisions")}
+    sections = {name: range_rows(name, s, e) for name in ("telemetry", "real_telemetry", "alerts", "work_orders", "events", "rl_decisions")}
     rl_eval: List[Dict[str, Any]] = []
     if RL_METRICS_PATH.exists():
         results = json.loads(RL_METRICS_PATH.read_text(encoding="utf-8")).get("results", {})
@@ -1124,7 +1343,10 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
     sheets = [
         {"name": "About", "columns": ["field", "value"], "rows": about},
         {"name": "Summary", "columns": summary_cols, "rows": summary_rows, "note": "Since the last reset (not the range)"},
-        {"name": "Telemetry", "columns": TELEMETRY_COLS, "rows": sections["telemetry"][0], "note": note, "time_columns": ["ts"]},
+        {"name": "Telemetry", "columns": TELEMETRY_COLS, "rows": sections["telemetry"][0],
+         "note": note + " Simulated / replayed telemetry (source SIM or REPLAY).", "time_columns": ["ts"]},
+        {"name": "Real telemetry", "columns": TELEMETRY_COLS, "rows": sections["real_telemetry"][0],
+         "note": f"Readings from real devices only (source LIVE). Range {s} → {e} (UTC).", "time_columns": ["ts"]},
         {"name": "Energy & OEE", "columns": oee_cols, "rows": oee_rows, "note": "Since the last reset and since server start"},
         {"name": "Alerts", "columns": ALERT_COLS, "rows": sections["alerts"][0], "note": note,
          "time_columns": ["raised_at", "acknowledged_at", "resolved_at"]},
@@ -1219,7 +1441,11 @@ def api_ims_validation(trends: bool = False):
 
 @app.get("/api/metrics")
 def api_get_metrics():
-    """AI4I 2020 failure-model test metrics (models/metrics.json, written by `python -m ml.train_ai4i`)."""
+    """Test metrics of the deployed AI4I failure model: the registry's production version once the registry is in
+    use, otherwise models/metrics.json (written by `python -m ml.train_ai4i`)."""
+    if model_registry.index_path.is_file():
+        version = model_registry.production()
+        return {**model_registry.metrics(version), "registry_version": version}
     metrics_file = ROOT / "models" / "metrics.json"
     if metrics_file.exists():
         return json.loads(metrics_file.read_text(encoding="utf-8"))
@@ -1283,12 +1509,308 @@ def _decide(proposal_id: str, decision: str, operator: str) -> Dict[str, Any]:
         raise HTTPException(status_code=err.status, detail=err.detail())
 
 
+# -----------------------------------------------------------------------------
+# Model registry: candidate training on AI4I + synthetic data, gated promotion, rollback (ml/model_registry.py)
+# -----------------------------------------------------------------------------
+class CandidateTrainRequest(BaseModel):
+    datasets: List[str] = Field(min_length=1, max_length=10)
+    synthetic_weight: float = Field(default=1.0, ge=0.1, le=5.0)
+    use_confirmed_labels: bool = False
+
+
+class ModelDeployRequest(BaseModel):
+    operator: str = Field(default="operator", min_length=1, max_length=60)
+    to_version: Optional[str] = Field(default=None, pattern="^v[0-9]{3}$")
+
+
+def _registry_call(fn):
+    try:
+        return fn()
+    except RegistryError as err:
+        raise HTTPException(status_code=409, detail={"error": "model_registry", "message": str(err)})
+
+
+def models_status() -> Dict[str, Any]:
+    reg = _registry_call(model_registry.state)
+    return {**reg, "gate_criteria": MODEL_GATE, "training": training_job.status(),
+            "deployed_model": _deployed_model_path().name if not _deployed_model_path().is_relative_to(ROOT)
+            else str(_deployed_model_path().relative_to(ROOT)),
+            "synthetic_datasets": [{k: d.get(k) for k in ("dataset_id", "name", "config", "counts")}
+                                   for d in synthetic_store.list()],
+            "note": ("Versions marked real_machine_data include operator-confirmed samples from real machines; "
+                     "all other training data is synthetic (AI4I 2020 and SYNTHETIC DIGITAL TWIN DATA)."
+                     if any(v.get("real_machine_data") for v in reg["versions"]) else
+                     "Every version is trained on synthetic data only (AI4I 2020 and SYNTHETIC DIGITAL TWIN DATA); "
+                     "none has learned from real machines.")}
+
+
+@app.get("/api/models/ai4i")
+def get_models():
+    """Model registry: versions with their evaluation gate, the production version, history and training job."""
+    return models_status()
+
+
+@app.get("/api/models/ai4i/{version}/metrics")
+def get_model_metrics(version: str):
+    return _registry_call(lambda: model_registry.metrics(version))
+
+
+@app.post("/api/models/ai4i/train", status_code=202)
+def post_train_candidate(req: CandidateTrainRequest):
+    """Train a candidate in the background. Training never deploys anything: it is only registered."""
+    _registry_call(model_registry.state)  # registers the baseline first if needed
+    try:
+        return training_job.start(req.datasets, req.synthetic_weight, by="dashboard", use_labels=req.use_confirmed_labels)
+    except CandidateError as err:
+        raise HTTPException(status_code=409 if "already" in str(err) else 422,
+                            detail={"error": "candidate_training", "message": str(err)})
+
+
+async def _model_switched(action: str, reg: Dict[str, Any], operator: str) -> Dict[str, Any]:
+    use_model_path(_deployed_model_path)  # the twin reloads the model on its next evaluation
+    last = reg["history"][-1]
+    factory_engine._emit_event(None, "MODEL", "INFO",
+                               f"Failure-risk model {action}: {last['from']} → {last['version']} (by {operator})",
+                               data={"action": action, **last})
+    await broadcast_messages(factory_engine.flush_events())
+    return models_status()
+
+
+@app.post("/api/models/ai4i/{version}/promote")
+async def post_promote_model(version: str, request: Request, body: Optional[ModelDeployRequest] = None,
+                             x_operator_token: Optional[str] = Header(default=None)):
+    """Deploy a candidate that passed its evaluation gate. Needs an operator; refused in Real Data mode."""
+    _authorize_operator(request, x_operator_token)
+    _testing_only("Changing the deployed model")
+    operator = (body.operator if body else "operator").strip() or "operator"
+    reg = _registry_call(lambda: model_registry.promote(version, by=operator))
+    return await _model_switched("promoted", reg, operator)
+
+
+@app.post("/api/models/ai4i/rollback")
+async def post_rollback_model(request: Request, body: Optional[ModelDeployRequest] = None,
+                              x_operator_token: Optional[str] = Header(default=None)):
+    """Make an earlier production version (default: the previous one) production again."""
+    _authorize_operator(request, x_operator_token)
+    _testing_only("Changing the deployed model")
+    operator = (body.operator if body else "operator").strip() or "operator"
+    reg = _registry_call(lambda: model_registry.rollback(by=operator, to_version=body.to_version if body else None))
+    return await _model_switched("rolled back", reg, operator)
+
+
+# -----------------------------------------------------------------------------
+# Adaptive learning: input drift and operator-confirmed labels (ml/adaptive.py)
+# -----------------------------------------------------------------------------
+class BaselineRequest(BaseModel):
+    machine_id: str
+    source: str = Field(default="SIM", pattern="^(SIM|REPLAY|LIVE)$")
+
+
+class LabelRequest(BaseModel):
+    machine_id: str
+    label: str = Field(pattern="^(failure|false_alarm|normal)$")
+    source: Optional[str] = Field(default=None, pattern="^(SIM|REPLAY|LIVE)$")
+    alert_id: Optional[str] = None
+    minutes: Optional[float] = Field(default=None, gt=0, le=30)
+    start: Optional[str] = None
+    end: Optional[str] = None
+    fault_type: Optional[str] = Field(default=None, max_length=60)
+    note: Optional[str] = Field(default=None, max_length=300)
+    operator: str = Field(default="operator", min_length=1, max_length=60)
+
+
+def _current_source(machine_id: str) -> str:
+    if machine_id in set(real_connection().get("live_machines") or []):
+        return "LIVE"
+    return "REPLAY" if factory_engine.replay_machine == machine_id else "SIM"
+
+
+def _label_window(req: LabelRequest) -> tuple[datetime, datetime, Optional[str]]:
+    now = datetime.now(timezone.utc)
+    if req.alert_id:
+        a = get_alert(req.alert_id)
+        if a is None or a.get("machine_id") != req.machine_id:
+            raise HTTPException(status_code=404, detail={"error": "unknown_alert", "message": "No such alert on that machine."})
+        start = _parse_iso(a["raised_at"]) - timedelta(minutes=5)
+        end = min(now, _parse_iso(a["last_seen_at"]) + timedelta(minutes=1), start + MAX_LABEL_WINDOW)
+        return start, end, a["alert_id"]
+    if req.minutes:
+        return now - timedelta(minutes=req.minutes), now, None
+    if req.start and req.end:
+        return _parse_iso(req.start), _parse_iso(req.end), None
+    raise HTTPException(status_code=422, detail={"error": "label_window", "message": "Give alert_id, minutes, or start and end."})
+
+
+def _parse_iso(ts: str) -> datetime:
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"error": "bad_time", "message": f"Not an ISO time: {ts}"})
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def adaptive_status() -> Dict[str, Any]:
+    labels = label_store.list(include_retracted=True)
+    active = [l for l in labels if l["status"] == "ACTIVE"]
+    return {"drift": drift_monitor.status(), "reference": production_reference().public(),
+            "labels": labels[:100],
+            "label_counts": {"active": len(active), "failure": sum(l["label"] == "failure" for l in active),
+                             "false_alarm": sum(l["label"] == "false_alarm" for l in active),
+                             "normal": sum(l["label"] == "normal" for l in active),
+                             "from_real_machines": sum(l["source"] == "LIVE" for l in active)},
+            "note": "Drift is information, not a fault: nothing is retrained or changed automatically. Only "
+                    "operator-confirmed labels are used for training; unlabelled readings never are."}
+
+
+@app.get("/api/adaptive")
+def get_adaptive():
+    return adaptive_status()
+
+
+@app.post("/api/adaptive/baseline")
+def post_adaptive_baseline(req: BaselineRequest):
+    """Use the last 5 minutes as the machine's new baseline (e.g. after an intended change of job or settings)."""
+    try:
+        drift_monitor.set_baseline(req.machine_id, req.source, by="dashboard")
+    except ValueError as err:
+        raise HTTPException(status_code=409, detail={"error": "baseline", "message": str(err)})
+    return adaptive_status()
+
+
+@app.post("/api/adaptive/labels", status_code=201)
+async def post_adaptive_label(req: LabelRequest, request: Request, x_operator_token: Optional[str] = Header(default=None)):
+    """Confirm what happened in a window (failure / false alarm / normal). Needs an operator; allowed in both modes
+    (labelling is a record, not a machine action). The buffered model inputs for the window are stored with it."""
+    _authorize_operator(request, x_operator_token)
+    start, end, alert_id = _label_window(req)
+    source = req.source or _current_source(req.machine_id)
+    try:
+        lab = label_store.create(machine_id=req.machine_id, source=source, start=start, end=end, label=req.label,
+                                 samples=drift_monitor.window(req.machine_id, source, start, end),
+                                 operator=req.operator.strip() or "operator", fault_type=req.fault_type,
+                                 alert_id=alert_id, note=req.note)
+    except LabelError as err:
+        raise HTTPException(status_code=422, detail={"error": "label", "message": str(err)})
+    factory_engine._emit_event(req.machine_id, "LABEL", "INFO",
+                               f"{lab['label_text']} confirmed by {lab['operator']} on {req.machine_id} ({source}, "
+                               f"{lab['n_samples']} samples)", data={"label_id": lab["id"], "label": lab["label"], "source": source})
+    await broadcast_messages(factory_engine.flush_events())
+    return lab
+
+
+@app.post("/api/adaptive/labels/{label_id}/retract")
+def post_retract_label(label_id: int, request: Request, body: Optional[ProposalDecision] = None,
+                       x_operator_token: Optional[str] = Header(default=None)):
+    _authorize_operator(request, x_operator_token)
+    try:
+        return label_store.retract(label_id, (body.operator if body else "operator").strip() or "operator")
+    except LabelError as err:
+        raise HTTPException(status_code=409, detail={"error": "label", "message": str(err)})
+
+
+@app.get("/api/adaptive/labels/export")
+def get_labels_export(format: str = Query(default="csv", pattern="^(csv|json)$")):
+    """Every active label's samples with their origin (real machine or simulation)."""
+    rows = [{**r, "data_origin": "REAL MACHINE (operator-confirmed)" if r["source"] == "LIVE"
+             else "SIMULATION (operator-confirmed)"} for r in label_store.training_rows()]
+    cols = ["ts", "label_id", "source", "data_origin", *FEATURES_AI4I, "machine_failure"]
+    if format == "json":
+        return JSONResponse({"rows": rows, "columns": cols},
+                            headers={"Content-Disposition": 'attachment; filename="confirmed_labels.json"'})
+    return Response(_csv(rows, cols), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="confirmed_labels.csv"'})
+
+
+# -----------------------------------------------------------------------------
+# What-if comparisons (sim/whatif.py): separate engines, never the live simulation
+# -----------------------------------------------------------------------------
+class WhatIfScenarioIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    params: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    fault: Optional[Dict[str, Any]] = None
+    auto_derate: bool = True
+
+
+class WhatIfRequest(BaseModel):
+    scenarios: List[WhatIfScenarioIn] = Field(min_length=whatif.MIN_SCENARIOS, max_length=whatif.MAX_SCENARIOS)
+    minutes: float = Field(default=15.0, ge=1.0, le=whatif.MAX_MINUTES)
+    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+    focus_machine: str = "VMC-01"
+
+
+@app.get("/api/whatif/options")
+def get_whatif_options():
+    probe = FactoryEngine(machines=4)
+    return {"label": whatif.RESULT_LABEL, "faults": whatif.FAULTS, "max_scenarios": whatif.MAX_SCENARIOS,
+            "max_minutes": whatif.MAX_MINUTES,
+            "machines": [{"machine_id": mid, "name": p.name, "template": p.template,
+                          "params": factory_engine.machine_params(mid)["specs"] if mid in factory_engine.plants else []}
+                         for mid, p in probe.plants.items()],
+            "live_params": {mid: v for mid, v in factory_engine.sim_params.items() if mid in probe.plants}}
+
+
+@app.post("/api/whatif/run", status_code=202)
+def post_whatif_run(req: WhatIfRequest):
+    """Compare scenarios on separate simulated lines (allowed in both modes: nothing live is touched)."""
+    scenarios = [whatif.Scenario(s.name.strip(), s.params, s.fault, s.auto_derate) for s in req.scenarios]
+    try:
+        return whatif_jobs.start(scenarios, req.minutes, req.seed, req.focus_machine, get_economics())
+    except whatif.WhatIfError as err:
+        raise HTTPException(status_code=409 if "already" in str(err) else 422,
+                            detail={"error": "whatif", "message": str(err)})
+
+
+@app.get("/api/whatif/job")
+def get_whatif_job():
+    return whatif_jobs.status()
+
+
+@app.post("/api/whatif/job/cancel")
+def post_whatif_cancel():
+    whatif_jobs.cancel()
+    return whatif_jobs.status()
+
+
+@app.get("/api/whatif/results")
+def get_whatif_results():
+    return [{"id": r["id"], "created_at": r["created_at"], "minutes": r["minutes"], "focus_machine": r["focus_machine"],
+             "scenarios": [s["name"] for s in r["scenarios"]]} for r in reversed(list(whatif_jobs.results.values()))]
+
+
+def _whatif_result(rid: str) -> Dict[str, Any]:
+    r = whatif_jobs.results.get(rid)
+    if r is None:
+        raise HTTPException(status_code=404, detail=f"No what-if result {rid}")
+    return r
+
+
+@app.get("/api/whatif/results/{rid}")
+def get_whatif_result(rid: str):
+    return _whatif_result(rid)
+
+
+@app.get("/api/whatif/results/{rid}/export")
+def get_whatif_export(rid: str, format: str = Query(default="csv", pattern="^(csv|json)$")):
+    r = _whatif_result(rid)
+    if format == "json":
+        return JSONResponse(r, headers={"Content-Disposition": f'attachment; filename="{rid}.json"'})
+    keys = list(r["scenarios"][0]["kpis"])
+    rows = [{"label": r["label"], "scenario": s["name"], **s["kpis"],
+             **{f"delta_{k}": (s.get("delta_vs_baseline") or {}).get(k) for k in keys}} for s in r["scenarios"]]
+    cols = ["label", "scenario", *keys, *[f"delta_{k}" for k in keys]]
+    return Response(_csv(rows, cols), media_type="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="{rid}.csv"'})
+
+
 @app.post("/api/chat/proposals/{proposal_id}/approve")
 async def api_approve_proposal(proposal_id: str, request: Request, body: Optional[ProposalDecision] = None,
                                x_operator_token: Optional[str] = Header(default=None)):
     """Operator approval: executes the proposal once, on the simulated plant only (never a physical machine)."""
     _authorize_operator(request, x_operator_token)
     operator = (body or ProposalDecision()).operator
+    pending = advisor.proposals.get(proposal_id) or {}
+    if pending.get("action") in ("derate", "clear_derate"):
+        _testing_only("Applying a derate in the simulator")
     p = _decide(proposal_id, "approved", operator)
     if p["action"] in ("derate", "clear_derate"):
         pct = float(p.get("derate_pct", 0.0)) if p["action"] == "derate" else 0.0
@@ -1327,6 +1849,10 @@ def api_sim_metrics():
 # -----------------------------------------------------------------------------
 # WebSocket Telemetry Channel
 # -----------------------------------------------------------------------------
+WS_TESTING_COMMANDS = {"inject_fault", "clear_faults", "start_scenario", "resolve", "reset", "auto_demo", "set_mode",
+                       "set_derate"}
+
+
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(ws: WebSocket):
     await ws.accept()
@@ -1341,6 +1867,12 @@ async def websocket_telemetry_endpoint(ws: WebSocket):
             try:
                 cmd = json.loads(text)
             except json.JSONDecodeError:
+                continue
+            # REAL DATA mode is read-only: simulator commands are refused (add_machine stays allowed).
+            if operating_mode.is_real and cmd.get("cmd") in WS_TESTING_COMMANDS and not (
+                    cmd.get("cmd") == "auto_demo" and not cmd.get("on", True)):
+                await ws.send_text(json.dumps({"type": "error", "cmd": cmd.get("cmd"),
+                                               "detail": ReadOnlyError(f"'{cmd.get('cmd')}'").detail()}))
                 continue
             # Reset and Auto Demo go through the same paths as REST; everything else to the engine.
             if cmd.get("cmd") == "reset":

@@ -165,9 +165,7 @@ function renderMachineGrid() {
             <span class="pill OK">RUN</span>
           </div>
         </div>
-        <div style="font-size: 11px; color: var(--text-muted);">
-          ID: <b>${esc(m.machine_id)}</b> · ${esc(m.template)} · Rated: ${esc(m.nameplate?.rated_kw || 7.5)} kW
-        </div>
+        <div class="mc-id">${esc(m.machine_id)} · ${esc(m.template.replace("_", " "))} · ${esc(m.nameplate?.rated_kw || 7.5)} kW</div>
         <div id="content-${esc(m.machine_id)}">
           <div class="text-muted" style="font-size: 12px;">Waiting for telemetry tick...</div>
         </div>
@@ -191,6 +189,7 @@ function sourceBadge(o) {
 }
 
 function updateModeBadge() {
+  if (window.udyamMode) return;  // web/mode.js owns the badge (Testing / Real Data switch)
   const el = document.getElementById("globalModeBadge");
   if (!el) return;
   const live = Object.values(state.obs).filter(o => o.source_mode === "LIVE").length;
@@ -207,7 +206,7 @@ function renderMachineCard(machineId) {
   if (!container) return;
 
   const m = state.machines[machineId];
-  const o = state.obs[machineId] || {};
+  const o = realOnly(state.obs[machineId] || {});
   const t = state.twin[machineId] || {};
 
   if (badgesContainer) {
@@ -220,29 +219,28 @@ function renderMachineCard(machineId) {
     `;
   }
 
+  // Compact card: four key readings; torque, the twin's prediction and parameters are in the detail panel.
   let fields = [];
   if (m.template.startsWith("cnc")) {
     fields = [
-      ["Spindle Speed", `${fmt(o.rpm, 0)} RPM`],
-      ["Torque", `${fmt(o.torque_nm, 1)} Nm`],
-      ["Process Temp", `${fmt(o.process_temp_k, 2)} K`],
-      ["Twin Predicted", `${fmt(t.predicted?.process_temp_k, 2)} K`],
-      ["Tool Wear", `${fmt(o.tool_wear_min, 1)} min`],
-      ["Spindle Vibration", `${fmt(o.vibration_rms_mm_s, 2)} mm/s`],
+      ["Speed", fmt(o.rpm, 0), "RPM"],
+      ["Process temp", fmt(o.process_temp_k, 1), "K"],
+      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
+      ["Tool wear", fmt(o.tool_wear_min, 0), "min"],
     ];
   } else if (m.template === "air_compressor") {
     fields = [
-      ["Line Pressure", `${fmt(o.pressure_bar, 2)} bar`],
-      ["Duty Cycle", `${fmt(o.duty_pct, 1)} %`],
-      ["Discharge Temp", `${fmt(o.discharge_temp_c, 1)} °C`],
-      ["Vibration", `${fmt(o.vibration_rms_mm_s, 2)} mm/s`],
+      ["Pressure", fmt(o.pressure_bar, 2), "bar"],
+      ["Duty", fmt(o.duty_pct, 0), "%"],
+      ["Discharge", fmt(o.discharge_temp_c, 1), "°C"],
+      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
     ];
   } else {
     fields = [
-      ["Blade Speed", `${fmt(o.rpm, 0)} RPM`],
-      ["Blade Wear", `${fmt(o.blade_wear_pct, 1)} %`],
-      ["Motor Power", `${fmt(o.power_kw, 2)} kW`],
-      ["Vibration", `${fmt(o.vibration_rms_mm_s, 2)} mm/s`],
+      ["Blade speed", fmt(o.rpm, 0), "RPM"],
+      ["Blade wear", fmt(o.blade_wear_pct, 1), "%"],
+      ["Power", fmt(o.power_kw, 2), "kW"],
+      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
     ];
   }
 
@@ -251,26 +249,15 @@ function renderMachineCard(machineId) {
   const forecast = t.forecast || { minutes_to_warning: null };
 
   container.innerHTML = `
-    <table class="telemetry-table">
-      ${fields.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}
-    </table>
-    <div class="twin-section">
-      <div class="twin-header">
-        <span>Residual (${esc(res.signal || "e")})</span>
-        <span class="pill ${esc(res.state || 'IN_BAND')}">${fmt(res.value, 2)} (${esc(res.state)})</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span>Params ${esc(params.version || 'v1.0')} ${params.frozen ? '<b style="color:var(--status-crit)">[FROZEN]</b>' : ''}</span>
-        <span style="font-family:var(--font-mono); font-size:11px;">
-          ${Object.entries(params.values || {}).map(([k, v]) => `${esc(k)}=${fmt(v, 2)}`).join(" ")}
-        </span>
-      </div>
-      ${forecast.warning ? `
-        <div style="background:rgba(239,68,68,0.15); color:#f87171; padding:4px 6px; border-radius:4px; font-weight:600; font-size:11px;">
-          ⚠ ${esc(forecast.warning)} in ~${fmt(forecast.minutes_to_warning, 0)} min at current rate
-        </div>
-      ` : ''}
+    <div class="mc-metrics">
+      ${fields.map(([k, v, u]) => `<div class="mc-metric"><span>${esc(k)}</span><b>${esc(v)}<small> ${esc(u)}</small></b></div>`).join("")}
     </div>
+    <div class="mc-foot" title="Residual ${esc(res.signal || "e")} · params ${esc(params.version || "v1.0")} ${Object.entries(params.values || {}).map(([k, v]) => `${esc(k)}=${fmt(v, 2)}`).join(" ")}">
+      <span>Twin residual</span>
+      <span class="pill ${esc(res.state || "IN_BAND")}">${fmt(res.value, 2)} · ${esc(res.state)}</span>
+      ${params.frozen ? '<b class="mc-frozen">FROZEN</b>' : ""}
+    </div>
+    ${forecast.warning ? `<div class="mc-warn">⚠ ${esc(forecast.warning)} in ~${fmt(forecast.minutes_to_warning, 0)} min at current rate</div>` : ""}
   `;
 }
 
@@ -338,7 +325,7 @@ function renderDetailPanel() {
     threeContainer = document.getElementById("threeContainer");
   }
 
-  const o = state.obs[mid] || {};
+  const o = realOnly(state.obs[mid] || {});
   const t = state.twin[mid] || {};
   const r = t.residual || { signal: "process_temp_k", value: 0.0, ewma: 0.0, cusum: 0.0, band: 0.6, state: "IN_BAND" };
   const p = t.params || { version: "v1.0", values: {}, frozen: false, freeze_reason: null };
@@ -633,16 +620,36 @@ function updateKindFilter(kind) {
   sel.appendChild(new Option(kind.replace(/_/g, " ").toLowerCase(), kind));
 }
 
+// REAL DATA mode: a device sends only some signals; the rest of a LIVE frame is still simulated, so it is blanked.
+const SENSED_FIELDS = ["rpm", "torque_nm", "process_temp_k", "air_temp_k", "tool_wear_min", "vibration_rms_mm_s", "current_a",
+  "voltage_v", "power_kw", "load_pct", "pressure_bar", "duty_pct", "discharge_temp_c", "blade_wear_pct"];
+function realOnly(o) {
+  const m = window.udyamMode;
+  if (!o || !m || m.mode !== "REAL_DATA" || !Array.isArray(o.live_fields)) return o;
+  const out = { ...o };
+  SENSED_FIELDS.forEach(k => { if (!o.live_fields.includes(k)) out[k] = null; });
+  return out;
+}
+
+// REAL DATA mode (web/mode.js): items about machines without a real device are simulation, so they are hidden
+function hiddenInRealMode(mid) {
+  const m = window.udyamMode;
+  return !!(m && m.mode === "REAL_DATA" && mid && mid !== "FACTORY" && !m.liveMachines.has(mid));
+}
+
 function renderEventLog() {
   const container = document.getElementById("eventLog");
   if (!container) return;
   const { sev, kind } = state.eventFilter;
-  const rows = state.events.filter(e => (sev === "ALL" || e.severity === sev) && (kind === "ALL" || e.kind === kind));
+  const matching = state.events.filter(e => (sev === "ALL" || e.severity === sev) && (kind === "ALL" || e.kind === kind));
+  const rows = matching.filter(e => !hiddenInRealMode(e.machine_id));
+  const hidden = matching.length - rows.length;
+  const note = hidden ? `<div class="list-empty">${hidden} simulation event(s) hidden in Real Data mode.</div>` : "";
   if (!rows.length) {
-    container.innerHTML = `<div class="list-empty">${state.events.length ? "No events match the filter." : "No events yet."}</div>`;
+    container.innerHTML = note || `<div class="list-empty">${state.events.length ? "No events match the filter." : "No events yet."}</div>`;
     return;
   }
-  container.innerHTML = rows.map(e => {
+  container.innerHTML = note + rows.map(e => {
     const open = state.expandedEvents.has(e._id);
     const detail = e.measured || e.inferred || e.suggested;
     const summary = e.inferred || e.measured || "";
@@ -703,12 +710,16 @@ function renderAlerts() {
   const list = document.getElementById("alertList");
   const count = document.getElementById("alertCount");
   if (!list) return;
-  const alerts = [...state.alerts].sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3)
+  const simHidden = state.alerts.filter(a => hiddenInRealMode(a.machine_id)).length;
+  const alerts = state.alerts.filter(a => !hiddenInRealMode(a.machine_id)).sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3)
     || (a.status === "ACTIVE" ? -1 : 1) - (b.status === "ACTIVE" ? -1 : 1) || String(b.raised_at).localeCompare(String(a.raised_at)));
   const active = alerts.filter(a => a.status === "ACTIVE").length;
   if (count) { count.textContent = `${active} active`; count.classList.toggle("zero", active === 0); }
   list.classList.toggle("empty", !alerts.length);
-  if (!alerts.length) { list.innerHTML = `<div class="list-empty ok">✓ No open alerts</div>`; return; }
+  if (!alerts.length) {
+    list.innerHTML = `<div class="list-empty ok">✓ No open alerts${simHidden ? ` (${simHidden} simulation alert(s) hidden in Real Data mode)` : ""}</div>`;
+    return;
+  }
   list.innerHTML = alerts.map(a => `
     <div class="alert-card ${esc(a.severity)}${a.status === "ACKNOWLEDGED" ? " acked" : ""}" title="${esc([a.measured, a.inferred, a.suggested].filter(Boolean).join("\n"))}">
       <div class="alert-main">

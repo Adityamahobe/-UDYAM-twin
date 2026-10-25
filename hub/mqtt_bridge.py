@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 from hub.core import HubError, IoTHub
@@ -30,6 +31,9 @@ class MqttBridge:
         self.received = 0
         self.rejected = 0
         self.last_error: str | None = None
+        # CONNECTING → CONNECTED; DISCONNECTED (paho keeps retrying) or ERROR otherwise
+        self.state = "NOT_STARTED"
+        self.last_message_at: str | None = None
 
     @classmethod
     def from_env(cls, hub: IoTHub) -> "MqttBridge | None":
@@ -49,6 +53,7 @@ class MqttBridge:
             import paho.mqtt.client as mqtt
         except ImportError:
             self.last_error = "paho-mqtt not installed (pip install paho-mqtt)"
+            self.state = "ERROR"
             return False
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="udyam-hub")
         if self.username:
@@ -57,10 +62,12 @@ class MqttBridge:
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
         try:
+            self.state = "CONNECTING"
             self.client.connect_async(self.host, self.port, keepalive=30)
             self.client.loop_start()
         except Exception as err:  # noqa: BLE001 - surface any broker error in status
             self.last_error = str(err)
+            self.state = "ERROR"
             return False
         return True
 
@@ -74,11 +81,14 @@ class MqttBridge:
         if self.connected:
             client.subscribe(TOPIC, qos=0)
             self.last_error = None
+            self.state = "CONNECTED"
         else:
             self.last_error = f"connect failed: {reason_code}"
+            self.state = "ERROR"
 
     def _on_disconnect(self, _client, _userdata, _flags, reason_code, _props=None) -> None:
         self.connected = False
+        self.state = "DISCONNECTED"
         if reason_code.is_failure:
             self.last_error = f"disconnected: {reason_code}"
 
@@ -88,6 +98,7 @@ class MqttBridge:
     def handle(self, topic: str, raw: bytes) -> None:
         """Process one MQTT message (split out so it is testable without a broker)."""
         self.received += 1
+        self.last_message_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         parts = topic.split("/")
         if len(parts) != 3:
             self.rejected += 1
@@ -105,6 +116,8 @@ class MqttBridge:
             "broker": f"{self.host}:{self.port}",
             "topic": TOPIC,
             "connected": self.connected,
+            "state": self.state,
+            "last_message_at": self.last_message_at,
             "received": self.received,
             "rejected": self.rejected,
             "last_error": self.last_error,

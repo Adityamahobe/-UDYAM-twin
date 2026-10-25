@@ -64,6 +64,8 @@ class ProductionLine:
                 state, speed = "DERATED", max(0.0, 1.0 - derate / 100.0)
             else:
                 state, speed = "RUNNING", 1.0
+            # Testing-mode spindle speed (sim/controls.py): a cutting-bound cycle scales with speed; 1.0 by default
+            speed *= getattr(m, "speed_scale", 1.0)
 
             self.progress[mid] += speed * TICK_S / cycle
             if self.progress[mid] >= 1.0:

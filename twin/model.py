@@ -9,7 +9,8 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
 from config import get_config
 from ml.ai4i import AI4IPredictor
@@ -27,10 +28,20 @@ RUL_WINDOW_S = 60.0         # tool-wear trend window for the RUL estimate
 RUL_MIN_POINTS = 20         # at least 10 s of trend before an RUL is given
 
 
+_model_path: Callable[[], Path] | None = None  # the deployed model (registry production), set by the API
+
+
+def use_model_path(provider: Callable[[], Path] | None) -> None:
+    """Point the twin at another model file (e.g. after a registry promotion or rollback) and reload it."""
+    global _model_path
+    _model_path = provider
+    ai4i_predictor.cache_clear()
+
+
 @lru_cache(maxsize=1)
 def ai4i_predictor() -> AI4IPredictor:
     """One shared model per process (loaded on first use)."""
-    return AI4IPredictor()
+    return AI4IPredictor(_model_path()) if _model_path else AI4IPredictor()
 
 
 def _c(k: float) -> str:
@@ -73,6 +84,8 @@ class DigitalTwin:
     wear_hist: deque = field(default_factory=lambda: deque(maxlen=int(RUL_WINDOW_S / TICK_S)))
     rule_state: dict = field(default_factory=dict)  # debounced alert latches, see _rule()
     rated_kw: float | None = None                   # set by the engine from the machine's nameplate
+    auto_derate: bool = True                        # the engine applies proposed SIM derates (False: proposal only)
+    risk_model: Any = None                          # per-twin override of the AI4I model (e.g. skipped in dataset generation)
 
     def __post_init__(self):
         cfg = get_config()
@@ -142,9 +155,10 @@ class DigitalTwin:
                                         "priority": "Critical" if lv == "CRITICAL" else "High"}}
             if lv == "CRITICAL" and derate_to is not None:
                 sp_from = float(obs.get("rpm_setpoint") or obs.get("rpm_nominal") or 0.0)
-                title += f"; auto-derated 20% (SIM only), setpoint {sp_from:.0f} → {derate_to:.0f} rpm"
+                title += (f"; auto-derated 20% (SIM only), setpoint {sp_from:.0f} → {derate_to:.0f} rpm" if self.auto_derate
+                          else f"; 20% derate proposed, not applied (self-healing off), setpoint {sp_from:.0f} → {derate_to:.0f} rpm")
                 data.update({"derate_pct": 20.0, "rpm_setpoint_from": sp_from, "rpm_setpoint_to": derate_to,
-                             "mode": "SIM_AUTO"})
+                             "mode": "SIM_AUTO" if self.auto_derate else "PROPOSED"})
             return self._alert(
                 obs["ts"], "VIB", lv, title,
                 measured=f"Velocity RMS {vib:.2f} mm/s, zone {zone} (boundary {name} {bound:g} mm/s); "
@@ -315,7 +329,8 @@ class DigitalTwin:
         current_derate = float(obs.get("derate_pct") or 0.0)
         derate_to = None
         if self.hero and not replay and current_derate == 0.0 and vib_rms >= (self.vib_zones or (0, float("inf")))[1]:
-            derate_to = round(float(obs.get("rpm_nominal") or 0.0) * 0.8, 1)
+            # 20 % off the current commanded setpoint (which includes any Testing-mode speed setting)
+            derate_to = round(float(obs.get("rpm_setpoint") or obs.get("rpm_nominal") or 0.0) * 0.8, 1)
         vib_event = self._vibration_alert(obs, vib_rms, derate_to)
         if vib_event:
             events.append(vib_event)
@@ -346,7 +361,7 @@ class DigitalTwin:
             proposed_derate = 20.0
             # Derate acts on the commanded setpoint, so the alert quotes setpoints, not a noisy measured rpm.
             sp_from = float(obs.get("rpm_setpoint") or obs.get("rpm_nominal") or 0.0)
-            sp_to = round(float(obs.get("rpm_nominal") or sp_from) * (1.0 - proposed_derate / 100.0), 1)
+            sp_to = round(sp_from * (1.0 - proposed_derate / 100.0), 1)
             evidence = (f"Process temp {_c(now_temp)} and rising; twin forecasts {_c(temp_limit)} limit "
                         f"in ~{minutes:.0f} min at current settings")
             events.append({
@@ -357,7 +372,10 @@ class DigitalTwin:
                 "machine_id": self.machine_id,
                 "kind": "ALERT",
                 "severity": "WARN",
-                "title": f"Over-temperature forecast: auto-derated 20% (SIM only), setpoint {sp_from:.0f} → {sp_to:.0f} rpm",
+                "title": (f"Over-temperature forecast: auto-derated 20% (SIM only), setpoint {sp_from:.0f} → {sp_to:.0f} rpm"
+                          if self.auto_derate else
+                          f"Over-temperature forecast: 20% derate proposed, not applied (self-healing off), setpoint "
+                          f"{sp_from:.0f} → {sp_to:.0f} rpm"),
                 "measured": f"Process temp {_c(now_temp)}, rising; spindle setpoint {sp_from:.0f} rpm",
                 "inferred": f"Calibrated twin forecasts {_c(temp_limit)} in ~{minutes:.0f} min at current settings",
                 "suggested": "Check coolant flow and filter. On a LIVE machine this derate needs operator approval.",
@@ -365,7 +383,7 @@ class DigitalTwin:
                     "derate_pct": proposed_derate,
                     "rpm_setpoint_from": sp_from,
                     "rpm_setpoint_to": sp_to,
-                    "mode": "SIM_AUTO",
+                    "mode": "SIM_AUTO" if self.auto_derate else "PROPOSED",
                     "work_order_draft": {
                         "machine_id": self.machine_id,
                         "cause": "Over-temperature forecast (cooling degraded)",
@@ -515,10 +533,20 @@ class DigitalTwin:
         if obs.get("process_temp_k") is None or not isinstance(obs.get("rpm"), (int, float)):
             self.ml_detail = None
             return None, {"status": "NO_DATA", "detail": "Process temperature or speed not available this tick."}
+        if obs.get("source_mode") == "LIVE":
+            # A real device's frame keeps the simulation's values for fields it did not send (hub/core.py overlay):
+            # never score a real machine on a mix of real and simulated inputs.
+            missing = [f for f in ("air_temp_k", "process_temp_k", "rpm", "torque_nm", "tool_wear_min")
+                       if f not in (obs.get("live_fields") or [])]
+            if missing:
+                self.ml_detail = None
+                return None, {"status": "NO_DATA",  # the v1.0 schema's status enum is frozen
+                              "detail": "The device does not send " + ", ".join(missing) + "; the failure-risk model "
+                                        "needs all five inputs from the machine, so no risk is given."}
         # Replayed rows are independent samples, so each one gets its own prediction.
         if self.ml_detail is None or self.ticks % ML_EVERY_TICKS == 1 or obs.get("source_mode") == "REPLAY":
             self.ml_detail = {
-                **ai4i_predictor().predict(
+                **(self.risk_model or ai4i_predictor()).predict(
                     air_temp_k=air_temp,
                     process_temp_k=float(obs["process_temp_k"]),
                     rpm=float(obs["rpm"]),

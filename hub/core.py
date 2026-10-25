@@ -292,6 +292,7 @@ class IoTHub:
             status = d.status(self.clock())
             out = dict(obs)
             out["source_mode"] = "SIM" if d.simulated else "LIVE"
+            out["live_fields"] = sorted(d.last_fields)  # the rest of the frame is still the simulation's
             if status == "OFFLINE":
                 for k in d.last_fields:
                     out[k] = None

@@ -152,6 +152,9 @@ def init_db(db_path: Path = DB_PATH) -> None:
             );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS telemetry_ts ON telemetry (ts);")
+        # Readings from real devices (source LIVE) are kept apart from simulated / replayed telemetry.
+        conn.execute("CREATE TABLE IF NOT EXISTS real_telemetry AS SELECT * FROM telemetry WHERE 0;")
+        conn.execute("CREATE INDEX IF NOT EXISTS real_telemetry_ts ON real_telemetry (ts);")
         # Reinforcement-learning feedback loop: one row per evaluated 20 s decision (ml/maintenance_rl.py).
         conn.execute("""
             CREATE TABLE IF NOT EXISTS rl_decisions (
@@ -217,6 +220,15 @@ def log_event(event: dict[str, Any], db_path: Path = DB_PATH) -> None:
                 data_json,
             ),
         )
+
+
+def max_event_seq(db_path: Path = DB_PATH) -> int:
+    """Highest event number stored (E00123 or E00123-RULE → 123). The engine numbers events from here after a
+    restart; otherwise new ids collide with stored ones and INSERT OR IGNORE silently drops the new events."""
+    row = get_connection(db_path).execute(
+        "SELECT MAX(CAST(substr(event_id, 2, instr(event_id || '-', '-') - 2) AS INTEGER)) FROM events "
+        "WHERE event_id GLOB 'E[0-9]*';").fetchone()
+    return int(row[0] or 0)
 
 
 def get_events(limit: int = 50, db_path: Path = DB_PATH) -> list[dict[str, Any]]:
@@ -517,7 +529,11 @@ TELEMETRY_COLUMNS = ("ts", "machine_id", "mode", "state", "rpm", "derate_pct", "
                      "power_kw", "load_pct", "energy_kwh", "tool_wear_min", "risk", "failure_risk_pct", "active_scenario")
 
 
+TELEMETRY_TABLES = {"sim": "telemetry", "real": "real_telemetry"}
+
+
 def log_telemetry(rows: list[dict[str, Any]], db_path: Path = DB_PATH) -> None:
+    """Rows tagged mode LIVE (real devices) go to real_telemetry; SIM and REPLAY rows to telemetry."""
     if not rows:
         return
     cols = ", ".join(TELEMETRY_COLUMNS)
@@ -525,21 +541,26 @@ def log_telemetry(rows: list[dict[str, Any]], db_path: Path = DB_PATH) -> None:
     with _WRITE_LOCK:
         conn = get_connection(db_path)
         with conn:
-            conn.executemany(f"INSERT INTO telemetry ({cols}) VALUES ({marks});",
-                             [tuple(r.get(c) for c in TELEMETRY_COLUMNS) for r in rows])
+            for table, part in (("real_telemetry", [r for r in rows if r.get("mode") == "LIVE"]),
+                                ("telemetry", [r for r in rows if r.get("mode") != "LIVE"])):
+                if part:
+                    conn.executemany(f"INSERT INTO {table} ({cols}) VALUES ({marks});",
+                                     [tuple(r.get(c) for c in TELEMETRY_COLUMNS) for r in part])
 
 
 def prune_telemetry(before_ts: str, db_path: Path = DB_PATH) -> int:
     with _WRITE_LOCK:
         conn = get_connection(db_path)
         with conn:
-            return conn.execute("DELETE FROM telemetry WHERE ts < ?;", (before_ts,)).rowcount
+            return sum(conn.execute(f"DELETE FROM {t} WHERE ts < ?;", (before_ts,)).rowcount
+                       for t in TELEMETRY_TABLES.values())
 
 
 def query_telemetry(start: str, end: str, machine_id: str | None = None, limit: int = 500_000,
-                    db_path: Path = DB_PATH) -> list[dict[str, Any]]:
-    """Telemetry rows with start <= ts <= end (UTC ISO strings in the stored format), oldest first."""
-    sql = f"SELECT {', '.join(TELEMETRY_COLUMNS)} FROM telemetry WHERE ts >= ? AND ts <= ?"
+                    db_path: Path = DB_PATH, source: str = "sim") -> list[dict[str, Any]]:
+    """Telemetry rows with start <= ts <= end (UTC ISO strings in the stored format), oldest first.
+    source "sim" = simulated / replayed telemetry, "real" = readings from real devices."""
+    sql = f"SELECT {', '.join(TELEMETRY_COLUMNS)} FROM {TELEMETRY_TABLES[source]} WHERE ts >= ? AND ts <= ?"
     args: list[Any] = [start, end]
     if machine_id:
         sql += " AND machine_id = ?"

@@ -16,71 +16,121 @@
   <header>
     <div class="brand">
       <h1>UDYAM-TWIN</h1>
-      <span class="badge-sim" id="globalModeBadge">SIMULATION MODE (SUPERVISED SIL)</span>
+      <button type="button" class="badge-sim mode-switch" id="globalModeBadge" title="Switch between Testing mode (simulation) and Real Data mode (live telemetry)">TESTING MODE · SIMULATION</button>
     </div>
     <div class="header-controls">
       <div class="connection-status">
         <div class="status-dot" id="statusDot"></div>
         <span id="connectionStatusText">Connecting...</span>
       </div>
-      <button class="btn btn-sm" id="btnAutoDemo" onclick="toggleAutoDemo()">Auto Demo: ON</button>
-      <button class="btn btn-sm" onclick="resetScenario()">Reset Scenario</button>
+      <button class="btn btn-sm testing-only" id="btnAutoDemo" onclick="toggleAutoDemo()">Auto Demo: ON</button>
+      <button class="btn btn-sm testing-only" onclick="resetScenario()">Reset Scenario</button>
       <button class="btn btn-sm btn-primary" onclick="openOnboardingModal()">+ Add Your Machine</button>
       <a href="/operator" class="btn btn-sm" style="text-decoration:none;">Operator View 📱</a>
     </div>
   </header>
 
   <main>
-    <!-- Line Flow & Throughput Banner -->
-    <section class="line-banner">
-      <div class="line-flow" id="lineStationsFlow">
-        <div class="station-node"><span>SAW-01</span><span class="buffer-pill">buf 0/10</span><span class="pill OK">RUNNING</span></div>
-        <span class="flow-arrow">→</span>
-        <div class="station-node"><span>LATHE-01</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
-        <span class="flow-arrow">→</span>
-        <div class="station-node"><span>VMC-01 ★</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
+    <!-- Real Data mode: connection status (web/mode.js); hidden in Testing mode -->
+    <section class="real-banner" id="realBanner" hidden aria-live="polite"></section>
+
+    <!-- Workspace tabs (web/workspace.js): one screen per job instead of one long page -->
+    <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Dashboard sections">
+      <button type="button" role="tab" class="ws-tab" data-tab="live" aria-selected="true">Live <span class="ws-count" id="wsAlertCount" hidden></span></button>
+      <button type="button" role="tab" class="ws-tab ws-testing" data-tab="simulate" aria-selected="false">Simulate</button>
+      <button type="button" role="tab" class="ws-tab" data-tab="ai" aria-selected="false">Data &amp; AI</button>
+      <button type="button" role="tab" class="ws-tab" data-tab="reports" aria-selected="false">Reports</button>
+    </nav>
+
+    <!-- LIVE: the plant now -->
+    <div class="ws-pane" data-pane="live" role="tabpanel">
+      <!-- Line Flow & Throughput Banner -->
+      <section class="line-banner sim-view">
+        <div class="line-flow" id="lineStationsFlow">
+          <div class="station-node"><span>SAW-01</span><span class="buffer-pill">buf 0/10</span><span class="pill OK">RUNNING</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="station-node"><span>LATHE-01</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="station-node"><span>VMC-01 ★</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
+        </div>
+        <div class="line-kpis">
+          <div class="kpi-item">
+            <span class="kpi-label">Line Rate</span>
+            <span class="kpi-val" id="lineThroughput">— /h</span>
+          </div>
+          <div class="kpi-item">
+            <span class="kpi-label">Line Loss Est.</span>
+            <span class="kpi-val" id="lineLoss" style="color:var(--status-warn);">₹0 /h</span>
+          </div>
+          <div class="kpi-item">
+            <span class="kpi-label">Bottleneck</span>
+            <span class="kpi-val" id="lineBottleneck">—</span>
+          </div>
+          <div class="kpi-item">
+            <span class="kpi-label">Air Supply (Shared Utility)</span>
+            <span class="kpi-val" id="lineAirSupply" style="color:var(--status-ok);">OPTIMAL</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4-Machine Factory Assets Grid -->
+      <section class="machine-grid" id="machineGrid">
+        <!-- Populated dynamically by app.js -->
+      </section>
+
+      <div class="lower-layout">
+        <div class="ws-col">
+          <!-- Detailed Inspector Panel -->
+          <section class="panel" id="detailView">
+            <div class="text-muted">Loading telemetry model inspector...</div>
+          </section>
+
+          <!-- Vibration Health (ml/vibration): measured vs simulated, rule-based severity, ML prediction -->
+          <section class="panel" id="vibrationPanel">
+            <div class="text-muted">Loading vibration health...</div>
+          </section>
+        </div>
+        <div class="ws-col">
+          <!-- Active alerts (server alert store) + explainable event log -->
+          <section class="panel panel-compact">
+            <div class="panel-header">
+              <h2>Alerts &amp; Explainable Event Log</h2>
+              <span class="count-pill crit" id="alertCount" title="Active alerts">0 active</span>
+            </div>
+            <div id="alertList" class="alert-list scroll-list"></div>
+            <div class="event-filters" id="eventFilters">
+              <div class="sev-chips" role="group" aria-label="Filter by severity">
+                <button type="button" class="sev-chip active" data-sev="ALL">All</button>
+                <button type="button" class="sev-chip INFO" data-sev="INFO">Info</button>
+                <button type="button" class="sev-chip WARN" data-sev="WARN">Warning</button>
+                <button type="button" class="sev-chip CRITICAL" data-sev="CRITICAL">Critical</button>
+              </div>
+              <select id="eventKindFilter" aria-label="Filter by event type"><option value="ALL">All types</option></select>
+            </div>
+            <div class="event-log scroll-list" id="eventLog">
+              <!-- Populated dynamically -->
+            </div>
+          </section>
+
+          <!-- Work Orders Panel -->
+          <section class="panel panel-compact">
+            <div class="panel-header">
+              <h2>Operator Work Orders <span class="count-pill" id="woCount">0</span></h2>
+              <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('VMC-01', 'Scheduled Inspection')">+ New Order</button>
+            </div>
+            <div id="workOrderList" class="wo-list scroll-list">
+              <!-- Populated dynamically -->
+            </div>
+          </section>
+        </div>
       </div>
-      <div class="line-kpis">
-        <div class="kpi-item">
-          <span class="kpi-label">Line Rate</span>
-          <span class="kpi-val" id="lineThroughput">— /h</span>
-        </div>
-        <div class="kpi-item">
-          <span class="kpi-label">Line Loss Est.</span>
-          <span class="kpi-val" id="lineLoss" style="color:var(--status-warn);">₹0 /h</span>
-        </div>
-        <div class="kpi-item">
-          <span class="kpi-label">Bottleneck</span>
-          <span class="kpi-val" id="lineBottleneck">—</span>
-        </div>
-        <div class="kpi-item">
-          <span class="kpi-label">Air Supply (Shared Utility)</span>
-          <span class="kpi-val" id="lineAirSupply" style="color:var(--status-ok);">OPTIMAL</span>
-        </div>
-      </div>
-    </section>
+    </div>
 
-    <!-- 4-Machine Factory Assets Grid -->
-    <section class="machine-grid" id="machineGrid">
-      <!-- Populated dynamically by app.js -->
-    </section>
-
-    <!-- Lower Split: Digital Twin Inspector & Operations Panel -->
-    <div class="lower-layout">
-      <!-- Left Column: Detailed Inspector, Controls, Economics -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <!-- Detailed Inspector Panel -->
-        <section class="panel" id="detailView">
-          <div class="text-muted">Loading telemetry model inspector...</div>
-        </section>
-
-        <!-- Vibration Health (ml/vibration): measured vs simulated, rule-based severity, ML prediction -->
-        <section class="panel" id="vibrationPanel">
-          <div class="text-muted">Loading vibration health...</div>
-        </section>
-
+    <!-- SIMULATE: Testing-mode tools (hidden in Real Data mode) -->
+    <div class="ws-pane" data-pane="simulate" role="tabpanel" hidden>
+      <div class="ws-grid">
         <!-- Fault Injection & Supervised Control Toolbar -->
-        <section class="panel">
+        <section class="panel testing-only" data-testing-note="Fault injection and derates are simulator controls: switch to Testing mode to use them.">
           <div class="panel-header">
             <h2>Controlled Fault Injection & Self-Healing Testing</h2>
           </div>
@@ -123,8 +173,225 @@
           </div>
         </section>
 
+        <!-- Testing-mode machine parameters and run control (web/sim_controls.js); simulation only -->
+        <section class="panel testing-only" id="simControlsPanel" data-testing-note="Simulation parameters and run control are Testing-mode controls: they never change real machines.">
+          <div class="panel-header">
+            <h2>Simulation Controls</h2>
+            <span class="sc-run" id="scRunState">—</span>
+          </div>
+          <div class="control-bar">
+            <button class="btn btn-sm" id="scPause">Pause</button>
+            <button class="btn btn-sm" id="scResume">Resume</button>
+            <button class="btn btn-sm btn-danger" id="scStop" title="Stop and reset the plant to a clean baseline (parameters are kept)">Stop</button>
+            <span class="sc-sep"></span>
+            <label class="sc-label" for="scMinutes">Run for</label>
+            <input type="number" id="scMinutes" class="sc-num" min="0.5" max="240" step="0.5" value="5">
+            <span class="sc-label">min</span>
+            <button class="btn btn-sm" id="scRunFor">Run, then pause</button>
+          </div>
+          <div class="control-bar sc-machine-bar">
+            <label class="sc-label" for="scMachine">Machine:</label>
+            <select id="scMachine"></select>
+            <span class="sc-tag" id="scTag"></span>
+          </div>
+          <div class="sc-params" id="scParams"></div>
+          <div class="control-bar">
+            <button class="btn btn-sm btn-primary" id="scApply">Apply to simulation</button>
+            <button class="btn btn-sm" id="scResetOne">Defaults (this machine)</button>
+            <button class="btn btn-sm" id="scResetAll">Defaults (all)</button>
+          </div>
+          <div class="sc-hint" id="scHint">Parameters change the simulated plant only. The twin is not told; it has to notice the effect in the telemetry.</div>
+        </section>
+
+        <!-- What-if comparisons (web/whatif.js); separate simulated lines, never the live simulation -->
+        <section class="panel" id="whatifPanel">
+          <div class="panel-header">
+            <h2>What-If Comparison</h2>
+            <span class="synth-label" title="Runs on separate virtual lines. Not a prediction for real machines.">SIMULATED WHAT-IF</span>
+          </div>
+          <div class="synth-body">
+            <div class="synth-grid">
+              <label>Run time (min) <input type="number" id="wiMinutes" min="1" max="60" value="15"></label>
+              <label>Seed <input type="number" id="wiSeed" min="0" value="42"></label>
+              <label>Focus machine <select id="wiFocus"></select></label>
+              <label>Add a preset <select id="wiPreset"></select></label>
+            </div>
+            <div class="wi-scenarios" id="wiScenarios"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm" id="wiAdd">+ Scenario</button>
+              <button class="btn btn-sm" id="wiFromLive" title="Copy the live Simulation Controls parameters into the baseline">Baseline = current settings</button>
+              <button class="btn btn-sm btn-primary" id="wiRun">Run comparison</button>
+              <button class="btn btn-sm" id="wiCancel" hidden>Cancel</button>
+              <span class="sc-hint" id="wiHint">Every scenario runs on its own virtual line with the same seed. The live simulation is not touched.</span>
+            </div>
+            <div id="wiResult"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- DATA & AI: datasets, models, drift and labels, RL policy -->
+    <div class="ws-pane" data-pane="ai" role="tabpanel" hidden>
+      <div class="ws-grid">
+        <!-- Synthetic dataset generator (web/synthetic.js); separate engines, never the live simulation -->
+        <section class="panel" id="synthPanel">
+          <div class="panel-header">
+            <h2>Synthetic Dataset Generator</h2>
+            <span class="synth-label" title="Generated by the simulator. Contains no readings from real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
+          </div>
+          <div class="synth-body">
+            <div class="synth-grid">
+              <label>Machine <select id="synMachine"></select></label>
+              <label>Episodes <input type="number" id="synEpisodes" min="1" max="200" value="20"></label>
+              <label>Minutes each <input type="number" id="synMinutes" min="1" max="60" step="1" value="10"></label>
+              <label>Seed <input type="number" id="synSeed" min="0" value="2026"></label>
+              <label>Auto-derate share <input type="number" id="synDerate" min="0" max="1" step="0.1" value="0.5"></label>
+              <label>Name <input type="text" id="synName" maxlength="60" placeholder="optional"></label>
+            </div>
+            <div class="synth-sub">Faults to sample (one per episode, random onset)</div>
+            <div class="synth-faults" id="synFaults"></div>
+            <div class="synth-sub">Parameter ranges (min – max, sampled per episode; within the Testing-mode limits)</div>
+            <div class="synth-ranges" id="synRanges"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm btn-primary" id="synGenerate">Generate dataset</button>
+              <button class="btn btn-sm" id="synCancel" hidden>Cancel</button>
+              <div class="synth-progress" id="synProgress" hidden><div id="synBar"></div></div>
+            </div>
+            <div class="sc-hint" id="synHint">Runs on separate simulation engines: the live dashboard and real telemetry are not touched.</div>
+            <div class="synth-list" id="synList"></div>
+          </div>
+        </section>
+
+        <!-- Failure-risk model registry (web/models.js): candidates, evaluation gate, promotion, rollback -->
+        <section class="panel" id="modelPanel">
+          <div class="panel-header">
+            <h2>Model Registry · Failure-Risk Model</h2>
+            <span class="badge-sim" id="mdProd" style="font-size:10px;">—</span>
+          </div>
+          <div class="synth-body">
+            <div class="sc-hint">Every version is trained on synthetic data only (AI4I 2020 and SYNTHETIC DIGITAL TWIN DATA): none has learned from real machines. A candidate is never deployed automatically; it must pass the evaluation gate and an operator must promote it.</div>
+            <div class="synth-sub">Train a candidate: AI4I 2020 + synthetic datasets</div>
+            <div class="synth-faults" id="mdDatasets"></div>
+            <div class="control-bar">
+              <label class="sc-label" for="mdWeight">Synthetic row weight</label>
+              <input type="number" id="mdWeight" class="sc-num" min="0.1" max="5" step="0.1" value="1">
+              <label class="sc-label"><input type="checkbox" id="mdUseLabels"> Include operator-confirmed labels (<span id="mdLabelCount">0</span>)</label>
+              <button class="btn btn-sm btn-primary" id="mdTrain">Train candidate</button>
+              <span class="sc-hint" id="mdJob"></span>
+            </div>
+            <details class="md-gate"><summary>Evaluation gate (fixed before training)</summary><ul id="mdGate"></ul></details>
+            <div class="md-versions" id="mdVersions"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm testing-only" id="mdRollback">Roll back to previous production</button>
+              <span class="sc-hint" id="mdHint"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Adaptive learning (web/adaptive.js): input drift vs the model's training data, operator-confirmed labels -->
+        <section class="panel" id="adaptivePanel">
+          <div class="panel-header">
+            <h2>Adaptive Learning · Drift &amp; Confirmed Labels</h2>
+            <span class="badge-sim" id="adRef" style="font-size:10px;">—</span>
+          </div>
+          <div class="synth-body">
+            <div class="sc-hint">Drift is information, not a fault: nothing is retrained or changed automatically. Only labels an operator confirms are used for training.</div>
+            <div class="md-versions" id="adDrift"></div>
+            <div class="synth-sub">Confirm what happened (operator)</div>
+            <div class="synth-grid">
+              <label>Machine <select id="adMachine"></select></label>
+              <label>What happened <select id="adLabel">
+                <option value="failure">Confirmed failure</option>
+                <option value="false_alarm">False alarm</option>
+                <option value="normal">Normal operation</option>
+              </select></label>
+              <label>Window <select id="adWindow"></select></label>
+              <label>Fault type <input type="text" id="adFault" maxlength="60" placeholder="if a failure"></label>
+              <label>Note <input type="text" id="adNote" maxlength="300" placeholder="optional"></label>
+            </div>
+            <div class="control-bar">
+              <button class="btn btn-sm btn-primary" id="adConfirm">Confirm label</button>
+              <a class="btn btn-sm" href="/api/adaptive/labels/export?format=csv">Labels CSV</a>
+              <a class="btn btn-sm" href="/api/adaptive/labels/export?format=json">Labels JSON</a>
+              <span class="sc-hint" id="adHint"></span>
+            </div>
+            <div class="md-versions" id="adLabels"></div>
+          </div>
+        </section>
+
+        <!-- Reinforcement-learning maintenance policy (web/rl.js) -->
+        <section class="panel" id="rlPanel">
+          <div class="panel-header">
+            <h2>Reinforcement Learning · Maintenance Policy</h2>
+            <span class="badge-sim" style="font-size:10px;">SIM-TRAINED</span>
+          </div>
+          <div id="rlBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- REPORTS: export, economics, research -->
+    <div class="ws-pane" data-pane="reports" role="tabpanel" hidden>
+      <div class="ws-grid">
+        <div class="ws-col">
+          <!-- Time-range export (web/reports.js) -->
+          <section class="panel" id="exportPanel">
+            <div class="panel-header">
+              <h2>Reports &amp; Export</h2>
+              <span class="badge-sim" style="font-size:10px;">CSV · EXCEL</span>
+            </div>
+            <div class="export-body">
+              <div class="export-quick" id="exportQuick">
+                <button type="button" class="btn btn-sm" data-min="15">Last 15 min</button>
+                <button type="button" class="btn btn-sm" data-min="60">Last 1 h</button>
+                <button type="button" class="btn btn-sm" data-min="480">Last 8 h</button>
+                <button type="button" class="btn btn-sm" data-min="1440">Last 24 h</button>
+              </div>
+              <div class="export-range">
+                <label>From <input type="datetime-local" id="exportStart" step="1"></label>
+                <label>To <input type="datetime-local" id="exportEnd" step="1"></label>
+              </div>
+              <div class="export-row">
+                <label>Section
+                  <select id="exportSection">
+                    <option value="telemetry">Telemetry · simulated (every 2 s)</option>
+                    <option value="real_telemetry">Telemetry · real devices only</option>
+                    <option value="alerts">Alerts</option>
+                    <option value="work_orders">Work orders</option>
+                    <option value="events">Event log</option>
+                    <option value="rl_decisions">RL decisions &amp; feedback</option>
+                    <option value="summary">Summary (since reset)</option>
+                    <option value="oee">Energy &amp; OEE (since reset)</option>
+                  </select>
+                </label>
+                <button type="button" class="btn btn-sm" id="exportCsv">⬇ CSV</button>
+                <button type="button" class="btn btn-sm btn-primary" id="exportXlsx">⬇ Excel (all sheets)</button>
+              </div>
+              <div class="formula-hint" id="exportHint">Times are your local time; files store UTC plus an India time (IST) column.</div>
+            </div>
+          </section>
+
+          <!-- Live records (web/recent.js): the newest rows written to the database, i.e. what the exports contain -->
+          <section class="panel panel-compact" id="recentPanel">
+            <div class="panel-header">
+              <h2>Live Records</h2>
+              <button type="button" class="btn btn-sm" id="rcPause" aria-pressed="false">Pause</button>
+            </div>
+            <div class="sev-chips" id="rcKinds" role="group" aria-label="Filter records">
+              <button type="button" class="sev-chip active" data-kind="all">All</button>
+              <button type="button" class="sev-chip" data-kind="telemetry">Telemetry</button>
+              <button type="button" class="sev-chip" data-kind="events">Events</button>
+              <button type="button" class="sev-chip" data-kind="alerts">Alerts</button>
+              <button type="button" class="sev-chip" data-kind="work_orders">Work orders</button>
+            </div>
+            <div class="rc-wrap scroll-list"><table class="rc-table"><thead><tr><th>Time</th><th>Type</th><th>Machine</th><th>Entry</th></tr></thead>
+              <tbody id="rcBody"><tr><td colspan="4" class="sc-hint">Loading…</td></tr></tbody></table></div>
+            <div class="sc-hint" id="rcHint">Newest first. Updates every 2 s while this tab is open.</div>
+          </section>
+        </div>
+
         <!-- MSME Economics & Sustainability Calculator -->
-        <section class="panel">
+        <section class="panel sim-view">
           <div class="panel-header">
             <div>
               <h2>MSME Business Impact & Sustainability Calculator</h2>
@@ -205,104 +472,6 @@
             </div>
           </div>
         </section>
-      </div>
-
-      <!-- Right Column: Events, Work Orders, Model Metrics -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <!-- Work Orders Panel -->
-        <section class="panel panel-compact">
-          <div class="panel-header">
-            <h2>Operator Work Orders <span class="count-pill" id="woCount">0</span></h2>
-            <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('VMC-01', 'Scheduled Inspection')">+ New Order</button>
-          </div>
-          <div id="workOrderList" class="wo-list scroll-list">
-            <!-- Populated dynamically -->
-          </div>
-        </section>
-
-        <!-- Active alerts (server alert store) + explainable event log -->
-        <section class="panel panel-compact">
-          <div class="panel-header">
-            <h2>Alerts &amp; Explainable Event Log</h2>
-            <span class="count-pill crit" id="alertCount" title="Active alerts">0 active</span>
-          </div>
-          <div id="alertList" class="alert-list scroll-list"></div>
-          <div class="event-filters" id="eventFilters">
-            <div class="sev-chips" role="group" aria-label="Filter by severity">
-              <button type="button" class="sev-chip active" data-sev="ALL">All</button>
-              <button type="button" class="sev-chip INFO" data-sev="INFO">Info</button>
-              <button type="button" class="sev-chip WARN" data-sev="WARN">Warning</button>
-              <button type="button" class="sev-chip CRITICAL" data-sev="CRITICAL">Critical</button>
-            </div>
-            <select id="eventKindFilter" aria-label="Filter by event type"><option value="ALL">All types</option></select>
-          </div>
-          <div class="event-log scroll-list" id="eventLog">
-            <!-- Populated dynamically -->
-          </div>
-        </section>
-
-        <!-- Reinforcement-learning maintenance policy (web/rl.js) -->
-        <section class="panel" id="rlPanel">
-          <div class="panel-header">
-            <h2>Reinforcement Learning · Maintenance Policy</h2>
-            <span class="badge-sim" style="font-size:10px;">SIM-TRAINED</span>
-          </div>
-          <div id="rlBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
-        </section>
-
-        <!-- Time-range export (web/reports.js) -->
-        <section class="panel" id="exportPanel">
-          <div class="panel-header">
-            <h2>Reports &amp; Export</h2>
-            <span class="badge-sim" style="font-size:10px;">CSV · EXCEL</span>
-          </div>
-          <div class="export-body">
-            <div class="export-quick" id="exportQuick">
-              <button type="button" class="btn btn-sm" data-min="15">Last 15 min</button>
-              <button type="button" class="btn btn-sm" data-min="60">Last 1 h</button>
-              <button type="button" class="btn btn-sm" data-min="480">Last 8 h</button>
-              <button type="button" class="btn btn-sm" data-min="1440">Last 24 h</button>
-            </div>
-            <div class="export-range">
-              <label>From <input type="datetime-local" id="exportStart" step="1"></label>
-              <label>To <input type="datetime-local" id="exportEnd" step="1"></label>
-            </div>
-            <div class="export-row">
-              <label>Section
-                <select id="exportSection">
-                  <option value="telemetry">Telemetry (every 2 s)</option>
-                  <option value="alerts">Alerts</option>
-                  <option value="work_orders">Work orders</option>
-                  <option value="events">Event log</option>
-                  <option value="rl_decisions">RL decisions &amp; feedback</option>
-                  <option value="summary">Summary (since reset)</option>
-                  <option value="oee">Energy &amp; OEE (since reset)</option>
-                </select>
-              </label>
-              <button type="button" class="btn btn-sm" id="exportCsv">⬇ CSV</button>
-              <button type="button" class="btn btn-sm btn-primary" id="exportXlsx">⬇ Excel (all sheets)</button>
-            </div>
-            <div class="formula-hint" id="exportHint">Times are your local time; files store UTC plus an India time (IST) column.</div>
-          </div>
-        </section>
-
-        <!-- IMS bearing run-to-failure validation of the ISO 20816-3 zones (web/vibration_dataset.js) -->
-        <section class="panel panel-compact" id="imsPanel">
-          <div class="panel-header">
-            <h2>Vibration Dataset · ISO 20816-3 on IMS Run-to-Failure</h2>
-            <span class="badge-sim" style="font-size:10px;">NASA IMS DATA</span>
-          </div>
-          <div id="imsBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
-        </section>
-
-        <!-- NASA C-MAPSS turbofan RUL experiment (web/cmapss.js): separate research, not the CNC machines -->
-        <section class="panel panel-compact" id="cmapssPanel">
-          <div class="panel-header">
-            <h2>Research · Turbofan RUL (NASA C-MAPSS)</h2>
-            <span class="badge-sim" style="font-size:10px;">EXPERIMENTAL</span>
-          </div>
-          <div id="cmapssBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
-        </section>
 
         <!-- AI4I Research Intelligence & Benchmark Metrics Panel -->
         <section class="panel">
@@ -345,6 +514,24 @@
               <b>Research Integrity:</b> Vibration and current signals are reserved exclusively for the physical rule engine to prevent synthetic leakage. Evaluated on stratified 80/20 split (2,000 test samples).
             </div>
           </div>
+        </section>
+
+        <!-- IMS bearing run-to-failure validation of the ISO 20816-3 zones (web/vibration_dataset.js) -->
+        <section class="panel panel-compact" id="imsPanel">
+          <div class="panel-header">
+            <h2>Vibration Dataset · ISO 20816-3 on IMS Run-to-Failure</h2>
+            <span class="badge-sim" style="font-size:10px;">NASA IMS DATA</span>
+          </div>
+          <div id="imsBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
+        </section>
+
+        <!-- NASA C-MAPSS turbofan RUL experiment (web/cmapss.js): separate research, not the CNC machines -->
+        <section class="panel panel-compact" id="cmapssPanel">
+          <div class="panel-header">
+            <h2>Research · Turbofan RUL (NASA C-MAPSS)</h2>
+            <span class="badge-sim" style="font-size:10px;">EXPERIMENTAL</span>
+          </div>
+          <div id="cmapssBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
         </section>
       </div>
     </div>
@@ -451,10 +638,18 @@
   </div>
 
   <script src="/static/app.js"></script>
+  <script src="/static/mode.js"></script>
+  <script src="/static/workspace.js"></script>
+  <script src="/static/sim_controls.js"></script>
   <script src="/static/chat.js"></script>
   <script src="/static/rl.js"></script>
   <script src="/static/vibration_dataset.js"></script>
   <script src="/static/cmapss.js"></script>
   <script src="/static/reports.js"></script>
+  <script src="/static/recent.js"></script>
+  <script src="/static/synthetic.js"></script>
+  <script src="/static/whatif.js"></script>
+  <script src="/static/models.js"></script>
+  <script src="/static/adaptive.js"></script>
 </body>
 </html>
