@@ -5,13 +5,11 @@ __pycache__/
 venv/
 *.sqlite
 *.db
-ml/data/
 ml/*.joblib
 node_modules/
 .DS_Store
 .vscode/
 .idea/
-ml/vibration/data/
 # Secrets: never commit the real environment file
 .env
 .env.*
@@ -23,3 +21,21 @@ ml/vibration/data/
 /Udyam-Twin/
 desktop.ini
 .claude/
+
+# Datasets (see DATA.md). Committed: AI4I 2020, UDYAM-SIM v1, the C-MAPSS zip, the CWRU raw recordings and the
+# IMS features. Not committed: IMS.zip (1.06 GB, over GitHub's 100 MB file limit), unpacked or generated copies.
+ml/data/*
+!ml/data/ai4i2020.csv
+!ml/data/UDYAM_SIM_DATASET.md
+!ml/data/udyam_sim_v1_*
+!ml/data/cmapss/
+ml/data/cmapss/*
+!ml/data/cmapss/CMAPSSData.zip
+ml/vibration/data/*
+!ml/vibration/data/cwru/
+ml/vibration/data/cwru/*
+!ml/vibration/data/cwru/raw/
+!ml/vibration/data/ims/
+ml/vibration/data/ims/*
+!ml/vibration/data/ims/features.csv
+!ml/vibration/data/ims/features_meta.json

@@ -1,0 +1,37 @@
+{
+ "source": "NASA Prognostics Data Repository, IMS Bearings (data.nasa.gov IMS.zip, 1,061,902,801 bytes)",
+ "credit": "Center for Intelligent Maintenance Systems, University of Cincinnati (Lee, Qiu, Yu, Lin; Rexnord Technical Services)",
+ "sampling_rate_hz": 20000,
+ "rpm": 2000,
+ "band_hz": [
+  10.0,
+  1000.0
+ ],
+ "unit_assumed": "g",
+ "zone_profile": "demo-iso20816-3-g2-rigid",
+ "zone_boundaries_mm_s": {
+  "A_B": 1.4,
+  "B_C": 2.8,
+  "C_D": 4.5
+ },
+ "zone_note": "zones computed with the ISO 20816-3 method on a test rig; not a certified assessment",
+ "direction_rule": "test 1 has x and y channels per bearing; the larger velocity RMS is used",
+ "failures": {
+  "1": {
+   "3": "inner_race",
+   "4": "roller_element"
+  },
+  "2": {
+   "1": "outer_race"
+  },
+  "3": {
+   "3": "outer_race"
+  }
+ },
+ "rows": 37856,
+ "snapshots_per_test": {
+  "1": 2156,
+  "2": 984,
+  "3": 6324
+ }
+}

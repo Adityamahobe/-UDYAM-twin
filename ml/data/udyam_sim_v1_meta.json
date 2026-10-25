@@ -1,0 +1,99 @@
+{
+  "dataset": "udyam_sim_v1",
+  "description": "Labelled windows from randomised runs of the UDYAM-TWIN virtual CNC line. Synthetic (simulation) data: labels are injected ground-truth faults.",
+  "seed": 2026,
+  "episodes": 400,
+  "ood_episodes": 40,
+  "minutes_per_episode": 30.0,
+  "window_s": 60.0,
+  "stride_s": 10.0,
+  "horizon_min": 30.0,
+  "fault_weights": {
+    "normal": 0.22,
+    "coolant_degradation": 0.16,
+    "bearing_defect": 0.12,
+    "overload": 0.1,
+    "tool_wear_accel": 0.1,
+    "sensor_stuck": 0.08,
+    "pressure_drop": 0.1,
+    "order_surge": 0.12
+  },
+  "ranges": {
+    "h_true": [
+      0.92,
+      1.1
+    ],
+    "ambient_offset_k": [
+      -3.0,
+      1.0
+    ],
+    "load_scale": [
+      0.85,
+      1.12
+    ],
+    "noise_scale": [
+      0.7,
+      1.6
+    ],
+    "fault_severity": [
+      0.6,
+      1.6
+    ],
+    "tool_wear_start": [
+      0.0,
+      200.0
+    ],
+    "onset_s": [
+      60.0,
+      600.0
+    ]
+  },
+  "ood_load_range": [
+    1.12,
+    1.22
+  ],
+  "features": [
+    "temp_mean",
+    "temp_std",
+    "temp_slope",
+    "temp_max",
+    "vib_mean",
+    "vib_std",
+    "vib_slope",
+    "vib_max",
+    "cur_mean",
+    "cur_std",
+    "cur_slope",
+    "cur_max",
+    "torque_mean",
+    "torque_std",
+    "torque_slope",
+    "torque_max",
+    "rpm_mean",
+    "rpm_std",
+    "rpm_slope",
+    "rpm_max",
+    "wear_mean",
+    "wear_std",
+    "wear_slope",
+    "wear_max",
+    "air_temp_mean",
+    "delta_t",
+    "dq_bad_frac",
+    "derate_pct",
+    "air_pressure_bar",
+    "resid_mean",
+    "resid_std",
+    "resid_slope",
+    "resid_max",
+    "resid_ewma",
+    "resid_cusum",
+    "h_cool_est",
+    "h_cool_drift",
+    "k_wear_est",
+    "calib_frozen",
+    "twin_forecast_min"
+  ],
+  "rows": 77000,
+  "generated_in_s": 776.0
+}

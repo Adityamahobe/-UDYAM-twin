@@ -1,6 +1,7 @@
 """NASA C-MAPSS turbofan remaining-useful-life (RUL) experiment. A separate research module.
 
-    python -m ml.cmapss            (reads ml/data/cmapss/raw; writes models/cmapss_metrics.json, ~1 min)
+    python -m ml.cmapss            (reads ml/data/cmapss/raw, or the committed CMAPSSData.zip; writes
+                                   models/cmapss_metrics.json, ~2.5 min)
 
 Data: NASA Prognostics Data Repository, "CMAPSS Jet Engine Simulated Data" (data.nasa.gov CMAPSSData.zip,
 12,425,978 bytes). Simulated turbofan engines run to failure (A. Saxena, K. Goebel, D. Simon, N. Eklund,
@@ -37,6 +38,7 @@ from sklearn.model_selection import GroupKFold
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "ml" / "data" / "cmapss" / "raw"
+ZIP = ROOT / "ml" / "data" / "cmapss" / "CMAPSSData.zip"  # committed; used when raw/ has not been unpacked
 OUT = ROOT / "models" / "cmapss_metrics.json"
 SUBSETS = ("FD001", "FD002", "FD003", "FD004")
 DESCRIPTION = {"FD001": "1 condition, HPC degradation", "FD002": "6 conditions, HPC degradation",
@@ -47,15 +49,25 @@ COLUMNS = ["unit", "cycle", "op1", "op2", "op3"] + [f"s{i}" for i in range(1, 22
 SENSORS = [f"s{i}" for i in range(1, 22)]
 
 
+def _source(path: Path):
+    """The file itself, or the same-named member of CMAPSSData.zip when it has not been unpacked."""
+    if path.exists() or not ZIP.exists():
+        return path
+    import io
+    import zipfile
+    with zipfile.ZipFile(ZIP) as z:
+        return io.BytesIO(z.read(path.name))
+
+
 def read(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path, sep=r"\s+", header=None, engine="python")
+    df = pd.read_csv(_source(path), sep=r"\s+", header=None, engine="python")
     df = df.iloc[:, :26]
     df.columns = COLUMNS
     return df
 
 
 def read_rul(path: Path) -> np.ndarray:
-    return pd.read_csv(path, sep=r"\s+", header=None).iloc[:, 0].to_numpy(dtype=float)
+    return pd.read_csv(_source(path), sep=r"\s+", header=None).iloc[:, 0].to_numpy(dtype=float)
 
 
 def nasa_score(pred: np.ndarray, true: np.ndarray) -> float:

@@ -91,7 +91,7 @@ How the pipeline trains:
 
 ## Trained model: CWRU Bearing Data Center (24 Oct 2026)
 
-**Data.** The source is https://engineering.case.edu/bearingdatacenter; 40 files were downloaded to `data/cwru/raw/`, which git ignores. Conversion (reproducible):
+**Data.** The source is https://engineering.case.edu/bearingdatacenter; the 40 files used are committed in `data/cwru/raw/` (see [`DATA.md`](../../DATA.md)). Conversion (reproducible):
 ```bash
 python -m ml.vibration.datasets.cwru --raw ml/vibration/data/cwru/raw --out ml/vibration/data/cwru/dataset
 python -m ml.vibration.train --data ml/vibration/data/cwru/dataset --split machine

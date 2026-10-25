@@ -6,16 +6,16 @@ machines and nothing here feeds their RUL**; it shows the RUL method on a standa
 ## Data
 
 NASA Prognostics Data Repository, *CMAPSS Jet Engine Simulated Data* (data.nasa.gov `CMAPSSData.zip`,
-12,425,978 bytes; not committed). Engines simulated with C-MAPSS run from normal operation to failure
+12,425,978 bytes; committed in the repo). Engines simulated with C-MAPSS run from normal operation to failure
 (A. Saxena, K. Goebel, D. Simon, N. Eklund, *Damage Propagation Modeling for Aircraft Engine Run-to-Failure
 Simulation*, PHM08). Each row is one flight cycle: unit, cycle, 3 operating settings, 21 sensors. Training
 engines run to failure; test engines stop earlier and `RUL_FD00x.txt` gives their true remaining cycles.
 The archive's FD004 has 249 training and 248 test engines (its readme says the reverse); the files are used as they are.
 
+The zip is committed at `ml/data/cmapss/CMAPSSData.zip` (see [`DATA.md`](../DATA.md)); the module reads it directly.
+
 ```bash
-mkdir -p ml/data/cmapss/raw && curl -L -o ml/data/cmapss/CMAPSSData.zip https://data.nasa.gov/docs/legacy/CMAPSSData.zip
-bsdtar -xf ml/data/cmapss/CMAPSSData.zip -C ml/data/cmapss/raw      # or unzip
-python -m ml.cmapss                                                   # ~2.5 min, writes models/cmapss_metrics.json
+python -m ml.cmapss          # ~2.5 min, writes models/cmapss_metrics.json
 ```
 
 ## Method (fixed before looking at the test engines)
