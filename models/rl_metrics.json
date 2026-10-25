@@ -2,17 +2,18 @@
  "label": "Simulation results on held-out seeds (not a real plant)",
  "policy": {
   "algorithm": "tabular Q-learning (\u03b5-greedy 1.0 \u2192 0.05, learning rate 1/(1+n)^0.6, \u03b3 = 0.9)",
-  "environment": "VMC plant physics from sim/plant.py; scenarios none, vibration_fault, over_temperature, tool_wear, overload; random injection time, severity, ambient, load and starting tool wear",
-  "episodes": 15000,
+  "environment": "VMC and air-compressor physics from sim/plant.py; scenarios none, vibration_fault, over_temperature, tool_wear, overload, air_pressure_drop; random injection time, severity, ambient, load and starting tool wear; state includes air pressure and the latest inspection result",
+  "episodes": 25000,
   "seed": 7,
-  "trained_at": "2026-10-25T12:52:56Z",
-  "train_seconds": 104.1,
+  "trained_at": "2026-10-25T14:29:17Z",
+  "train_seconds": 240.4,
   "decision_interval_s": 20.0
  },
  "actions": [
   "continue",
   "derate_20",
   "derate_40",
+  "inspect",
   "maintain"
  ],
  "reward": {
@@ -24,6 +25,8 @@
    "overload_inr_per_s": 10.0,
    "worn_tool_inr_per_s": 15.0,
    "maintenance_inr": 1500.0,
+   "inspection_inr": 400.0,
+   "inspection_output_loss": 0.25,
    "trip_downtime_h": 4.0,
    "downtime_cost_inr_per_hr": 2500.0
   },
@@ -32,6 +35,7 @@
    "downtime_cost_inr_per_hr": "config/machines.yaml site.downtime_cost_inr_per_hr",
    "trip": "trip_downtime_h \u00d7 downtime cost (unplanned breakdown)",
    "maintenance": "maintenance_inr + no parts during the 20 s decision (planned stop)",
+   "inspection": "inspection_inr + a quarter of the 20 s decision's parts (short stop)",
    "penalty_rates": "illustrative assumptions for the simulation, not measured plant costs"
   }
  },
@@ -40,356 +44,466 @@
  "results": {
   "always_continue": {
    "none": {
-    "return_inr": 9333.0,
+    "return_inr": 9332.775,
     "parts": 24.0,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "vibration_fault": {
-    "return_inr": -12004.525,
-    "parts": 5.4,
+    "return_inr": -12003.9,
+    "parts": 5.402,
     "trips": 1.0,
     "over_temp_s": 0.0,
-    "zone_d_s": 72.09,
-    "maintenance_stops": 0.0
+    "zone_d_s": 72.085,
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "over_temperature": {
-    "return_inr": -6534.0,
+    "return_inr": -6524.225,
     "parts": 24.0,
     "trips": 0.0,
-    "over_temp_s": 396.675,
+    "over_temp_s": 396.425,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "tool_wear": {
-    "return_inr": 9327.375,
+    "return_inr": 9327.45,
     "parts": 24.0,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "overload": {
-    "return_inr": -4230.5,
+    "return_inr": -4205.275,
     "parts": 24.0,
     "trips": 0.0,
-    "over_temp_s": 196.685,
+    "over_temp_s": 196.1,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
+   },
+   "air_pressure_drop": {
+    "return_inr": 7008.378,
+    "parts": 18.709,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "all": {
-    "return_inr": -821.73,
-    "parts": 20.28,
-    "trips": 0.2,
-    "over_temp_s": 118.672,
-    "zone_d_s": 14.418,
-    "maintenance_stops": 0.0
+    "return_inr": 489.201,
+    "parts": 20.018,
+    "trips": 0.167,
+    "over_temp_s": 98.754,
+    "zone_d_s": 12.014,
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    }
   },
   "rule_based": {
    "none": {
-    "return_inr": 9275.4,
-    "parts": 23.859,
+    "return_inr": 9285.225,
+    "parts": 23.876,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "vibration_fault": {
-    "return_inr": 6828.675,
-    "parts": 23.212,
+    "return_inr": 6815.5,
+    "parts": 23.209,
     "trips": 0.0,
     "over_temp_s": 0.0,
-    "zone_d_s": 10.42,
-    "maintenance_stops": 1.0
+    "zone_d_s": 10.61,
+    "maintenance_stops": 1.0,
+    "inspections": 0.0
    },
    "over_temperature": {
-    "return_inr": 5877.525,
-    "parts": 20.7,
+    "return_inr": 5854.6,
+    "parts": 20.705,
     "trips": 0.0,
-    "over_temp_s": 49.02,
+    "over_temp_s": 49.79,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "tool_wear": {
-    "return_inr": 9262.8,
-    "parts": 23.859,
+    "return_inr": 9270.825,
+    "parts": 23.876,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "overload": {
-    "return_inr": 5475.975,
-    "parts": 21.347,
+    "return_inr": 5410.825,
+    "parts": 21.352,
     "trips": 0.0,
-    "over_temp_s": 9.64,
+    "over_temp_s": 11.51,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
+   },
+   "air_pressure_drop": {
+    "return_inr": 6991.053,
+    "parts": 18.656,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "all": {
-    "return_inr": 7344.075,
-    "parts": 22.595,
+    "return_inr": 7271.338,
+    "parts": 21.946,
     "trips": 0.0,
-    "over_temp_s": 11.732,
-    "zone_d_s": 2.084,
-    "maintenance_stops": 0.2
+    "over_temp_s": 10.217,
+    "zone_d_s": 1.768,
+    "maintenance_stops": 0.167,
+    "inspections": 0.0
+   }
+  },
+  "rule_with_inspection": {
+   "none": {
+    "return_inr": 9077.425,
+    "parts": 23.904,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0,
+    "inspections": 0.53
+   },
+   "vibration_fault": {
+    "return_inr": 6623.575,
+    "parts": 23.243,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 10.585,
+    "maintenance_stops": 1.0,
+    "inspections": 0.51
+   },
+   "over_temperature": {
+    "return_inr": 6764.475,
+    "parts": 23.069,
+    "trips": 0.0,
+    "over_temp_s": 1.23,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 1.0,
+    "inspections": 1.5
+   },
+   "tool_wear": {
+    "return_inr": 8895.0,
+    "parts": 23.766,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.21,
+    "inspections": 0.54
+   },
+   "overload": {
+    "return_inr": 6297.225,
+    "parts": 23.032,
+    "trips": 0.0,
+    "over_temp_s": 4.515,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 1.0,
+    "inspections": 1.64
+   },
+   "air_pressure_drop": {
+    "return_inr": 6875.008,
+    "parts": 18.662,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0,
+    "inspections": 0.28
+   },
+   "all": {
+    "return_inr": 7422.118,
+    "parts": 22.613,
+    "trips": 0.0,
+    "over_temp_s": 0.957,
+    "zone_d_s": 1.764,
+    "maintenance_stops": 0.535,
+    "inspections": 0.833
    }
   },
   "rl_policy": {
    "none": {
-    "return_inr": 9321.75,
-    "parts": 23.977,
+    "return_inr": 9310.95,
+    "parts": 23.959,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "vibration_fault": {
-    "return_inr": 6776.575,
-    "parts": 23.301,
+    "return_inr": 6803.525,
+    "parts": 23.289,
     "trips": 0.0,
     "over_temp_s": 0.0,
-    "zone_d_s": 11.815,
-    "maintenance_stops": 1.0
+    "zone_d_s": 11.2,
+    "maintenance_stops": 1.0,
+    "inspections": 0.01
    },
    "over_temperature": {
-    "return_inr": 7085.925,
-    "parts": 19.513,
+    "return_inr": 7095.875,
+    "parts": 19.752,
     "trips": 0.0,
-    "over_temp_s": 5.265,
+    "over_temp_s": 8.305,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "tool_wear": {
-    "return_inr": 9325.65,
-    "parts": 23.989,
+    "return_inr": 9309.075,
+    "parts": 23.943,
     "trips": 0.0,
     "over_temp_s": 0.0,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.0
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "overload": {
-    "return_inr": 6417.325,
-    "parts": 19.749,
+    "return_inr": 6697.125,
+    "parts": 19.938,
     "trips": 0.0,
-    "over_temp_s": 1.725,
+    "over_temp_s": 1.68,
     "zone_d_s": 0.0,
-    "maintenance_stops": 0.01
+    "maintenance_stops": 0.0,
+    "inspections": 0.03
+   },
+   "air_pressure_drop": {
+    "return_inr": 6917.628,
+    "parts": 18.505,
+    "trips": 0.0,
+    "over_temp_s": 0.0,
+    "zone_d_s": 0.0,
+    "maintenance_stops": 0.0,
+    "inspections": 0.0
    },
    "all": {
-    "return_inr": 7785.445,
-    "parts": 22.106,
+    "return_inr": 7689.03,
+    "parts": 21.564,
     "trips": 0.0,
-    "over_temp_s": 1.398,
-    "zone_d_s": 2.363,
-    "maintenance_stops": 0.202
+    "over_temp_s": 1.664,
+    "zone_d_s": 1.867,
+    "maintenance_stops": 0.167,
+    "inspections": 0.007
    }
   }
  },
  "returns_curve": [
   {
-   "episode": 300,
-   "mean_return_inr": -8332.5
+   "episode": 500,
+   "mean_return_inr": -8887.5
   },
   {
-   "episode": 600,
-   "mean_return_inr": -7990.0
-  },
-  {
-   "episode": 900,
-   "mean_return_inr": -7333.3
-  },
-  {
-   "episode": 1200,
-   "mean_return_inr": -7028.7
+   "episode": 1000,
+   "mean_return_inr": -8268.8
   },
   {
    "episode": 1500,
-   "mean_return_inr": -6369.1
+   "mean_return_inr": -7820.6
   },
   {
-   "episode": 1800,
-   "mean_return_inr": -6603.1
+   "episode": 2000,
+   "mean_return_inr": -7464.1
   },
   {
-   "episode": 2100,
-   "mean_return_inr": -5947.5
-  },
-  {
-   "episode": 2400,
-   "mean_return_inr": -4913.9
-  },
-  {
-   "episode": 2700,
-   "mean_return_inr": -4472.3
+   "episode": 2500,
+   "mean_return_inr": -6643.9
   },
   {
    "episode": 3000,
-   "mean_return_inr": -4300.9
+   "mean_return_inr": -6602.2
   },
   {
-   "episode": 3300,
-   "mean_return_inr": -3844.8
+   "episode": 3500,
+   "mean_return_inr": -5973.9
   },
   {
-   "episode": 3600,
-   "mean_return_inr": -3287.4
-  },
-  {
-   "episode": 3900,
-   "mean_return_inr": -2579.7
-  },
-  {
-   "episode": 4200,
-   "mean_return_inr": -2543.0
+   "episode": 4000,
+   "mean_return_inr": -5628.0
   },
   {
    "episode": 4500,
-   "mean_return_inr": -1532.2
+   "mean_return_inr": -4950.4
   },
   {
-   "episode": 4800,
-   "mean_return_inr": -1496.2
+   "episode": 5000,
+   "mean_return_inr": -4375.3
   },
   {
-   "episode": 5100,
-   "mean_return_inr": -797.3
-  },
-  {
-   "episode": 5400,
-   "mean_return_inr": -4.3
-  },
-  {
-   "episode": 5700,
-   "mean_return_inr": 569.7
+   "episode": 5500,
+   "mean_return_inr": -3770.6
   },
   {
    "episode": 6000,
-   "mean_return_inr": 615.5
+   "mean_return_inr": -3528.8
   },
   {
-   "episode": 6300,
-   "mean_return_inr": 1275.7
+   "episode": 6500,
+   "mean_return_inr": -2944.9
   },
   {
-   "episode": 6600,
-   "mean_return_inr": 1796.1
-  },
-  {
-   "episode": 6900,
-   "mean_return_inr": 2844.6
-  },
-  {
-   "episode": 7200,
-   "mean_return_inr": 2508.9
+   "episode": 7000,
+   "mean_return_inr": -2267.5
   },
   {
    "episode": 7500,
-   "mean_return_inr": 3501.7
+   "mean_return_inr": -1812.6
   },
   {
-   "episode": 7800,
-   "mean_return_inr": 3391.5
+   "episode": 8000,
+   "mean_return_inr": -1693.7
   },
   {
-   "episode": 8100,
-   "mean_return_inr": 4410.9
-  },
-  {
-   "episode": 8400,
-   "mean_return_inr": 4479.4
-  },
-  {
-   "episode": 8700,
-   "mean_return_inr": 5095.4
+   "episode": 8500,
+   "mean_return_inr": -948.4
   },
   {
    "episode": 9000,
-   "mean_return_inr": 5497.4
+   "mean_return_inr": -533.7
   },
   {
-   "episode": 9300,
-   "mean_return_inr": 5634.2
+   "episode": 9500,
+   "mean_return_inr": -64.8
   },
   {
-   "episode": 9600,
-   "mean_return_inr": 6118.1
-  },
-  {
-   "episode": 9900,
-   "mean_return_inr": 6874.9
-  },
-  {
-   "episode": 10200,
-   "mean_return_inr": 7152.1
+   "episode": 10000,
+   "mean_return_inr": 445.4
   },
   {
    "episode": 10500,
-   "mean_return_inr": 6992.1
+   "mean_return_inr": 879.4
   },
   {
-   "episode": 10800,
-   "mean_return_inr": 7306.3
+   "episode": 11000,
+   "mean_return_inr": 1665.2
   },
   {
-   "episode": 11100,
-   "mean_return_inr": 7301.4
-  },
-  {
-   "episode": 11400,
-   "mean_return_inr": 7141.6
-  },
-  {
-   "episode": 11700,
-   "mean_return_inr": 7326.7
+   "episode": 11500,
+   "mean_return_inr": 1945.5
   },
   {
    "episode": 12000,
-   "mean_return_inr": 7294.1
+   "mean_return_inr": 2384.6
   },
   {
-   "episode": 12300,
-   "mean_return_inr": 7278.8
+   "episode": 12500,
+   "mean_return_inr": 2834.7
   },
   {
-   "episode": 12600,
-   "mean_return_inr": 7155.5
-  },
-  {
-   "episode": 12900,
-   "mean_return_inr": 7482.0
-  },
-  {
-   "episode": 13200,
-   "mean_return_inr": 7244.6
+   "episode": 13000,
+   "mean_return_inr": 3501.0
   },
   {
    "episode": 13500,
-   "mean_return_inr": 7035.9
+   "mean_return_inr": 3773.9
   },
   {
-   "episode": 13800,
-   "mean_return_inr": 7312.2
+   "episode": 14000,
+   "mean_return_inr": 4148.6
   },
   {
-   "episode": 14100,
-   "mean_return_inr": 7092.7
-  },
-  {
-   "episode": 14400,
-   "mean_return_inr": 7289.7
-  },
-  {
-   "episode": 14700,
-   "mean_return_inr": 7454.2
+   "episode": 14500,
+   "mean_return_inr": 4733.7
   },
   {
    "episode": 15000,
-   "mean_return_inr": 7183.7
+   "mean_return_inr": 5320.6
+  },
+  {
+   "episode": 15500,
+   "mean_return_inr": 6101.1
+  },
+  {
+   "episode": 16000,
+   "mean_return_inr": 5914.7
+  },
+  {
+   "episode": 16500,
+   "mean_return_inr": 6711.2
+  },
+  {
+   "episode": 17000,
+   "mean_return_inr": 6733.0
+  },
+  {
+   "episode": 17500,
+   "mean_return_inr": 6764.7
+  },
+  {
+   "episode": 18000,
+   "mean_return_inr": 7051.0
+  },
+  {
+   "episode": 18500,
+   "mean_return_inr": 6967.7
+  },
+  {
+   "episode": 19000,
+   "mean_return_inr": 6884.0
+  },
+  {
+   "episode": 19500,
+   "mean_return_inr": 7008.9
+  },
+  {
+   "episode": 20000,
+   "mean_return_inr": 7208.6
+  },
+  {
+   "episode": 20500,
+   "mean_return_inr": 7017.4
+  },
+  {
+   "episode": 21000,
+   "mean_return_inr": 7062.8
+  },
+  {
+   "episode": 21500,
+   "mean_return_inr": 7067.2
+  },
+  {
+   "episode": 22000,
+   "mean_return_inr": 6954.7
+  },
+  {
+   "episode": 22500,
+   "mean_return_inr": 7103.6
+  },
+  {
+   "episode": 23000,
+   "mean_return_inr": 6897.4
+  },
+  {
+   "episode": 23500,
+   "mean_return_inr": 6997.1
+  },
+  {
+   "episode": 24000,
+   "mean_return_inr": 6963.7
+  },
+  {
+   "episode": 24500,
+   "mean_return_inr": 7075.7
+  },
+  {
+   "episode": 25000,
+   "mean_return_inr": 7078.1
   }
  ],
- "states_learned": 206
+ "states_learned": 569
 }

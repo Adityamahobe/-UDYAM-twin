@@ -1158,6 +1158,8 @@ def api_rl_propose(machine_id: str):
     action, why = rec["action"], f"RL policy ({rec['label']}) for state {rec['state']}; Q = {rec['q_values']}"
     if action == "maintain":
         p = advisor.tool_propose_action(machine_id, "work_order", why, title=f"Planned maintenance stop on {machine_id} (RL)")
+    elif action == "inspect":  # the work-order title is how the feedback loop recognises an inspection
+        p = advisor.tool_propose_action(machine_id, "work_order", why, title=f"Inspect {machine_id} (RL short stop)")
     elif ACTION_DERATE[action] != current:
         kind = "derate" if ACTION_DERATE[action] > 0 else "clear_derate"
         p = advisor.tool_propose_action(machine_id, kind, why, derate_pct=ACTION_DERATE[action] or None)

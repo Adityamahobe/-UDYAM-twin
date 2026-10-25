@@ -8,8 +8,9 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from ml.maintenance_rl import (ACTIONS, DECISION_TICKS, METRICS_PATH, POLICY_PATH, REWARD, TEMP_LIMIT_C, FeedbackAgent,
-                               Outcome, QPolicy, VmcEnv, discretize, reward, rule_policy, zone_of)
+from ml.maintenance_rl import (ACTIONS, AIR_MIN_BAR, DECISION_TICKS, METRICS_PATH, POLICY_PATH, REWARD, TEMP_LIMIT_C,
+                               FeedbackAgent, Outcome, QPolicy, VmcEnv, discretize, reward, rule_inspect_policy,
+                               rule_policy, zone_of)
 from sim.factory import FactoryEngine
 
 T0 = datetime(2026, 10, 26, 10, 0, tzinfo=timezone.utc)
@@ -18,17 +19,20 @@ T0 = datetime(2026, 10, 26, 10, 0, tzinfo=timezone.utc)
 def test_state_encoding():
     assert [zone_of(v) for v in (1.0, 1.4, 3.0, 4.5)] == ["A", "B", "C", "D"]
     f = {"temp_c": TEMP_LIMIT_C - 2, "temp_trend_c": 0.8, "zone": "A", "load_pct": 60, "tool_wear_min": 100, "derate_pct": 0}
-    assert discretize(f) == "m2|up|AB|ok|t0|d0"
+    assert discretize(f) == "m2|up|AB|ok|t0|d0|a?|i-"
     hot = {**f, "temp_c": TEMP_LIMIT_C + 0.2, "temp_trend_c": -0.9, "zone": "D", "load_pct": 90, "tool_wear_min": 210,
-           "derate_pct": 20}
-    assert discretize(hot) == "m0|dn|D|hi|t2|d20"
-    assert discretize({}) == "m?|st|AB|ok|t?|d0"
+           "derate_pct": 20, "air_bar": AIR_MIN_BAR - 0.5, "inspection": "fault"}
+    assert discretize(hot) == "m0|dn|D|hi|t2|d20|a2|iF"
+    assert discretize({**f, "air_bar": 7.0, "inspection": "ok"}) == "m2|up|AB|ok|t0|d0|a0|iO"
+    assert discretize({}) == "m?|st|AB|ok|t?|d0|a?|i-"
 
 
 def test_reward_accounts_parts_penalties_maintenance_and_trip():
     o = Outcome(parts=2 / 3)
     assert reward(o, "continue") == pytest.approx(REWARD["inr_per_part"] * 2 / 3, abs=0.01)
     assert reward(o, "maintain") == -REWARD["maintenance_inr"]  # a planned stop makes no parts that interval
+    assert reward(o, "inspect") == pytest.approx(REWARD["inr_per_part"] * 2 / 3 * (1 - REWARD["inspection_output_loss"])
+                                                 - REWARD["inspection_inr"], abs=0.01)
     hot = Outcome(parts=2 / 3, over_temp_s=5.0)
     assert reward(hot, "continue") == pytest.approx(reward(o, "continue") - 5 * REWARD["over_temp_inr_per_s"], abs=0.01)
     trip = Outcome(trip=True)
@@ -55,9 +59,29 @@ def test_environment_is_deterministic_and_actions_matter():
     assert _run(VmcEnv(seed=4, scenario="none"), lambda s: "continue")[0] > _run(VmcEnv(seed=4, scenario="none"), lambda s: "derate_40")[0]
 
 
+def test_inspection_and_air_interlock_in_the_environment():
+    env = VmcEnv(seed=12, scenario="over_temperature")
+    env.inject_at = 0
+    env.step("continue")
+    s, _, _, _ = env.step("inspect")
+    assert s.endswith("|iF")  # the inspection sees the injected coolant fault
+    for _ in range(3):
+        s, _, _, _ = env.step("derate_20")
+    assert s.endswith("|i-")  # results expire after INSPECTION_VALID_DECISIONS
+    clean = VmcEnv(seed=13, scenario="none")
+    assert clean.step("inspect")[0].endswith("|iO")
+    air = VmcEnv(seed=11, scenario="air_pressure_drop")
+    air.inject_at = 0
+    for _ in range(2):
+        s, _, _, o = air.step("continue")
+    assert "|d20|a2|" in s and o.min_air_bar < AIR_MIN_BAR  # interlock derates the VMC 25 %
+    assert rule_policy(s) == "continue" and rule_inspect_policy("m2|up|AB|ok|t0|d0|a0|i-") == "inspect"
+    assert rule_inspect_policy("m2|up|AB|ok|t0|d0|a0|iF") == "maintain"
+
+
 def test_q_update_and_fallback():
     pol = QPolicy()
-    assert pol.best("m3|st|D|ok|t0|d0") == "maintain"  # unseen state → rule baseline
+    assert pol.best("m3|st|D|ok|t0|d0|a0|i-") == "maintain"  # unseen state → rule baseline
     before, after = pol.update("s", "derate_20", 100.0, "s2", done=True, alpha=0.5)
     assert (before, after) == (0.0, 50.0) and pol.best("s") == "derate_20"
     pol.update("s2", "continue", 300.0, "s3", done=True, alpha=1.0)
@@ -71,7 +95,8 @@ def test_trained_policy_and_metrics():
     pol = QPolicy.load()
     assert pol is not None and len(pol.q) > 50 and pol.meta["episodes"] > 0
     res = json.loads(METRICS_PATH.read_text())["results"]
-    assert set(res) == {"always_continue", "rule_based", "rl_policy"}
+    assert set(res) == {"always_continue", "rule_based", "rule_with_inspection", "rl_policy"}
+    assert "air_pressure_drop" in res["rl_policy"]
     assert res["rl_policy"]["all"]["return_inr"] > res["always_continue"]["all"]["return_inr"]
     assert res["rl_policy"]["all"]["trips"] <= res["always_continue"]["all"]["trips"]
 
@@ -114,6 +139,17 @@ def test_feedback_loop_detects_maintenance_and_skips_learning_outside_sim():
     for _ in range(DECISION_TICKS * 2 + 2):
         replay.observe([{**m, "mode": "REPLAY"} if m.get("type") == "snapshot" else m for m in e.step()])
     assert replay.recent and all(not r["policy_updated"] for r in replay.recent) and not replay.policy.q.get("s")
+    # an inspection work order is recognised and its (simulated) result enters the next state
+    insp = FeedbackAgent(policy=QPolicy())
+    e2 = FactoryEngine(seed=42, start=T0)
+    _feed(insp, e2, DECISION_TICKS + 2)
+    e2.command({"cmd": "inject_fault", "machine_id": "VMC-01", "fault": "coolant_degradation"})
+    _feed(insp, e2, 2)
+    insp.observe([{"type": "event", "kind": "WORK_ORDER", "machine_id": "VMC-01", "ts": "x",
+                   "title": "Work order WO-0001 created: Inspect VMC-01 (RL short stop) (Open)"}])
+    _feed(insp, e2, DECISION_TICKS)
+    assert insp.recent[0]["action_taken"] == "inspect" and insp.recent[0]["inspection_result"] == "fault"
+    assert insp.open["VMC-01"].state.endswith("|iF")
     # a reset drops open decisions instead of evaluating across it
     agent.observe(e.command({"cmd": "reset"}))
     assert agent.open == {}
@@ -158,3 +194,7 @@ def test_rl_api_recommends_and_proposal_needs_approval(client):
     agent.open["VMC-01"].recommended = "maintain"
     p = c.post("/api/rl/VMC-01/propose").json()["proposal"]
     assert p["action"] == "work_order" and "RL" in p["title"]
+    agent.open["VMC-01"].recommended = "inspect"
+    p = c.post("/api/rl/VMC-01/propose").json()["proposal"]
+    assert p["action"] == "work_order" and p["title"].startswith("Inspect VMC-01")
+    assert st["policy"]["actions"] == list(ACTIONS) and "inspect" in ACTIONS

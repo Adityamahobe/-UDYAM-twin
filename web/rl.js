@@ -6,9 +6,9 @@
 // The policy only recommends: "Send for approval" creates a proposal that an operator approves
 // through the same authorized workflow as the Advisor (POST /api/chat/proposals/{id}/approve).
 (function () {
-  const ACTIONS = ["continue", "derate_20", "derate_40", "maintain"];
-  const SHORT = { continue: "Continue", derate_20: "Derate 20%", derate_40: "Derate 40%", maintain: "Maintain" };
-  const POLICY_NAME = { always_continue: "Always continue", rule_based: "Rule-based (twin today)", rl_policy: "RL policy" };
+  let ACTIONS = ["continue", "derate_20", "derate_40", "inspect", "maintain"];  // replaced by the server's list
+  const SHORT = { continue: "Continue", derate_20: "Derate 20%", derate_40: "Derate 40%", inspect: "Inspect", maintain: "Maintain" };
+  const POLICY_NAME = { always_continue: "Always continue", rule_based: "Rules (twin today)", rule_with_inspection: "Rules + inspect", rl_policy: "RL policy" };
   let metrics = null, operatorToken = null, pending = null;
   const openDetails = new Set();
 
@@ -19,12 +19,14 @@
   const time = ts => ts ? new Date(ts).toLocaleTimeString() : "";
 
   function describe(state) {
-    const [m, tr, vz, load, tw, d] = (state || "").split("|");
+    const [m, tr, vz, load, tw, d, air, insp] = (state || "").split("|");
     const margin = { m0: "above temp limit", m1: "< 1 °C to limit", m2: "1–3 °C to limit", m3: "> 3 °C to limit", "m?": "temp unknown" }[m];
     const trend = { up: "rising", dn: "falling", st: "steady" }[tr];
     const tool = { t0: "tool OK", t1: "tool worn (warn)", t2: "tool near end of life", "t?": "tool unknown" }[tw];
     return [`${margin}, ${trend}`, `zone ${vz === "AB" ? "A/B" : vz}`, load === "hi" ? "overloaded" : "load OK", tool,
-      d === "d0" ? "no derate" : `derate ${d.slice(1)} %`].join(" · ");
+      d === "d0" ? "no derate" : `derate ${d.slice(1)} %`,
+      { a0: "air OK", a1: "air pressure warning", a2: "air pressure LOW (interlock derate)", "a?": "air unknown" }[air] || "",
+      { iF: "inspection: fault found", iO: "inspection: all clear" }[insp] || ""].filter(Boolean).join(" · ");
   }
 
   // Tiny inline SVG charts (no chart library on this page)
@@ -54,6 +56,7 @@
     const f = s.feedback || {}, meta = (metrics && metrics.policy) || s.policy || {};
     const all = metrics && metrics.results ? {
       rl: metrics.results.rl_policy.all.return_inr, rule: metrics.results.rule_based.all.return_inr,
+      best: Math.max(...Object.entries(metrics.results).filter(([k]) => k !== "rl_policy").map(([, v]) => v.all.return_inr)),
     } : null;
     const gain = all && all.rule ? (all.rl - all.rule) / Math.abs(all.rule) : null;
     const tile = (label, value, sub, tag) => `<div class="kpi"><div class="kpi-label">${label}${tag ? ` <span class="src-tag ${tag}">${tag === "sim" ? "SIM training" : "Live run"}</span>` : ""}</div>
@@ -62,7 +65,7 @@
       ${tile("Training", s.trained ? "Trained" : "Not trained",
         s.trained ? `${(meta.episodes || 0).toLocaleString("en-IN")} episodes · ${s.policy.states_learned} states` : "run python -m ml.train_rl", "sim")}
       ${tile("vs rule-based", gain == null ? "–" : `${gain >= 0 ? "+" : ""}${(100 * gain).toFixed(1)}%`,
-        all ? `${inr(all.rl)} vs ${inr(all.rule)} / 12-min shift, held-out` : "no evaluation file", "sim")}
+        all ? `${inr(all.rl)} vs ${inr(all.rule)} / 12-min shift, held-out · best baseline ${inr(all.best)}` : "no evaluation file", "sim")}
       ${tile("Decisions evaluated", (f.decisions ?? 0).toLocaleString("en-IN"), `${f.online_updates ?? 0} policy updates · ${pct(f.prediction_accuracy)} risk calls right`, "live")}
       ${tile("Mean reward", inr(f.mean_reward_inr), `per 20 s decision · advice followed ${pct(f.followed_rate)}`, "live")}
     </div>`;
@@ -95,7 +98,9 @@
       return `<tr><td>${esc(sc.replace(/_/g, " "))}</td>${vals.map(v => `<td class="${v === top ? "win" : ""}">${inr(v)}</td>`).join("")}</tr>`;
     }).join("");
     return `<div class="rl-table-wrap"><table class="rl-table rl-eval"><tr><th>Scenario</th>${pols.map(p => `<th>${esc(POLICY_NAME[p] || p)}</th>`).join("")}</tr>${rows}
-      <tr><td>trips / shift</td>${pols.map(p => `<td>${res[p].all.trips}</td>`).join("")}</tr></table></div>
+      <tr><td>trips / shift</td>${pols.map(p => `<td>${res[p].all.trips}</td>`).join("")}</tr>
+      <tr><td>inspections / shift</td>${pols.map(p => `<td>${res[p].all.inspections ?? "–"}</td>`).join("")}</tr>
+      <tr><td>maintenance / shift</td>${pols.map(p => `<td>${res[p].all.maintenance_stops}</td>`).join("")}</tr></table></div>
       <div class="formula-hint">${esc(metrics.label)}; mean ₹ per 12-minute simulated shift, ${metrics.eval_episodes_per_scenario} held-out seeds per scenario.</div>`;
   }
 
@@ -106,7 +111,8 @@
       <div><b>Environment:</b> ${esc(meta.environment || "VMC plant physics (sim/plant.py)")}</div>
       <div><b>Decision:</b> every ${s.decision_interval_s} s · actions ${ACTIONS.map(a => SHORT[a]).join(", ")}</div>
       <div><b>Reward:</b> parts × ₹${r.inr_per_part} − ₹${r.over_temp_inr_per_s}/s over temp − ₹${r.zone_c_inr_per_s}/s zone C − ₹${r.zone_d_inr_per_s}/s zone D
-        − ₹${r.overload_inr_per_s}/s overload − ₹${r.worn_tool_inr_per_s}/s worn tool − ₹${r.maintenance_inr} per maintenance stop − trip ${r.trip_downtime_h} h × ₹${r.downtime_cost_inr_per_hr}/h.
+        − ₹${r.overload_inr_per_s}/s overload − ₹${r.worn_tool_inr_per_s}/s worn tool − ₹${r.maintenance_inr} per maintenance stop
+        − ₹${r.inspection_inr} and ${Math.round(100 * r.inspection_output_loss)} % of the output per inspection − trip ${r.trip_downtime_h} h × ₹${r.downtime_cost_inr_per_hr}/h.
         Penalty rates are illustrative assumptions.</div>
       <div><b>Trained:</b> ${esc(meta.trained_at || "–")}${meta.train_seconds ? ` in ${meta.train_seconds} s` : ""}. Online updates happen in SIM mode only and are not saved on restart.</div>
     </div>`;
@@ -117,6 +123,7 @@
   }
 
   function render(s) {
+    if (s.policy && Array.isArray(s.policy.actions)) ACTIONS = s.policy.actions;
     const recs = Object.values(s.recommendations || {}).filter(Boolean);
     const recent = s.recent || [];
     const curve = (metrics && metrics.returns_curve || []).map(p => p.mean_return_inr);
