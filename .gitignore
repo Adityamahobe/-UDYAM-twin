@@ -16,4 +16,10 @@ ml/vibration/data/
 .env
 .env.*
 !.env.example
+
+# Blender autosave backups
 *.blend1
+# Local-only: old team clone, Windows folder file, editor/agent settings
+/Udyam-Twin/
+desktop.ini
+.claude/
