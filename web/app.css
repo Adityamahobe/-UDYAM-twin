@@ -928,3 +928,12 @@ select {
   .ev-detail { padding-left: 22px; }
   .event-filters select { margin-left: 0; }
 }
+
+/* ---- IMS run-to-failure panel (web/vibration_dataset.js) ---- */
+.ims-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.ims-charts figure { margin: 0; background: var(--bg-card); border-radius: var(--radius-sm); padding: 6px 8px; min-width: 0; }
+.ims-charts figcaption { font-size: 10.5px; color: var(--text-secondary); }
+.ims-charts svg { width: 100%; height: 64px; display: block; margin-top: 4px; }
+.ims-zone { stroke: var(--status-warn); stroke-dasharray: 3 3; opacity: 0.45; vector-effect: non-scaling-stroke; }
+.ims-zone.cd { stroke: var(--status-crit); opacity: 0.7; }
+@media (max-width: 640px) { .ims-charts { grid-template-columns: 1fr; } }

@@ -1,11 +1,11 @@
 """Configurable, standard-referenced vibration severity assessment.
 
-ISO 10816 / ISO 20816 evaluation zones depend on the standard part and edition, the
+ISO 20816 evaluation zones (ISO 10816 before it was withdrawn) depend on the standard part and edition, the
 machine group/class, power and speed range, foundation (rigid/flexible), measurement
 location and direction, the measured quantity and its frequency band.
 
 Profiles and machine assignments come from config/machines.yaml (config.loader). The
-shipped profiles are configurable demo thresholds referencing ISO 10816-3 with
+shipped profiles are configurable demo thresholds referencing ISO 20816-3 with
 `verified: false`, so results are reported as "PROVISIONAL", never as a verified
 severity. A machine without a complete profile returns status "UNAVAILABLE".
 

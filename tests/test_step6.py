@@ -226,7 +226,7 @@ def test_reports_and_csv_export(client):
 
 # ----------------------------------------------------------------- Add Your Machine
 NEW_VMC = {"template": "cnc_mill", "name": "Haas VF-2", "rated_kw": 15, "rated_rpm": 2000, "foundation": "rigid",
-           "iso_class": "ISO 10816-3 Group 2, rigid", "zone_boundaries": {"A_B": 1.8, "B_C": 3.5, "C_D": 5.0},
+           "iso_class": "ISO 20816-3 Group 2, rigid", "zone_boundaries": {"A_B": 1.8, "B_C": 3.5, "C_D": 5.0},
            "thresholds": {"process_temp_limit_k": 316.0}}
 
 

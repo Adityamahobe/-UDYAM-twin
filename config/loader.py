@@ -54,6 +54,10 @@ class ConfigError(ValueError):
     pass
 
 
+LEGACY_PROFILE_IDS = {"demo-iso10816-3-g2-rigid": "demo-iso20816-3-g2-rigid",
+                      "demo-iso10816-3-g2-flexible": "demo-iso20816-3-g2-flexible"}
+
+
 def _num(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
@@ -76,6 +80,10 @@ class MachineConfig:
         self.source = source
         self.site: dict[str, Any] = raw.get("site") or {}
         self.profiles: dict[str, dict[str, Any]] = raw.get("vibration_profiles") or {}
+        # Profile IDs before the ISO 20816-3 relabel; specs saved with them still resolve.
+        for old, new in LEGACY_PROFILE_IDS.items():
+            if new in self.profiles:
+                self.profiles.setdefault(old, self.profiles[new])
         self.templates: dict[str, dict[str, Any]] = raw.get("templates") or {}
         self.machines: dict[str, dict[str, Any]] = raw.get("machines") or {}
         self.runtime: dict[str, str | None] = {}  # machines added at runtime → their custom profile id
@@ -268,7 +276,7 @@ class MachineConfig:
         return {
             "source": Path(self.source).name,
             "site": dict(self.site),
-            "vibration_profiles": copy.deepcopy(self.profiles),
+            "vibration_profiles": copy.deepcopy({k: v for k, v in self.profiles.items() if k not in LEGACY_PROFILE_IDS}),
             "templates": copy.deepcopy(self.templates),
             "machines": {mid: self.machine(mid) for mid in self.machines},
             "runtime_machines": sorted(self.runtime),

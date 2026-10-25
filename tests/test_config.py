@@ -61,10 +61,10 @@ def test_runtime_machine_resolves_from_template():
 
 
 @pytest.mark.parametrize("breaker,msg", [
-    (lambda r: r["vibration_profiles"]["demo-iso10816-3-g2-rigid"]["zone_boundaries"].update({"B_C": 1.0}), "strictly increasing"),
-    (lambda r: r["vibration_profiles"]["demo-iso10816-3-g2-rigid"]["zone_boundaries"].pop("C_D"), "numeric A_B, B_C, C_D"),
-    (lambda r: r["vibration_profiles"]["demo-iso10816-3-g2-rigid"].update({"band_hz": [1000, 10]}), "band_hz"),
-    (lambda r: r["vibration_profiles"]["demo-iso10816-3-g2-rigid"].update({"quantity": "rpm"}), "quantity"),
+    (lambda r: r["vibration_profiles"]["demo-iso20816-3-g2-rigid"]["zone_boundaries"].update({"B_C": 1.0}), "strictly increasing"),
+    (lambda r: r["vibration_profiles"]["demo-iso20816-3-g2-rigid"]["zone_boundaries"].pop("C_D"), "numeric A_B, B_C, C_D"),
+    (lambda r: r["vibration_profiles"]["demo-iso20816-3-g2-rigid"].update({"band_hz": [1000, 10]}), "band_hz"),
+    (lambda r: r["vibration_profiles"]["demo-iso20816-3-g2-rigid"].update({"quantity": "rpm"}), "quantity"),
     (lambda r: r["templates"]["cnc_mill"]["vibration"].update({"profile": "nope"}), "not defined"),
     (lambda r: r["templates"]["cnc_mill"]["vibration"].update({"foundation": "flexible"}), "requires mounting"),
     (lambda r: r["templates"]["cnc_mill"]["thresholds"].pop("process_temp_limit_k"), "process_temp_limit_k"),
@@ -157,5 +157,15 @@ def test_api_config_endpoint():
     with TestClient(app) as c:
         data = c.get("/api/config").json()
     assert data["site"]["grid_co2_kg_per_kwh"] == get_config().site["grid_co2_kg_per_kwh"]
-    assert data["machines"]["VMC-01"]["vibration"]["profile"] == "demo-iso10816-3-g2-rigid"
-    assert data["vibration_profiles"]["demo-iso10816-3-g2-rigid"]["zone_boundaries"]["C_D"] == 4.5
+    assert data["machines"]["VMC-01"]["vibration"]["profile"] == "demo-iso20816-3-g2-rigid"
+    assert data["vibration_profiles"]["demo-iso20816-3-g2-rigid"]["zone_boundaries"]["C_D"] == 4.5
+
+
+def test_iso_20816_profiles_and_legacy_ids():
+    from config import get_config
+    cfg = get_config()
+    rigid = cfg.profiles["demo-iso20816-3-g2-rigid"]
+    assert rigid["standard"].startswith("ISO 20816-3") and rigid["zone_boundaries"] == {"A_B": 1.4, "B_C": 2.8, "C_D": 4.5}
+    # specs stored before the relabel still resolve to the same boundaries
+    assert cfg.profiles["demo-iso10816-3-g2-rigid"]["zone_boundaries"] == rigid["zone_boundaries"]
+    assert cfg.vibration_profile("VMC-01", "cnc_mill")["profile_id"] == "demo-iso20816-3-g2-rigid"

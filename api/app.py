@@ -145,7 +145,7 @@ class AddMachineRequest(BaseModel):
     rated_kw: Optional[float] = Field(default=None, gt=0, le=500)
     rated_rpm: Optional[float] = Field(default=None, ge=60, le=24000, description="normal operating speed")
     foundation: Optional[str] = Field(default=None, pattern="^(rigid|flexible)$")
-    iso_class: Optional[str] = Field(default=None, max_length=60, description="e.g. 'ISO 10816-3 Group 2, rigid'")
+    iso_class: Optional[str] = Field(default=None, max_length=60, description="e.g. 'ISO 20816-3 Group 2, rigid'")
     zone_boundaries: Optional[ZoneBoundaries] = Field(default=None, description="velocity RMS mm/s; custom profile")
     thresholds: Optional[Dict[str, float]] = None
     x: Optional[float] = Field(default=None, ge=-50, le=50)
@@ -453,7 +453,7 @@ def _machine_spec(req: AddMachineRequest, machine_id: str) -> tuple[Dict[str, An
     vib = dict(tpl.get("vibration") or {})
     if req.foundation:
         vib["foundation"] = req.foundation
-        vib["profile"] = f"demo-iso10816-3-g2-{req.foundation}"
+        vib["profile"] = f"demo-iso20816-3-g2-{req.foundation}"
     profile = None
     if req.zone_boundaries is not None:
         profile = {
@@ -1048,6 +1048,32 @@ def _csv_rows(text: str) -> tuple[List[Dict[str, Any]], List[str]]:
     return list(reader), list(reader.fieldnames or [])
 
 
+def _ims_sheets() -> List[Dict[str, Any]]:
+    """IMS run-to-failure results for the workbook (empty when the dataset has not been processed)."""
+    if not IMS_METRICS.exists():
+        return []
+    m = json.loads(IMS_METRICS.read_text(encoding="utf-8"))
+    zones = [{**{k: z[k] for k in ("test", "bearing", "failed", "failure_mode", "duration_h", "baseline_vel_mm_s",
+                                    "max_vel_mm_s", "final_vel_mm_s", "final_zone")},
+              **{f"hours_in_{k}": v for k, v in z["hours_in_zone"].items()},
+              **{f"first_zone_{k}_h": v for k, v in z["first_reached_h"].items()}} for z in m["zone_progression"]]
+    ew = m["early_warning"]
+    methods = [("random_forest", ew["random_forest"])] + list(ew["rules"].items())
+    warn = [{"method": name, **r["overall"],
+             "first_alarm_h_before_failure": " · ".join("none" if l["first_alarm_hours_before_end"] is None
+                                                       else str(l["first_alarm_hours_before_end"])
+                                                       for l in r["lead_times"] if l["failed"])} for name, r in methods]
+    note = f"{m['label']}. Zones: {m['dataset'].get('zone_profile')} ({m['dataset'].get('zone_note')})"
+    zone_cols = list(zones[0]) if zones else []
+    warn_cols = ["method", "precision", "recall", "f1", "false_alarm_rate_healthy_bearings", "positives", "snapshots",
+                 "first_alarm_h_before_failure"]
+    return [
+        {"name": "IMS zone progression", "columns": zone_cols, "rows": zones, "note": note},
+        {"name": "IMS early warning", "columns": warn_cols, "rows": warn,
+         "note": f"Fails within {ew['horizon_h']:g} h; {ew['validation']}. Lead times per failed bearing (T1-B3, T1-B4, T2-B1, T3-B3)."},
+    ]
+
+
 @app.get("/api/reports/export.xlsx")
 def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
                         minutes: Optional[float] = Query(default=None, gt=0), tz: str = "Asia/Kolkata"):
@@ -1096,6 +1122,7 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
         {"name": "RL policy evaluation", "columns": ["policy", "scenario", "return_inr", "parts", "trips", "over_temp_s",
                                                       "zone_d_s", "maintenance_stops"], "rows": rl_eval,
          "note": "Held-out simulation seeds, mean per 12-minute shift (models/rl_metrics.json)"},
+        *_ims_sheets(),
     ]
     body = exporter.xlsx_bytes(sheets, zone)
     return Response(content=body, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1138,6 +1165,22 @@ def api_rl_propose(machine_id: str):
         raise HTTPException(status_code=409, detail={"error": "nothing_to_change",
                                                      "message": f"{machine_id} is already at {current:g} % derate."})
     return {"proposal": p, "recommendation": rec}
+
+
+IMS_METRICS = ROOT / "ml" / "vibration" / "artifacts" / "ims_metrics.json"
+IMS_TRENDS = ROOT / "ml" / "vibration" / "artifacts" / "ims_trends.json"
+
+
+@app.get("/api/datasets/ims")
+def api_ims_validation(trends: bool = False):
+    """IMS bearing run-to-failure results: ISO 20816-3 zone progression, early warning and RUL check
+    (ml/vibration/artifacts/ims_metrics.json, written by `python -m ml.vibration.train_ims`)."""
+    if not IMS_METRICS.exists():
+        raise HTTPException(status_code=404, detail="Run python -m ml.vibration.datasets.ims and python -m ml.vibration.train_ims")
+    out = json.loads(IMS_METRICS.read_text(encoding="utf-8"))
+    if trends and IMS_TRENDS.exists():
+        out["trends"] = json.loads(IMS_TRENDS.read_text(encoding="utf-8"))
+    return out
 
 
 @app.get("/api/metrics")

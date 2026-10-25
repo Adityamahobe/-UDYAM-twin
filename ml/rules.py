@@ -85,7 +85,7 @@ def evaluate_ai4i_rules(
         top_signals.append("process_temp_k")
 
     # Vibration rule: zone C (MEDIUM) and zone D (HIGH) boundaries of the machine's configured
-    # profile, which are demo thresholds referencing ISO 10816-3 (see config/machines.yaml).
+    # profile, which are demo thresholds referencing ISO 20816-3 (see config/machines.yaml).
     vibration_high = vibration_rms_mm_s >= vib_medium_mm_s
     if vibration_high and "vibration_rms_mm_s" not in top_signals:
         top_signals.append("vibration_rms_mm_s")

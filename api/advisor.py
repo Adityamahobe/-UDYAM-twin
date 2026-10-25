@@ -100,7 +100,7 @@ never measured.
 the operator must click Approve. Never say you have applied anything.
 - If calibration is frozen, vibration is in zone C/D, or sensor data quality is bad, say the thermal forecast is \
 less trustworthy and recommend inspection, not just derating.
-- Vibration zones are configurable demo thresholds referencing ISO 10816-3, not a certified assessment. AI4I \
+- Vibration zones are configurable demo thresholds referencing ISO 20816-3, not a certified assessment. AI4I \
 failure risk is a model vote share, not a calibrated probability.
 - Tools report process temperatures in kelvin; show them in °C (°C = K - 273.15), like the dashboard.
 - Use cautious wording for actions ("inspect", "check", "consider"). Reply in the user's language (English, Hindi \
@@ -673,7 +673,7 @@ class TwinAdvisor:
             return None
         z = get_config().risk_zones(mid, plant.template)
         return {"C_starts_mm_s": z[0], "D_starts_mm_s": z[1],
-                "basis": "configurable demo thresholds referencing ISO 10816-3"} if z else None
+                "basis": "configurable demo thresholds referencing ISO 20816-3"} if z else None
 
     def _snap(self, mid: str) -> dict:
         snap = (getattr(self.engine, "snapshots", None) or {}).get(mid) or {}

@@ -92,8 +92,9 @@ def test_excel_workbook(client):
     assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"]
     assert r.headers["content-disposition"].endswith('.xlsx"')
     wb = load_workbook(io.BytesIO(r.content))
-    assert wb.sheetnames == ["About", "Summary", "Telemetry", "Energy & OEE", "Alerts", "Work orders", "Events",
-                             "RL decisions", "RL policy evaluation"]
+    assert wb.sheetnames[:9] == ["About", "Summary", "Telemetry", "Energy & OEE", "Alerts", "Work orders", "Events",
+                                 "RL decisions", "RL policy evaluation"]
+    assert wb.sheetnames[9:] in ([], ["IMS zone progression", "IMS early warning"])  # present once IMS is processed
     tel = wb["Telemetry"]
     header = [c.value for c in tel[2]]
     assert header[:3] == ["ts", "ts (Asia/Kolkata)", "machine_id"]

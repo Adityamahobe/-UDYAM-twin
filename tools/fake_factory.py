@@ -22,7 +22,7 @@ TIME_SCALE = 30  # demo time runs 30x faster than plant time (used for "minutes"
 
 # Demo thresholds: configurable demo settings, not engineering limits.
 TEMP_LIMIT_K = 315.5  # process-temperature warning (physics rule, "OVERTEMP")
-VIB_ZONE_C = 4.5      # mm/s RMS: ISO-20816-*referenced* demo zones
+VIB_ZONE_C = 4.5      # mm/s RMS: ISO 20816-3-*referenced* demo zones
 VIB_ZONE_D = 7.1
 PRESSURE_MIN_BAR = 6.0
 INR_PER_PART = 450.0  # user-entered contribution per finished part (assumption)

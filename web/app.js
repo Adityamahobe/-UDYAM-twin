@@ -16,6 +16,7 @@ const state = {
   eventFilter: { sev: "ALL", kind: "ALL" },
   expandedEvents: new Set(),
   alerts: [],
+  snap: {},             // latest snapshot per machine (zones come from the configured ISO 20816-3 profile)
   economics: {
     inr_per_part: 450.0,
     downtime_cost_per_hr: 2500.0,
@@ -119,6 +120,8 @@ function handleMessage(msg) {
     state.line = msg;
     renderLineBanner(msg);
     renderEconomics();
+  } else if (msg.type === "snapshot") {
+    state.snap[msg.machine_id] = msg;
   } else if (msg.type === "alert") {
     scheduleAlertsFetch();
   } else if (msg.type === "event") {
@@ -288,6 +291,13 @@ function selectMachine(machineId) {
   }
 }
 
+// "Zone B · ISO 20816-3 (provisional)" from the server's severity assessment of the latest snapshot
+function isoZone(mid) {
+  const sev = (state.snap[mid] || {}).severity;
+  if (!sev || !sev.zone) return "ISO 20816-3 zone: unavailable";
+  return `Zone ${sev.zone} · ISO 20816-3${sev.status === "PROVISIONAL" ? " (provisional)" : ""}`;
+}
+
 function renderDetailPanel() {
   const panel = document.getElementById("detailView");
   if (!panel) return;
@@ -378,7 +388,7 @@ function renderDetailPanel() {
           <div>Spindle Speed: <b>${fmt(o.rpm, 0)} RPM</b></div>
           <div>Cutting Torque: <b>${fmt(o.torque_nm, 1)} Nm</b></div>
           <div>Motor Power: <b>${fmt(o.power_kw, 2)} kW</b></div>
-          <div>Vibration RMS: <b>${fmt(o.vibration_rms_mm_s, 2)} mm/s</b> (ISO 20816 Zone ${(o.vibration_rms_mm_s || 0) > 4.5 ? 'C/D' : 'A/B'})</div>
+          <div>Vibration RMS: <b>${fmt(o.vibration_rms_mm_s, 2)} mm/s</b> (${isoZone(mid)})</div>
           <div>Tool Wear: <b>${fmt(o.tool_wear_min, 1)} min</b></div>
         </div>
       </div>
@@ -436,7 +446,7 @@ function renderDetailPanel() {
         <div class="calc-card">
           <div class="calc-label">Vibration & Drive Health</div>
           <div class="calc-val">${fmt(o.vibration_rms_mm_s, 2)} mm/s</div>
-          <div class="formula-hint">ISO 20816 Zone ${(o.vibration_rms_mm_s || 0) > 4.5 ? 'C/D (Elevated)' : 'A/B (Normal)'}</div>
+          <div class="formula-hint">${isoZone(mid)}</div>
         </div>
       </div>
 

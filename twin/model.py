@@ -136,7 +136,7 @@ class DigitalTwin:
                                         "machine_id": self.machine_id,
                                         "cause": f"Vibration zone {zone} (possible bearing or imbalance problem)",
                                         "evidence": f"Velocity RMS {vib:.2f} mm/s ≥ {name} {bound:g} mm/s "
-                                                    f"(demo thresholds referencing ISO 10816-3)",
+                                                    f"(demo thresholds referencing ISO 20816-3)",
                                         "recommended_action": "Inspect spindle bearing, tool holder and balance; "
                                                               "check accelerometer mounting",
                                         "priority": "Critical" if lv == "CRITICAL" else "High"}}

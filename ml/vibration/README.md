@@ -42,11 +42,11 @@ The default band is a placeholder. Confirm the band that the applicable standard
 
 Profiles and machine assignments live in [`config/machines.yaml`](../../config/machines.yaml) (`vibration_profiles` and each template's `vibration` block), loaded and validated by `config/loader.py`. Machines added at runtime inherit their template's profile.
 
-The shipped profiles use the commonly cited ISO 10816-3 Group 2 boundaries as **configurable demo thresholds, not a certified assessment**. They are marked `verified: false`, so every result is reported as **Provisional**, with the zone and the boundary crossed (for example `Zone B (2.33 mm/s ≥ A/B 1.4 mm/s, below B/C 2.8 mm/s)`).
+The shipped profiles use the commonly cited ISO 20816-3 Group 2 boundaries (unchanged from the withdrawn ISO 10816-3) as **configurable demo thresholds, not a certified assessment**. They are marked `verified: false`, so every result is reported as **Provisional**, with the zone and the boundary crossed (for example `Zone B (2.33 mm/s ≥ A/B 1.4 mm/s, below B/C 2.8 mm/s)`).
 - VMC, lathe, saw: rigid foundation, A/B 1.4 · B/C 2.8 · C/D 4.5 mm/s RMS, 10–1000 Hz.
 - Compressor: flexible foundation, A/B 2.3 · B/C 4.5 · C/D 7.1 mm/s RMS, 10–1000 Hz.
 
-ISO 10816-3 covers machines above 15 kW, so for these smaller machines the values are illustrative. To mark a profile verified, an engineer sets `verified: true`, `verified_by` and `source_reference` after checking the applicable part and edition.
+ISO 20816-3 Group 2 covers machines of 15–300 kW, so for these smaller machines the values are illustrative. To mark a profile verified, an engineer sets `verified: true`, `verified_by` and `source_reference` after checking the applicable part and edition.
 
 The simulated stream value is defined as velocity RMS over the machine's `stream_band_hz`. A LIVE device's band is not declared, so LIVE values return **UNAVAILABLE** until the device contract declares one.
 
@@ -118,3 +118,51 @@ The Random Forest scored 0.831 on the validation load (0 hp); ball faults at 0 h
 - **Same sampling rate required.** Waveforms must be sampled at 12 kHz to get a prediction. The ESP32 / fake-device waveforms (2560 Hz) are reported as *Out of model domain*.
 - **Vote share.** The class vote share is not a calibrated probability.
 
+## IMS bearing run-to-failure validation (ISO 20816-3)
+
+Real bearings that ran until they failed, used to check how the ISO 20816-3 zones and an early-warning
+model behave before a failure. Source: NASA Prognostics Data Repository, *IMS Bearings* (`IMS.zip`,
+1,061,902,801 bytes, data.nasa.gov); data by the Center for Intelligent Maintenance Systems, University of
+Cincinnati, with Rexnord. Four Rexnord ZA-2115 bearings on one shaft at 2000 rpm under 6000 lb radial load;
+one-second snapshots (20,480 samples at 20 kHz), three tests, 9,464 snapshots in total. The archive's third test
+has 6,324 snapshots up to 18 April 2004 (the readme says 4,448 up to 4 April); the archive is used as it is.
+
+```bash
+python -m ml.vibration.datasets.ims --zip ml/vibration/data/ims/IMS.zip --out ml/vibration/data/ims   # ~5 min
+python -m ml.vibration.train_ims                                                                       # ~15 s
+```
+
+The loader unpacks one test at a time, computes the same features as the live machines (velocity RMS by
+frequency-domain integration, 10–1000 Hz; test 1's x/y channels → the larger), labels every snapshot with the
+demo Group 2 rigid zone, and deletes the raw files. Snapshots where every bearing reads < 0.1 mm/s (rig
+stopped) are excluded. Results: `ml/vibration/artifacts/ims_metrics.json`, `GET /api/datasets/ims`, the
+dashboard panel *Vibration Dataset · ISO 20816-3 on IMS Run-to-Failure*, and two sheets in the Excel export.
+
+**Zones before failure** (velocity RMS in mm/s):
+
+| Bearing | Failure | Test length | Baseline → max | Final zone | Zone C first reached |
+|---|---|---|---|---|---|
+| T1-B3 | inner race | 827.6 h | 0.41 → 7.01 | D | 0.0 h before the end |
+| T1-B4 | roller element | 827.6 h | 0.31 → 0.98 | A | never |
+| T2-B1 | outer race | 163.5 h | 0.64 → 3.17 | B | 0.3 h before the end |
+| T3-B3 | outer race | 1073.1 h | 0.51 → 27.49 | D | 0.0 h before the end |
+
+On this rig velocity RMS stays in zone A for almost the whole life and crosses into C/D only at the very end
+(the roller-element failure never leaves zone A), so the zones alone give almost no warning. That is a real
+finding, not a bug: the bearings are heavily loaded and the defects show first in impulsiveness (kurtosis)
+and high-frequency content, not in broadband velocity.
+
+**Early warning "fails within 24 h"**, leave-one-test-out (train on two tests, evaluate on the third), alarm = held for 3 snapshots:
+
+| Method | Precision | Recall | False alarms (healthy bearings) | First alarm before failure (T1-B3, T1-B4, T2-B1, T3-B3) |
+|---|---|---|---|---|
+| Random Forest on baseline-normalised features | 0.261 | 0.597 | 0.46 % | 12.5 h, 128.3 h, 2 h, 25.2 h |
+| Rule: velocity ≥ 2 × the bearing's own baseline | 0.663 | 0.151 | 0.00 % | 10.7 h, 92.7 h, 1 h, 3.3 h |
+| Rule: zone C or worse | 1.0 | 0.008 | 0.00 % | none, none, none, none |
+
+**RUL**: a regressor for hours-to-failure (capped at 100 h, leave-one-failed-bearing-out) is *worse* than
+predicting the mean on 3 of the 4 bearings; with four run-to-failure bearings there is not enough data, so no
+RUL is claimed. A time-to-zone-D model is not trainable either: zone D appears only in the final snapshot.
+
+Limits: one test rig at one speed and load, four failures; zones are computed with the standard's method on a
+rig outside its machine groups, so they are labels for comparison, not a certified assessment.
