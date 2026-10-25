@@ -210,22 +210,33 @@
       <!-- Right Column: Events, Work Orders, Model Metrics -->
       <div style="display:flex; flex-direction:column; gap:20px;">
         <!-- Work Orders Panel -->
-        <section class="panel">
+        <section class="panel panel-compact">
           <div class="panel-header">
-            <h2>Operator Work Orders</h2>
+            <h2>Operator Work Orders <span class="count-pill" id="woCount">0</span></h2>
             <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('VMC-01', 'Scheduled Inspection')">+ New Order</button>
           </div>
-          <div id="workOrderList" style="display:flex; flex-direction:column; gap:8px;">
+          <div id="workOrderList" class="wo-list scroll-list">
             <!-- Populated dynamically -->
           </div>
         </section>
 
-        <!-- Explainable Event Log Stream -->
-        <section class="panel">
+        <!-- Active alerts (server alert store) + explainable event log -->
+        <section class="panel panel-compact">
           <div class="panel-header">
-            <h2>Explainable Event Log & Alert Cards</h2>
+            <h2>Alerts &amp; Explainable Event Log</h2>
+            <span class="count-pill crit" id="alertCount" title="Active alerts">0 active</span>
           </div>
-          <div class="event-log" id="eventLog">
+          <div id="alertList" class="alert-list scroll-list"></div>
+          <div class="event-filters" id="eventFilters">
+            <div class="sev-chips" role="group" aria-label="Filter by severity">
+              <button type="button" class="sev-chip active" data-sev="ALL">All</button>
+              <button type="button" class="sev-chip INFO" data-sev="INFO">Info</button>
+              <button type="button" class="sev-chip WARN" data-sev="WARN">Warning</button>
+              <button type="button" class="sev-chip CRITICAL" data-sev="CRITICAL">Critical</button>
+            </div>
+            <select id="eventKindFilter" aria-label="Filter by event type"><option value="ALL">All types</option></select>
+          </div>
+          <div class="event-log scroll-list" id="eventLog">
             <!-- Populated dynamically -->
           </div>
         </section>

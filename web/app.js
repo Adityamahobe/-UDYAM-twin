@@ -12,6 +12,10 @@ const state = {
   selectedMachineId: "VMC-01",
   autoDemo: true,
   workOrders: [],
+  events: [],           // newest first, capped at EVENT_CAP; the log renders a filtered view
+  eventFilter: { sev: "ALL", kind: "ALL" },
+  expandedEvents: new Set(),
+  alerts: [],
   economics: {
     inr_per_part: 450.0,
     downtime_cost_per_hr: 2500.0,
@@ -115,6 +119,8 @@ function handleMessage(msg) {
     state.line = msg;
     renderLineBanner(msg);
     renderEconomics();
+  } else if (msg.type === "alert") {
+    scheduleAlertsFetch();
   } else if (msg.type === "event") {
     logEvent(msg);
     if (msg.kind === "MACHINE_ADDED") fetchRegistry();
@@ -589,44 +595,138 @@ function renderEconomics() {
   if (s3500) s3500.textContent = `${(totalHardwareCapEx / (avoidedHoursPerMonth * 3500)).toFixed(1)} mo`;
 }
 
+const EVENT_CAP = 200;
+const SEV_LABEL = { INFO: "Info", WARN: "Warning", CRITICAL: "Critical" };
+
+function machineName(mid) {
+  return (state.machines[mid] && state.machines[mid].name) || mid || "Factory";
+}
+
+function shortTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return isNaN(d) ? String(ts).slice(11, 19) : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+
 function logEvent(e) {
+  const id = e.event_id || `${e.ts}-${e.kind}-${e.title}`;
+  if (state.events.some(x => x._id === id)) return;
+  state.events.unshift({ ...e, _id: id, severity: e.severity || "INFO" });
+  if (state.events.length > EVENT_CAP) state.events.length = EVENT_CAP;
+  updateKindFilter(e.kind);
+  renderEventLog();
+}
+
+function updateKindFilter(kind) {
+  const sel = document.getElementById("eventKindFilter");
+  if (!sel || !kind || [...sel.options].some(o => o.value === kind)) return;
+  sel.appendChild(new Option(kind.replace(/_/g, " ").toLowerCase(), kind));
+}
+
+function renderEventLog() {
   const container = document.getElementById("eventLog");
   if (!container) return;
-
-  const card = document.createElement("div");
-  card.className = `event-card ${esc(e.severity || 'INFO')}`;
-
-  const tsDisp = (e.ts || "").slice(11, 19);
-  let cardBreakdown = "";
-  if (e.measured || e.inferred || e.suggested) {
-    cardBreakdown = `
-      <div class="event-breakdown">
-        ${e.measured ? `<div><b>Fact (Measured):</b> ${esc(e.measured)}</div>` : ''}
-        ${e.inferred ? `<div><b>Inference:</b> ${esc(e.inferred)}</div>` : ''}
-        ${e.suggested ? `<div><b>Suggested Action:</b> ${esc(e.suggested)}</div>` : ''}
-      </div>
-    `;
+  const { sev, kind } = state.eventFilter;
+  const rows = state.events.filter(e => (sev === "ALL" || e.severity === sev) && (kind === "ALL" || e.kind === kind));
+  if (!rows.length) {
+    container.innerHTML = `<div class="list-empty">${state.events.length ? "No events match the filter." : "No events yet."}</div>`;
+    return;
   }
+  container.innerHTML = rows.map(e => {
+    const open = state.expandedEvents.has(e._id);
+    const detail = e.measured || e.inferred || e.suggested;
+    const summary = e.inferred || e.measured || "";
+    const actionable = e.severity === "WARN" || e.severity === "CRITICAL";
+    return `<div class="ev-row ${esc(e.severity)}${open ? " open" : ""}" data-id="${esc(e._id)}">
+      <button type="button" class="ev-line" aria-expanded="${open}" ${detail || actionable ? "" : "disabled"}>
+        <span class="sev-dot" title="${esc(SEV_LABEL[e.severity] || e.severity)}"></span>
+        <span class="ev-time">${esc(shortTime(e.ts))}</span>
+        <span class="ev-text"><b>${esc(e.title)}</b>${summary && !open ? `<span class="ev-sum"> — ${esc(summary)}</span>` : ""}</span>
+        <span class="ev-tag">${esc(e.machine_id || "FACTORY")} · ${esc((e.kind || "").replace(/_/g, " ").toLowerCase())}</span>
+      </button>
+      ${open ? `<div class="ev-detail">
+        ${e.measured ? `<div><b>Measured:</b> ${esc(e.measured)}</div>` : ""}
+        ${e.inferred ? `<div><b>Inferred:</b> ${esc(e.inferred)}</div>` : ""}
+        ${e.suggested ? `<div><b>Suggested:</b> ${esc(e.suggested)}</div>` : ""}
+        ${actionable ? `<button type="button" class="btn btn-sm btn-primary" data-wo-mid="${esc(e.machine_id || "FACTORY")}" data-wo-title="${esc(e.title)}">Create work order</button>` : ""}
+      </div>` : ""}
+    </div>`;
+  }).join("");
+}
 
-  const isActionable = e.severity === "WARN" || e.severity === "CRITICAL";
-  const actionButton = isActionable ? `
-    <div style="margin-top:6px; display:flex; gap:6px;">
-      <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('${esc(e.machine_id || 'FACTORY')}', '${esc(e.title)}')">Create Work Order</button>
-    </div>
-  ` : '';
+function initEventLog() {
+  const log = document.getElementById("eventLog");
+  const filters = document.getElementById("eventFilters");
+  if (!log || !filters) return;
+  log.addEventListener("click", ev => {
+    const wo = ev.target.closest("[data-wo-mid]");
+    if (wo) { createWorkOrderFromAlert(wo.dataset.woMid, wo.dataset.woTitle); wo.disabled = true; wo.textContent = "Work order requested"; return; }
+    const line = ev.target.closest(".ev-line");
+    if (!line || line.disabled) return;
+    const id = line.parentElement.dataset.id;
+    state.expandedEvents.has(id) ? state.expandedEvents.delete(id) : state.expandedEvents.add(id);
+    renderEventLog();
+  });
+  filters.querySelectorAll(".sev-chip").forEach(b => b.onclick = () => {
+    state.eventFilter.sev = b.dataset.sev;
+    filters.querySelectorAll(".sev-chip").forEach(x => x.classList.toggle("active", x === b));
+    renderEventLog();
+  });
+  document.getElementById("eventKindFilter").onchange = e => { state.eventFilter.kind = e.target.value; renderEventLog(); };
+  // Recent history from SQLite so the log is not empty after a reload (oldest first, so newest ends on top)
+  fetch("/api/events?limit=100").then(r => r.json()).then(rows => rows.reverse().forEach(logEvent)).catch(() => {});
+}
 
-  card.innerHTML = `
-    <div class="event-top">
-      <span>${esc(tsDisp)} UTC · <b>${esc(e.kind)}</b></span>
-      <span>${esc(e.machine_id || 'FACTORY')}</span>
-    </div>
-    <div class="event-title">${esc(e.title)}</div>
-    ${cardBreakdown}
-    ${actionButton}
-  `;
+// Active alerts from the server alert store (raised, acknowledged and resolved server-side)
+let alertsTimer = null;
+function scheduleAlertsFetch() {
+  clearTimeout(alertsTimer);
+  alertsTimer = setTimeout(fetchAlerts, 250);  // several alert frames often arrive in one batch
+}
 
-  container.prepend(card);
-  while (container.children.length > 50) container.lastChild.remove();
+function fetchAlerts() {
+  fetch("/api/alerts").then(r => r.json()).then(data => { state.alerts = data; renderAlerts(); }).catch(() => {});
+}
+
+const SEV_RANK = { CRITICAL: 0, WARN: 1, INFO: 2 };
+function renderAlerts() {
+  const list = document.getElementById("alertList");
+  const count = document.getElementById("alertCount");
+  if (!list) return;
+  const alerts = [...state.alerts].sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3)
+    || (a.status === "ACTIVE" ? -1 : 1) - (b.status === "ACTIVE" ? -1 : 1) || String(b.raised_at).localeCompare(String(a.raised_at)));
+  const active = alerts.filter(a => a.status === "ACTIVE").length;
+  if (count) { count.textContent = `${active} active`; count.classList.toggle("zero", active === 0); }
+  list.classList.toggle("empty", !alerts.length);
+  if (!alerts.length) { list.innerHTML = `<div class="list-empty ok">✓ No open alerts</div>`; return; }
+  list.innerHTML = alerts.map(a => `
+    <div class="alert-card ${esc(a.severity)}${a.status === "ACKNOWLEDGED" ? " acked" : ""}" title="${esc([a.measured, a.inferred, a.suggested].filter(Boolean).join("\n"))}">
+      <div class="alert-main">
+        <div class="alert-head"><span class="sev-pill ${esc(a.severity)}">${esc(SEV_LABEL[a.severity] || a.severity)}</span>
+          <b>${esc(machineName(a.machine_id))}</b><span class="alert-time">${esc(shortTime(a.raised_at))}${a.occurrences > 1 ? ` · ×${esc(a.occurrences)}` : ""}</span></div>
+        <div class="alert-msg">${esc(a.title)}</div>
+      </div>
+      <div class="alert-actions">
+        ${a.status === "ACTIVE" ? `<button type="button" class="btn btn-sm" data-alert-ack="${esc(a.alert_id)}">Ack</button>` : `<span class="alert-state">Ack'd</span>`}
+        ${a.wo_id ? `<span class="alert-state">${esc(a.wo_id)}</span>` : `<button type="button" class="btn btn-sm btn-primary" data-alert-wo="${esc(a.alert_id)}">Work order</button>`}
+      </div>
+    </div>`).join("");
+}
+
+function initAlerts() {
+  const list = document.getElementById("alertList");
+  if (!list) return;
+  list.addEventListener("click", ev => {
+    const ack = ev.target.closest("[data-alert-ack]"), wo = ev.target.closest("[data-alert-wo]");
+    const btn = ack || wo;
+    if (!btn) return;
+    btn.disabled = true;
+    const id = encodeURIComponent(ack ? ack.dataset.alertAck : wo.dataset.alertWo);
+    fetch(ack ? `/api/alerts/${id}/acknowledge` : `/api/alerts/${id}/work-order`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: ack ? JSON.stringify({ by: "dashboard operator" }) : undefined,
+    }).then(() => { fetchAlerts(); if (wo) fetchWorkOrders(); }).catch(() => { btn.disabled = false; });
+  });
+  fetchAlerts();
 }
 
 // -----------------------------------------------------------------------------
@@ -756,25 +856,33 @@ function fetchWorkOrders() {
     .catch(() => {});
 }
 
+const WO_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+const WO_OPEN = wo => wo.status !== "Closed";
+
 function renderWorkOrders() {
   const list = document.getElementById("workOrderList");
+  const count = document.getElementById("woCount");
   if (!list) return;
+  const open = state.workOrders.filter(WO_OPEN).length;
+  if (count) { count.textContent = `${open} open`; count.title = `${state.workOrders.length} in total`; }
 
   if (state.workOrders.length === 0) {
-    list.innerHTML = "<div class='text-muted' style='font-size:12px;'>No active work orders.</div>";
+    list.innerHTML = "<div class='list-empty'>No work orders.</div>";
     return;
   }
-
-  list.innerHTML = state.workOrders.map(wo => `
-    <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-      <div>
-        <b>${esc(wo.wo_id)}</b> · ${esc(wo.machine_id)} · <i>${esc(wo.title)}</i>
-        <div style="color:var(--text-muted); font-size:11px;">Status: <b style="color:var(--text-primary);">${esc(wo.status)}</b> · Priority: ${esc(wo.priority)}</div>
-      </div>
-      <div>
+  // Open orders first (by priority), then closed ones, newest first within each group
+  const rows = [...state.workOrders].sort((a, b) => (WO_OPEN(b) - WO_OPEN(a)) || (WO_RANK[a.priority] ?? 9) - (WO_RANK[b.priority] ?? 9)
+    || String(b.created_at).localeCompare(String(a.created_at)));
+  list.innerHTML = rows.map(wo => `
+    <div class="wo-row${WO_OPEN(wo) ? "" : " closed"}" title="${esc(wo.cause || wo.title)}">
+      <span class="wo-id">${esc(wo.wo_id)}</span>
+      <span class="wo-main"><b>${esc(wo.machine_id)}</b> <span class="wo-title">${esc(wo.title)}</span></span>
+      <span class="prio-pill ${esc(wo.priority)}">${esc(wo.priority)}</span>
+      <span class="status-pill ${esc((wo.status || "").replace(/\s+/g, "-"))}">${esc(wo.status)}</span>
+      <span class="wo-act">
         ${wo.status === 'Open' ? `<button class="btn btn-sm btn-primary" onclick="updateWo('${esc(wo.wo_id)}', 'In Progress')">Acknowledge</button>` : ''}
         ${wo.status === 'In Progress' ? `<button class="btn btn-sm btn-primary" onclick="updateWo('${esc(wo.wo_id)}', 'Closed')">Close</button>` : ''}
-      </div>
+      </span>
     </div>
   `).join("");
 }
@@ -1102,6 +1210,8 @@ window.fetchMetrics = fetchMetrics;
 
 window.addEventListener("DOMContentLoaded", () => {
   initWebSocket();
+  initEventLog();
+  initAlerts();
   fetchRegistry();
   fetchWorkOrders();
   fetchEconomics();

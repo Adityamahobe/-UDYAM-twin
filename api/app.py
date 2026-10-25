@@ -343,6 +343,17 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def revalidate_ui_files(request: Request, call_next):
+    """Dashboard pages and scripts: the browser must revalidate (304 if unchanged), so an update never
+    mixes a new index.html with a stale cached app.js."""
+    response = await call_next(request)
+    path = request.url.path
+    if path in ("/", "/operator", "/iot") or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 app.include_router(build_router(iot_hub, factory_engine, mqtt_ref))
 app.include_router(build_vibration_router(iot_hub, vibration_monitor, lambda: list(factory_engine.plants)))
 
