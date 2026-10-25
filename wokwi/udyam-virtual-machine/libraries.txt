@@ -1,0 +1,7 @@
+# Wokwi installs these from the Arduino library manager
+PubSubClient
+ArduinoJson
+DHT sensor library for ESPx
+Adafruit MPU6050
+Adafruit Unified Sensor
+Adafruit BusIO

@@ -73,6 +73,16 @@
         </div>
       </section>
 
+      <!-- Wokwi virtual devices (web/wokwi.js): Real Data mode only; VIRTUAL data, separate from the simulated plant -->
+      <section class="panel real-only" id="wokwiPanel" aria-live="polite">
+        <div class="panel-header">
+          <h2>Virtual Devices · Wokwi Simulator</h2>
+          <span class="wk-chip" id="wkState">—</span>
+        </div>
+        <div id="wkBody"><div class="sc-hint">Loading…</div></div>
+        <div id="wkCircuit" class="wk-circuit-wrap" hidden></div>
+      </section>
+
       <!-- 4-Machine Factory Assets Grid -->
       <section class="machine-grid" id="machineGrid">
         <!-- Populated dynamically by app.js -->
@@ -112,8 +122,8 @@
             </div>
           </section>
 
-          <!-- Work Orders Panel -->
-          <section class="panel panel-compact">
+          <!-- Work Orders Panel (Testing mode only: hidden in Real Data mode) -->
+          <section class="panel panel-compact" id="workOrdersPanel">
             <div class="panel-header">
               <h2>Operator Work Orders <span class="count-pill" id="woCount">0</span></h2>
               <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('VMC-01', 'Scheduled Inspection')">+ New Order</button>
@@ -356,6 +366,7 @@
                   <select id="exportSection">
                     <option value="telemetry">Telemetry · simulated (every 2 s)</option>
                     <option value="real_telemetry">Telemetry · real devices only</option>
+                    <option value="virtual_telemetry">Telemetry · Wokwi virtual devices</option>
                     <option value="alerts">Alerts</option>
                     <option value="work_orders">Work orders</option>
                     <option value="events">Event log</option>
@@ -637,6 +648,7 @@
     </div>
   </div>
 
+  <script src="/static/dialog.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/mode.js"></script>
   <script src="/static/workspace.js"></script>
@@ -647,6 +659,7 @@
   <script src="/static/cmapss.js"></script>
   <script src="/static/reports.js"></script>
   <script src="/static/recent.js"></script>
+  <script src="/static/wokwi.js"></script>
   <script src="/static/synthetic.js"></script>
   <script src="/static/whatif.js"></script>
   <script src="/static/models.js"></script>

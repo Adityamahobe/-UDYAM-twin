@@ -1176,3 +1176,79 @@ header { padding: 8px 16px; }
 #recentPanel .rc-wrap { flex: 1 1 0; min-height: 240px; max-height: none; }
 /* one column (narrow screens): a fixed, scrollable height */
 @media (max-width: 1040px) { #recentPanel { flex: none; } #recentPanel .rc-wrap { flex: none; max-height: 480px; } }
+
+/* Wokwi virtual devices (web/wokwi.js): Real Data mode only, styled apart from real machines (violet = virtual) */
+body:not(.real-mode) .real-only { display: none !important; }
+.mode-switch.real.tone-virtual { color: #c4b5fd; background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.55); }
+#wokwiPanel { border-color: rgba(139, 92, 246, 0.45); }
+.wk-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.wk-ok { color: var(--status-ok); } .wk-warn { color: var(--status-warn); } .wk-err { color: var(--status-crit); }
+.wk-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.wk-facts code { font-size: 11px; }
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.wk-card { background: var(--bg-card); border: 1px dashed rgba(139, 92, 246, 0.55); border-radius: var(--radius-md);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.wk-card.wk-dim .wk-metrics { opacity: .55; }
+.wk-card .mc-metric { background: var(--bg-surface); }
+.pill.wk-src { color: #c4b5fd; border-color: rgba(139, 92, 246, 0.6); }
+.pill.wk-virtual { color: #fbbf24; border-color: rgba(251, 191, 36, 0.55); }
+.pill.wk-ok { color: var(--status-ok); } .pill.wk-warn { color: var(--status-warn); } .pill.wk-err { color: var(--status-crit); }
+.wk-fault { color: var(--status-warn); margin-left: 6px; }
+.wk-more { font-size: 11px; color: var(--text-secondary); }
+.wk-more summary { cursor: pointer; color: var(--text-muted); }
+.wk-more div { margin-top: 3px; }
+/* Wokwi virtual circuit (web/wokwi.js) */
+.wk-circuit-wrap { margin-top: 10px; border: 1px dashed rgba(139, 92, 246, 0.45); border-radius: var(--radius-md); padding: 8px 10px; background: var(--bg-card); }
+.wk-circuit-title { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--text-primary); }
+.wk-circuit-title span { font-weight: 500; color: var(--text-muted); }
+.wk-circuit-scroll { overflow-x: auto; }
+.wk-circuit { display: block; width: 100%; min-width: 620px; height: auto; }
+/* Wokwi circuit drawn with Wokwi's part graphics (web/wokwi.js) */
+#wkCircuit[hidden] { display: none !important; }
+.wkc-fit { position: relative; width: 100%; overflow: hidden; background: #2b2b2b; border-radius: var(--radius-sm); margin-top: 6px; }
+.wkc-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }  /* view only: knobs are not controls */
+.wkc-wires { position: absolute; left: 0; top: 0; overflow: visible; }
+.wkc-stage > :not(svg):not(.wkc-label) { z-index: 1; }
+.wkc-label { position: absolute; z-index: 2; white-space: nowrap; font-size: 11px; line-height: 1.3; color: #e5e7eb;
+  background: rgba(17, 24, 39, 0.82); border: 1px solid rgba(255, 255, 255, 0.12); border-left: 3px solid #94a3b8;
+  border-radius: 4px; padding: 2px 6px; display: flex; flex-direction: column; }
+.wkc-label.vs { border-left-color: #a78bfa; }
+.wkc-label.sw { border-left-color: #fbbf24; }
+.wkc-label span { color: #cbd5e1; font-size: 10px; }
+.wkc-label em { font-style: normal; font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: #fff; }
+.wkc-label em:empty { display: none; }
+.wkc-label em.stale { color: #9ca3af; }
+.wkc-label.alert { border-color: #ef4444; }
+.wkc-label.alert em { color: #fca5a5; }
+.wkc-stale .wkc-stage > :not(.wkc-label):not(svg) { filter: saturate(.55) brightness(.85); }
+.wkc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.wkc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.wkc-legend i.vs { background: #a78bfa; } .wkc-legend i.sw { background: #fbbf24; }
+
+/* On-page confirm / prompt (web/dialog.js) */
+.ud-dialog-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(3, 7, 18, 0.62); display: flex;
+  align-items: center; justify-content: center; padding: 16px; }
+.ud-dialog { width: min(440px, 100%); background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ud-dialog-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.ud-dialog-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+.ud-dialog-input { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 8px 10px; font-size: 14px; }
+.ud-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* Real Data mode: hide what has nothing to show there (Testing mode unchanged) */
+body.real-mode header .testing-only,
+body.real-mode .sim-view,
+body.real-mode .machine-card.no-real-data,
+body.real-mode #machineGrid.rd-empty,
+body.real-mode #detailView.no-real-data,
+body.real-mode #vibrationPanel.no-real-data,
+body.real-mode .lower-layout.rd-solo > .ws-col:first-child { display: none !important; }
+body.real-mode .lower-layout.rd-solo { grid-template-columns: 1fr; }
+.real-banner .rb-virtual { color: #c4b5fd; }
+.real-banner .rb-ro { color: var(--text-muted); }
+.real-banner.tone-virtual { border-left-color: #a78bfa; }
+.real-banner.tone-virtual .rb-state { color: #c4b5fd; }
+.real-banner .rb-future { font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed var(--border-subtle); padding-top: 5px; margin-top: 2px; }
+.real-banner .rb-future b { color: var(--text-secondary); }
+body.real-mode #workOrdersPanel { display: none !important; }  /* Real Data mode: no work orders on the Live tab */

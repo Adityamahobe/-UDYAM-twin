@@ -137,9 +137,9 @@
     fetch(`/api/chat/proposals/${encodeURIComponent(p.proposal_id)}/${decision}`,
       { method: "POST", headers, body: JSON.stringify({ operator: "dashboard operator" }) })
       .then(r => r.json().then(res => ({ r, res })))
-      .then(({ r, res }) => {
+      .then(async ({ r, res }) => {
         if (r.status === 401 && !retried) {
-          const t = window.prompt("Operator token required to " + decision + " this action:");
+          const t = await udyamPrompt("Operator token required to " + decision + " this action", { password: true, ok: "Continue" });
           if (t) { operatorToken = t; return decide(p, d, decision, true); }
         }
         d.classList.add("done");

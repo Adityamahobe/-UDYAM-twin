@@ -129,3 +129,28 @@ from the default `pytest` run and is skipped (not faked) when `.venv-mqtt` is mi
 ```bash
 pytest -m e2e -s tests/e2e
 ```
+
+## Wokwi virtual devices (Real Data mode)
+
+ESP32 sketches running in the [Wokwi](https://wokwi.com) simulator can send **virtual** telemetry to Real Data mode.
+The firmware is in [`wokwi/udyam-virtual-machine/`](../wokwi/udyam-virtual-machine/README.md); the backend module is
+`hub/wokwi.py`.
+
+- **Separate from everything else:** its own MQTT connection (`UDYAM_WOKWI_*` settings), its own store and its own
+  table (`virtual_telemetry`). Wokwi data never enters the Testing-mode simulation or a simulated machine, and it
+  never counts as a real device. The Real Data banner keeps reporting real devices (for example "Not configured")
+  and shows Wokwi on its own line. With only Wokwi online, the badge reads "WOKWI (VIRTUAL)".
+- **Display:** the *Virtual Devices · Wokwi Simulator* panel on the Live tab, in Real Data mode only. It shows
+  machine ID, rpm, temperature, vibration, current, scenario and simulated fault, the last message time, MQTT state,
+  and the labels WOKWI SIMULATOR and VIRTUAL DATA. A card turns Stale after about 3 missed intervals, and Offline
+  (values hidden) after 30 s or as soon as the device's last will "offline" arrives.
+- **Validation:** a public broker is untrusted. Each message must match schema `udyam.wokwi.v1`, carry
+  `source: WOKWI_SIMULATOR` and `virtual: true`, use a machine ID equal to its topic, stay within value ranges and
+  under 4 KB, and arrive at most every 0.2 s. At most 10 machines are tracked. Rejections are counted with the
+  reason.
+- **History and export:** stored rows appear in Reports (CSV section "Telemetry · Wokwi virtual devices", Excel
+  sheet "Virtual (Wokwi)", and Live Records tagged WOKWI). Each row is labelled VIRTUAL (Wokwi simulator).
+  `scenario` and `simulated_fault` are simulated conditions, never verified faults.
+- **Models:** the AI4I failure-risk model needs torque, tool wear and air temperature, which the device does not
+  send, so it reports not applicable. ISO 20816 vibration zones need a measured velocity RMS over a known band;
+  the Wokwi value is a software model, so no zone is given.

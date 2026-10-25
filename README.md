@@ -54,7 +54,7 @@ Choose with `POST /api/mode {"mode": "SIM" | "REPLAY" | "LIVE"}`; `GET /api/mode
 
 ## Testing mode and Real Data mode
 
-Click the mode badge in the header to switch. **Testing mode** is the simulation with every control. **Real Data mode** is read-only monitoring of real devices (MQTT, HTTP or WebSocket through the IoT hub): simulator controls are refused by the server, machines without a real device show "No real data", and a banner shows the connection state (Connected / Connecting / Disconnected / Error / Stale data) and the last message time. Real telemetry is stored apart from simulated telemetry. In Testing mode, the **Simulation Controls** panel changes simulated machine parameters (spindle speed, load, ambient temperature, cooling capacity, extra vibration) within engineering limits, and pauses, resumes, stops or runs the simulation for N minutes. The **What-If Comparison** panel runs 2–4 scenarios (parameters, a fault, self-healing on or off) side by side on separate virtual lines and compares output, energy, OEE, temperature and alerts. The **Synthetic Dataset Generator** panel produces labelled datasets marked SYNTHETIC DIGITAL TWIN DATA (CSV or JSON, with metadata) on separate engines; see [`DATA.md`](DATA.md). The **Model Registry** panel trains a candidate failure-risk model on AI4I plus synthetic data, checks it against a fixed evaluation gate, and lets an operator promote it or roll back (never automatically); see [`ml/README.md`](ml/README.md). A dev-only local MQTT broker and end-to-end tests for both modes are described in [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md#local-mqtt-test-broker-and-end-to-end-tests-dev-only). The **Adaptive Learning** panel shows when the model's inputs move outside its training data or away from a machine's baseline (information only, never a fault), and lets an operator confirm labels (failure, false alarm, normal) that candidates can train on. Details: [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md).
+Click the mode badge in the header to switch. **Testing mode** is the simulation with every control. **Real Data mode** is read-only monitoring of real devices (MQTT, HTTP or WebSocket through the IoT hub): simulator controls are refused by the server, machines without a real device show "No real data", and a banner shows the connection state (Connected / Connecting / Disconnected / Error / Stale data) and the last message time. Real telemetry is stored apart from simulated telemetry. In Testing mode, the **Simulation Controls** panel changes simulated machine parameters (spindle speed, load, ambient temperature, cooling capacity, extra vibration) within engineering limits, and pauses, resumes, stops or runs the simulation for N minutes. The **What-If Comparison** panel runs 2–4 scenarios (parameters, a fault, self-healing on or off) side by side on separate virtual lines and compares output, energy, OEE, temperature and alerts. The **Synthetic Dataset Generator** panel produces labelled datasets marked SYNTHETIC DIGITAL TWIN DATA (CSV or JSON, with metadata) on separate engines; see [`DATA.md`](DATA.md). The **Model Registry** panel trains a candidate failure-risk model on AI4I plus synthetic data, checks it against a fixed evaluation gate, and lets an operator promote it or roll back (never automatically); see [`ml/README.md`](ml/README.md). Real Data mode can also show **virtual** telemetry from an ESP32 running in the Wokwi simulator, clearly labelled and kept apart from real devices and the simulation; see [`wokwi/udyam-virtual-machine/README.md`](wokwi/udyam-virtual-machine/README.md). A dev-only local MQTT broker and end-to-end tests for both modes are described in [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md#local-mqtt-test-broker-and-end-to-end-tests-dev-only). The **Adaptive Learning** panel shows when the model's inputs move outside its training data or away from a machine's baseline (information only, never a fault), and lets an operator confirm labels (failure, false alarm, normal) that candidates can train on. Details: [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md).
 
 ## Fault lab and Auto Demo (demo simulation)
 
@@ -149,6 +149,25 @@ Retrain with `python -m ml.train_ai4i`. Rebuild our simulation dataset and its m
 ```
 
 The suite covers config validation and ISO zones, derate maths, the snapshot and WebSocket schema, the calibration throttle and cooling alert, alert and work-order lifecycles (always on a temporary database), the AI4I pipeline and RUL, every fault-lab scenario and its resolution, reset completeness, three identical Auto Demo cycles, OEE/energy/CO₂/₹ maths, REPLAY and the LIVE guard, reports, time-range CSV and Excel export, the RL policy and its feedback loop, Add Your Machine, and the offline rule.
+
+## Future scope: real machines
+
+Today, Real Data mode runs on **virtual sensors**: an ESP32 in the Wokwi simulator
+([`wokwi/udyam-virtual-machine/`](wokwi/udyam-virtual-machine/README.md)) publishes clearly labelled VIRTUAL telemetry
+over MQTT. The dashboard leads with that source, and real machines are shown as future scope rather than as an error.
+
+The path to a real machine is already built, but it hasn't been used with hardware yet:
+
+- **Connection:** mount sensors on the machine (for example an ESP32 with a temperature probe, an accelerometer and a
+  current clamp), publish to `udyam/<device_id>/telemetry`, and set `UDYAM_MQTT_HOST` (plus port, user and password)
+  on the server. See *Connecting a real device* above.
+- **Display:** readings are tagged LIVE and stored apart from simulated and virtual data. The machine's card,
+  detail and vibration panels then appear in Real Data mode.
+- **What a real installation still needs:**
+  - torque and tool-wear inputs before the failure-risk model can score a real machine;
+  - a measured vibration velocity over a known band before ISO 20816 zones apply;
+  - operator-confirmed labels before any model learns from real data;
+  - a separate, safety-reviewed path before anything could ever send commands to equipment. UDYAM-TWIN is read-only.
 
 ## Limitations (say these out loud to judges)
 

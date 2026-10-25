@@ -96,8 +96,8 @@
         </div>`;
       }).join("") : `<div class="sc-hint">No synthetic datasets yet.</div>`;
       el("synList").querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
-        if (!window.confirm(`Delete ${b.dataset.del}? The files are removed from ml/data/synthetic.`)) return;
-        fetch(`/api/synthetic/datasets/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }).then(loadList);
+        udyamConfirm(`Delete ${b.dataset.del}?\n\nThe files are removed from ml/data/synthetic.`, { ok: "Delete", danger: true })
+          .then(ok => { if (ok) fetch(`/api/synthetic/datasets/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }).then(loadList); });
       });
     }).catch(() => {});
   }

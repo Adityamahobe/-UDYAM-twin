@@ -76,6 +76,7 @@ from ml.adaptive import (DriftMonitor, LabelError, LabelStore, TrainingReference
 from twin.model import use_model_path
 from hub import IoTHub
 from hub.mqtt_bridge import MqttBridge
+from hub.wokwi import SOURCE as WOKWI_SOURCE, VirtualDeviceStore, WokwiBridge
 from ml.maintenance_rl import ACTION_DERATE, METRICS_PATH as RL_METRICS_PATH, FeedbackAgent
 from ml.vibration.monitor import VibrationMonitor
 from sim.analytics import Analytics
@@ -336,6 +337,7 @@ async def app_lifespan(app: FastAPI):
     # Startup: initialize database and launch ticker task
     init_db()
     label_store.init()
+    wokwi_store.init()
     factory_engine.event_seq = max(factory_engine.event_seq, max_event_seq())  # keep event ids unique across restarts
     _restore_custom_machines()
     # Simulation state does not survive a restart, so alerts left open by a previous run are stale.
@@ -344,6 +346,10 @@ async def app_lifespan(app: FastAPI):
     if bridge:
         bridge.start()
         mqtt_ref["mqtt"] = bridge
+    wokwi = WokwiBridge.from_env(wokwi_store)
+    if wokwi:
+        wokwi.start()
+        wokwi_ref["bridge"] = wokwi
     if os.environ.get("UDYAM_AUTO_DEMO", "1") != "0":
         auto_demo.on = True
     # UDYAM_TICKER=0 (tests) leaves ticking to the caller.
@@ -354,6 +360,8 @@ async def app_lifespan(app: FastAPI):
         task.cancel()
     if bridge:
         bridge.stop()
+    if wokwi:
+        wokwi.stop()
 
 
 app = FastAPI(
@@ -389,6 +397,9 @@ synthetic_store = SyntheticStore()
 app.include_router(build_synthetic_router(synthetic_store))
 model_registry = ModelRegistry()
 label_store = LabelStore(DB_PATH)
+# Wokwi virtual devices (hub/wokwi.py): own store, own MQTT connection; never fed into the simulation engine.
+wokwi_store = VirtualDeviceStore(DB_PATH)
+wokwi_ref: Dict[str, Any] = {}
 training_job = TrainingJob(model_registry, synthetic_store, label_store)
 _references: Dict[str, TrainingReference] = {}
 
@@ -1032,9 +1043,70 @@ def real_connection() -> Dict[str, Any]:
     return connection_state(bridge.status() if bridge else None, iot_hub.list())
 
 
+def wokwi_connection() -> Dict[str, Any]:
+    """Wokwi virtual devices, reported apart from real devices (they never count as real data)."""
+    bridge = wokwi_ref.get("bridge")
+    devices = wokwi_store.snapshot(history=False)
+    online = [d["machine_id"] for d in devices if d["state"] == "ONLINE"]
+    if bridge is None:
+        state, msg = "NOT_CONFIGURED", "No Wokwi broker configured (UDYAM_WOKWI_BROKER)"
+    elif online:
+        state, msg = "CONNECTED", f"{len(online)} Wokwi virtual device(s) sending data"
+    elif devices:
+        state, msg = "STALE_DATA", "No new messages from the Wokwi virtual device(s); values are not current"
+    elif bridge.state == "CONNECTED":
+        state, msg = "CONNECTED", "Broker connected; no Wokwi virtual device has sent data yet"
+    else:
+        state, msg = bridge.state, bridge.last_error or "Connecting to the broker…"
+    return {"state": state, "message": msg, "source": WOKWI_SOURCE, "virtual": True,
+            "broker": bridge.status() if bridge else None, "online_machines": online,
+            "devices": [{k: d[k] for k in ("machine_id", "state", "age_s", "last_message_at")} for d in devices],
+            "counters": wokwi_store.counters()}
+
+
 def operating_mode_status() -> Dict[str, Any]:
-    return {**operating_mode.public(), "connection": real_connection(), "telemetry_source": mode_status()["mode"],
-            "modes": list(OPERATING_MODES)}
+    return {**operating_mode.public(), "connection": real_connection(), "virtual": wokwi_connection(),
+            "telemetry_source": mode_status()["mode"], "modes": list(OPERATING_MODES)}
+
+
+def _wokwi_monitoring(d: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the existing monitoring models only where the virtual telemetry fits their inputs; otherwise say why not."""
+    last = d["last"]
+    vib = factory_engine.assessor.assess(d["machine_id"], {"velocity_rms_mm_s": last.get("vibration_rms_mm_s")},
+                                         template="cnc_mill", rpm=last.get("rpm"), operating_state="RUN")
+    return {
+        "vibration_severity": {**vib.as_dict(), "profile": None,
+                               "note": "ISO 20816-3 zones need velocity RMS measured over a known band (10–1000 Hz); the "
+                                       "Wokwi value is a software model, so no zone is given."},
+        "failure_risk": {"status": "NOT_APPLICABLE",
+                         "detail": "The AI4I failure-risk model needs air temperature, process temperature, rpm, torque "
+                                   "and tool wear; the Wokwi device sends rpm, temperature, vibration and current."},
+        "labels": "scenario and simulated_fault are the simulated condition chosen in Wokwi, not verified faults",
+    }
+
+
+WOKWI_DIAGRAM = ROOT / "wokwi" / "udyam-virtual-machine" / "diagram.json"
+
+
+@app.get("/api/wokwi/diagram")
+def get_wokwi_diagram():
+    """The Wokwi project's circuit (parts, positions, wires), so the dashboard draws the same circuit."""
+    try:
+        d = json.loads(WOKWI_DIAGRAM.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:
+        raise HTTPException(status_code=404, detail=f"Wokwi diagram unavailable: {err}")
+    return {"parts": d.get("parts", []), "connections": d.get("connections", []), "source": "wokwi/udyam-virtual-machine/diagram.json"}
+
+
+@app.get("/api/wokwi")
+def get_wokwi():
+    """Wokwi virtual devices: connection, latest values, short history and what the monitoring models can use."""
+    devices = wokwi_store.snapshot()
+    for d in devices:
+        d["monitoring"] = _wokwi_monitoring(d)
+    return {**wokwi_connection(), "machines": devices,
+            "notice": "VIRTUAL data from the Wokwi simulator (simulated sensors and software models). It is not a "
+                      "measurement of a real machine and never enters the Testing-mode simulation."}
 
 
 @app.get("/api/operating-mode")
@@ -1148,7 +1220,9 @@ def api_get_report(trend_minutes: float = Query(default=10.0, gt=0, le=30)):
     return build_report(trend_minutes)
 
 
-RANGE_SECTIONS = ("telemetry", "real_telemetry", "events", "rl_decisions")
+RANGE_SECTIONS = ("telemetry", "real_telemetry", "virtual_telemetry", "events", "rl_decisions")
+VIRTUAL_COLS = ["ts", "device_ts", "machine_id", "source", "data_label", "seq", "scenario", "simulated_fault", "rpm",
+                "temp_c", "vibration_rms_mm_s", "current_a", "ts_source", "value_sources"]
 TELEMETRY_COLS = ["ts", "machine_id", "mode", "state", "rpm", "derate_pct", "vibration_rms_mm_s", "zone", "temp_c",
                   "power_kw", "load_pct", "energy_kwh", "tool_wear_min", "risk", "failure_risk_pct", "active_scenario"]
 EVENT_COLS = ["ts", "event_id", "machine_id", "kind", "severity", "title", "measured", "inferred", "suggested"]
@@ -1177,6 +1251,8 @@ def range_rows(section: str, start: str, end: str) -> tuple[List[Dict[str, Any]]
         return query_telemetry(start, end), TELEMETRY_COLS
     if section == "real_telemetry":  # readings from real devices only (source LIVE)
         return query_telemetry(start, end, source="real"), TELEMETRY_COLS
+    if section == "virtual_telemetry":  # Wokwi simulator devices: virtual data, never real measurements
+        return wokwi_store.query(start, end), VIRTUAL_COLS
     if section == "events":
         return query_events(start, end), EVENT_COLS
     if section == "rl_decisions":
@@ -1222,6 +1298,9 @@ def get_recent_entries(limit: int = Query(default=60, ge=1, le=300),
             for r in query_telemetry(start, end, source=source)[-limit:]:
                 out.append({"ts": r["ts"], "kind": "telemetry", "machine_id": r["machine_id"], "source": r.get("mode") or "SIM",
                             "severity": None, "summary": _telemetry_summary(r)})
+        for r in wokwi_store.query(start, end)[-limit:]:
+            out.append({"ts": r["ts"], "kind": "telemetry", "machine_id": r["machine_id"], "source": "WOKWI",
+                        "severity": None, "summary": f"{_telemetry_summary(r)} · {r['current_a']:.2f} A · scenario {r['scenario']}"})
     if "events" in kinds:
         for e in get_events(limit=limit):
             out.append({"ts": e["ts"], "kind": "event", "machine_id": e.get("machine_id"), "source": None,
@@ -1321,7 +1400,8 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
     rep = build_report()
     summary_rows, summary_cols = _csv_rows(report_csv("summary", rep))
     oee_rows, oee_cols = _csv_rows(report_csv("oee", rep))
-    sections = {name: range_rows(name, s, e) for name in ("telemetry", "real_telemetry", "alerts", "work_orders", "events", "rl_decisions")}
+    sections = {name: range_rows(name, s, e) for name in ("telemetry", "real_telemetry", "virtual_telemetry", "alerts", "work_orders",
+                                                          "events", "rl_decisions")}
     rl_eval: List[Dict[str, Any]] = []
     if RL_METRICS_PATH.exists():
         results = json.loads(RL_METRICS_PATH.read_text(encoding="utf-8")).get("results", {})
@@ -1347,6 +1427,10 @@ def api_export_workbook(start: Optional[str] = None, end: Optional[str] = None,
          "note": note + " Simulated / replayed telemetry (source SIM or REPLAY).", "time_columns": ["ts"]},
         {"name": "Real telemetry", "columns": TELEMETRY_COLS, "rows": sections["real_telemetry"][0],
          "note": f"Readings from real devices only (source LIVE). Range {s} → {e} (UTC).", "time_columns": ["ts"]},
+        {"name": "Virtual (Wokwi)", "columns": VIRTUAL_COLS, "rows": sections["virtual_telemetry"][0],
+         "note": f"VIRTUAL data from Wokwi simulator devices (simulated sensors and software models), not real machine "
+                 f"measurements. Scenario labels are simulated conditions, not verified faults. Range {s} → {e} (UTC).",
+         "time_columns": ["ts", "device_ts"]},
         {"name": "Energy & OEE", "columns": oee_cols, "rows": oee_rows, "note": "Since the last reset and since server start"},
         {"name": "Alerts", "columns": ALERT_COLS, "rows": sections["alerts"][0], "note": note,
          "time_columns": ["raised_at", "acknowledged_at", "resolved_at"]},

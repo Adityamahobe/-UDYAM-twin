@@ -50,8 +50,8 @@
         ${l.status === "ACTIVE" ? `<button class="btn btn-sm" data-retract="${l.id}">Retract</button>` : ""}
       </div>`).join("") : `<div class="sc-hint">No confirmed labels yet.</div>`;
     el("adLabels").querySelectorAll("[data-retract]").forEach(b => b.onclick = () => {
-      if (!window.confirm(`Retract label #${b.dataset.retract}? It stays in the audit trail but is no longer used for training.`)) return;
-      send(`/api/adaptive/labels/${b.dataset.retract}/retract`, { operator: "dashboard operator" }, `Label #${b.dataset.retract} retracted.`);
+      udyamConfirm(`Retract label #${b.dataset.retract}?\n\nIt stays in the audit trail but is no longer used for training.`, { ok: "Retract" })
+        .then(ok => { if (ok) send(`/api/adaptive/labels/${b.dataset.retract}/retract`, { operator: "dashboard operator" }, `Label #${b.dataset.retract} retracted.`); });
     });
   }
 
@@ -91,7 +91,7 @@
     return fetch(url, { method: "POST", headers, body: JSON.stringify(body) }).then(async r => {
       const res = await r.json().catch(() => ({}));
       if (r.status === 401 && !retried) {
-        const t = window.prompt("Operator token required to record labels:");
+        const t = await udyamPrompt("Operator token required to record labels", { password: true, ok: "Continue" });
         if (t) { operatorToken = t; return send(url, body, okMsg, true); }
       }
       if (r.status === 401) operatorToken = null;

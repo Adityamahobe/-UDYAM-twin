@@ -2,7 +2,7 @@
 // or every section as an Excel workbook. The server filters in UTC and adds an IST column.
 (function () {
   const el = id => document.getElementById(id);
-  const RANGED = new Set(["telemetry", "real_telemetry", "alerts", "work_orders", "events", "rl_decisions"]);
+  const RANGED = new Set(["telemetry", "real_telemetry", "virtual_telemetry", "alerts", "work_orders", "events", "rl_decisions"]);
 
   // <input type="datetime-local"> wants local "YYYY-MM-DDTHH:MM:SS"
   function toLocalInput(d) {

@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "author": "UDYAM-TWIN",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -105.3,
+      "left": 196.2,
+      "attrs": {
+        "temperature": "38",
+        "humidity": "45"
+      }
+    },
+    {
+      "type": "wokwi-mpu6050",
+      "id": "imu1",
+      "top": 157.42,
+      "left": 213.52,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potSpeed",
+      "top": -116.5,
+      "left": -144.2,
+      "attrs": {
+        "value": "700"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potLoad",
+      "top": -116.5,
+      "left": -48.2,
+      "attrs": {
+        "value": "750"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnScenario",
+      "top": 227,
+      "left": -153.6,
+      "attrs": {
+        "color": "blue",
+        "label": "SCENARIO"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledFault",
+      "top": 140.4,
+      "left": -101.8,
+      "attrs": {
+        "color": "red",
+        "label": "FAULT"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 186.35,
+      "left": -76.8,
+      "attrs": {
+        "value": "220"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "dht1:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "dht1:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "dht1:SDA",
+      "esp:D15",
+      "green",
+      []
+    ],
+    [
+      "imu1:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "imu1:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "imu1:SDA",
+      "esp:D21",
+      "blue",
+      []
+    ],
+    [
+      "imu1:SCL",
+      "esp:D22",
+      "orange",
+      []
+    ],
+    [
+      "potSpeed:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "potSpeed:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "potSpeed:SIG",
+      "esp:D34",
+      "purple",
+      []
+    ],
+    [
+      "potLoad:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "potLoad:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "potLoad:SIG",
+      "esp:D35",
+      "violet",
+      []
+    ],
+    [
+      "btnScenario:1.l",
+      "esp:D4",
+      "blue",
+      []
+    ],
+    [
+      "btnScenario:2.l",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:D26",
+      "r1:1",
+      "red",
+      []
+    ],
+    [
+      "r1:2",
+      "ledFault:A",
+      "red",
+      []
+    ],
+    [
+      "ledFault:C",
+      "esp:GND.1",
+      "black",
+      []
+    ]
+  ],
+  "dependencies": {}
+}

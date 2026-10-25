@@ -1,0 +1,22 @@
+{
+  "schema": "udyam.wokwi.v1",
+  "source": "WOKWI_SIMULATOR",
+  "virtual": true,
+  "machine_id": "machine-001",
+  "seq": 42,
+  "ts": "2026-10-26T10:15:30Z",
+  "uptime_ms": 84012,
+  "interval_ms": 2000,
+  "rpm": 1538.4,
+  "temp_c": 38.1,
+  "vibration_rms_mm_s": 1.37,
+  "current_a": 6.42,
+  "scenario": "normal",
+  "simulated_fault": null,
+  "value_sources": {
+    "temp_c": "wokwi DHT22 virtual sensor",
+    "rpm": "wokwi potentiometer setpoint + software",
+    "vibration_rms_mm_s": "software model + wokwi MPU6050 virtual accelerometer",
+    "current_a": "software model"
+  }
+}

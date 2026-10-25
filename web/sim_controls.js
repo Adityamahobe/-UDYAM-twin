@@ -115,8 +115,8 @@
     el("scPause").onclick = () => post("/api/sim/run", { action: "pause" }, "Paused: the simulation state is frozen.");
     el("scResume").onclick = () => post("/api/sim/run", { action: status?.run.state === "STOPPED" ? "start" : "resume" }, "Running.");
     el("scStop").onclick = () => {
-      if (!window.confirm("Stop the simulation?\n\nThe virtual plant is reset to a clean baseline and stops ticking. Parameters are kept.")) return;
-      post("/api/sim/run", { action: "stop" }, "Stopped and reset. Press Start to run again.");
+      udyamConfirm("Stop the simulation?\n\nThe virtual plant is reset to a clean baseline and stops ticking. Parameters are kept.",
+        { ok: "Stop", danger: true }).then(ok => { if (ok) post("/api/sim/run", { action: "stop" }, "Stopped and reset. Press Start to run again."); });
     };
     el("scRunFor").onclick = () => {
       const min = +el("scMinutes").value;

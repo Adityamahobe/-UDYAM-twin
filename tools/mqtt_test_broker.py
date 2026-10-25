@@ -53,7 +53,10 @@ async def serve(host: str, port: int, user: str | None, password: str | None) ->
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
         await stop.wait()
-        await broker.shutdown()
+        try:
+            await asyncio.wait_for(broker.shutdown(), timeout=5)  # do not hang on clients that are still connected
+        except (asyncio.TimeoutError, Exception):  # noqa: BLE001 - exiting anyway
+            pass
 
 
 def main() -> None:

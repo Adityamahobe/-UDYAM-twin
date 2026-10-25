@@ -43,3 +43,6 @@ ml/vibration/data/ims/*
 
 # Model registry versions (ml/model_registry.py): generated locally
 models/registry/
+
+# Wokwi firmware credentials (copy of secrets.example.h)
+wokwi/**/secrets.h

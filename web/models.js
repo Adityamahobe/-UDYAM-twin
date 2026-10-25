@@ -61,8 +61,8 @@
     }).join("");
     el("mdVersions").querySelectorAll("[data-promote]").forEach(b => b.onclick = () => {
       const v = b.dataset.promote;
-      if (!window.confirm(`Deploy ${v} as the failure-risk model the twin uses?\n\nIt passed its evaluation gate on synthetic and AI4I test data. It has not been validated on real machines. You can roll back at any time.`)) return;
-      deploy(`/api/models/ai4i/${encodeURIComponent(v)}/promote`, {}, `${v} is now in production.`);
+      udyamConfirm(`Deploy ${v} as the failure-risk model the twin uses?\n\nIt passed its evaluation gate on synthetic and AI4I test data. It has not been validated on real machines. You can roll back at any time.`,
+        { ok: `Deploy ${v}` }).then(ok => { if (ok) deploy(`/api/models/ai4i/${encodeURIComponent(v)}/promote`, {}, `${v} is now in production.`); });
     });
     const job = s.training || {};
     const running = job.state === "running";
@@ -89,7 +89,7 @@
       .then(async r => {
         const res = await r.json().catch(() => ({}));
         if (r.status === 401 && !retried) {
-          const t = window.prompt("Operator token required to change the deployed model:");
+          const t = await udyamPrompt("Operator token required to change the deployed model", { password: true, ok: "Continue" });
           if (t) { operatorToken = t; return deploy(url, body, okMsg, true); }
         }
         if (r.status === 401) operatorToken = null;
@@ -116,8 +116,8 @@
         });
     };
     el("mdRollback").onclick = () => {
-      if (!window.confirm("Roll back the failure-risk model to the previous production version?")) return;
-      deploy("/api/models/ai4i/rollback", {}, "Rolled back.");
+      udyamConfirm("Roll back the failure-risk model to the previous production version?", { ok: "Roll back" })
+        .then(ok => { if (ok) deploy("/api/models/ai4i/rollback", {}, "Rolled back."); });
     };
     load();
     setInterval(() => { if (!polling) load(); }, 10000);  // picks up new synthetic datasets

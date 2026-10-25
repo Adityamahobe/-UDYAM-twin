@@ -92,10 +92,10 @@ def test_excel_workbook(client):
     assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"]
     assert r.headers["content-disposition"].endswith('.xlsx"')
     wb = load_workbook(io.BytesIO(r.content))
-    assert wb.sheetnames[:10] == ["About", "Summary", "Telemetry", "Real telemetry", "Energy & OEE", "Alerts",
-                                  "Work orders", "Events", "RL decisions", "RL policy evaluation"]
+    assert wb.sheetnames[:11] == ["About", "Summary", "Telemetry", "Real telemetry", "Virtual (Wokwi)", "Energy & OEE",
+                                  "Alerts", "Work orders", "Events", "RL decisions", "RL policy evaluation"]
     assert wb["Real telemetry"].max_row == 2  # note + header: no real device sent data in the test
-    extra = wb.sheetnames[10:]  # dataset sheets appear once their results exist
+    extra = wb.sheetnames[11:]  # dataset sheets appear once their results exist
     assert [n for n in extra if n not in ("IMS zone progression", "IMS early warning", "C-MAPSS RUL")] == []
     tel = wb["Telemetry"]
     header = [c.value for c in tel[2]]
