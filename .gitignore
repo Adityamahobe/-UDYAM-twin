@@ -11,3 +11,9 @@ node_modules/
 .DS_Store
 .vscode/
 .idea/
+ml/vibration/data/
+# Secrets: never commit the real environment file
+.env
+.env.*
+!.env.example
+*.blend1

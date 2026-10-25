@@ -1,0 +1,147 @@
+# UDYAM-TWIN machine and site configuration: the single home for every threshold.
+#
+# Loaded and validated by config/loader.py at startup (an invalid file stops the server).
+# Resolution order for a machine: templates.<template> defaults, then machines.<machine_id>
+# overrides. Machines added at runtime ("+ Add Your Machine") inherit their template.
+#
+# Units are in every key name. Temperatures stay in kelvin here because the simulator and the
+# AI4I 2020 columns are in kelvin; the UI converts to °C (°C = K − 273.15).
+
+site:
+  grid_co2_kg_per_kwh: 0.716
+  grid_co2_source: "CEA CO2 Baseline Database v20 (2024-25), weighted average grid emission factor"
+  tariff_inr_per_kwh: 8.5
+  tariff_source: "Illustrative MSME industrial tariff; edit for your DISCOM"
+  inr_per_part: 450.0
+  downtime_cost_inr_per_hr: 2500.0
+  sensor_node_cost_inr: 2200.0
+  # Illustrative ROI assumptions (shown with every ROI figure; not measured results)
+  operating_hours_per_month: 416.0          # 2 shifts × 8 h × 26 days
+  baseline_unplanned_downtime_h_per_month: 12.0
+  assumed_downtime_reduction_pct: 30.0      # an assumption for illustration, not a validated outcome
+  sensor_nodes: 6.0
+
+# Vibration severity profiles (velocity RMS, mm/s). Values are the commonly cited ISO 10816-3
+# Group 2 boundaries, used as configurable demo thresholds. verified: false makes every result
+# PROVISIONAL; set it true only after an engineer checks the applicable standard and records it.
+vibration_profiles:
+  demo-iso10816-3-g2-rigid:
+    standard: "ISO 10816-3 (referenced)"
+    edition: "2009"
+    machine_group: "Group 2 (medium machines), rigid foundation"
+    quantity: velocity_rms_mm_s
+    band_hz: [10, 1000]
+    measurement_location: bearing_housing
+    mounting: rigid
+    zone_boundaries: {A_B: 1.4, B_C: 2.8, C_D: 4.5}
+    label: "Configurable demo thresholds referencing ISO 10816-3 — not a certified assessment"
+    verified: false
+    notes: "ISO 10816-3 covers machines above 15 kW; the smaller demo machines use these boundaries for illustration only."
+  demo-iso10816-3-g2-flexible:
+    standard: "ISO 10816-3 (referenced)"
+    edition: "2009"
+    machine_group: "Group 2 (medium machines), flexible foundation"
+    quantity: velocity_rms_mm_s
+    band_hz: [10, 1000]
+    measurement_location: bearing_housing
+    mounting: flexible
+    zone_boundaries: {A_B: 2.3, B_C: 4.5, C_D: 7.1}
+    label: "Configurable demo thresholds referencing ISO 10816-3 — not a certified assessment"
+    verified: false
+    notes: "Compressor on anti-vibration mounts, so the flexible-foundation boundaries apply."
+
+# ml: which models apply to a machine class.
+#   failure_model: ai4i  → AI4I 2020 Random Forest failure risk (a milling dataset, so CNC mill only)
+#   bearing_model: true  → CWRU bearing-fault classifier (bearing/motor assets only)
+templates:
+  cnc_mill:
+    prefix: VMC
+    machine_class: cnc_mill
+    ml: {failure_model: ai4i, bearing_model: false}
+    nameplate: {rated_kw: 11.0, max_rpm: 3000, rpm_nominal: 1540, make: "Representative VMC (geometry: TseNC)", year: 2012}
+    vibration:
+      profile: demo-iso10816-3-g2-rigid
+      foundation: rigid
+      measurement_location: bearing_housing
+      sensor_axis: radial
+      # Band the stream value represents. The simulator generates velocity RMS over this band
+      # by definition; a LIVE device must declare its own band (see hub/ and edge/).
+      stream_band_hz: [10, 1000]
+    thresholds:
+      process_temp_limit_k: 315.5       # 42.35 °C: OVERTEMP physics rule and forecast target
+      tool_wear_warn_min: 180.0         # rule risk MEDIUM above this
+      tool_wear_forecast_min: 200.0     # TWF_RISK forecast starts here
+      tool_wear_limit_min: 235.0        # tool changed at end of life
+      vibration_trip_mm_s: 9.94         # simulated PLC interlock (SIM only, not an ISO value)
+      cooling_loss_alert_pct: 30.0      # one alert when estimated cooling capacity is this far below nominal
+      cooling_loss_rearm_pct: 20.0      # the alert can fire again only after the loss recovers below this
+      calibration_event_min_delta: 0.10 # log a CALIBRATION event only when h_cool moved this much since the last one
+      calibration_event_min_interval_s: 30.0  # ...and at least this long after the last one
+      overload_load_pct: 85.0           # spindle power above this % of rated kW raises an overload alert
+      overtemp_derate_horizon_min: 1.0  # SIM auto-derate when the over-temperature forecast is closer than this
+      alert_sustain_s: 3.0              # a rule condition must hold this long before it alerts (and to clear)
+  cnc_lathe:
+    prefix: LATHE
+    machine_class: cnc_lathe
+    ml: {failure_model: null, bearing_model: false}   # AI4I is a milling dataset; not applied to turning
+    nameplate: {rated_kw: 7.5, max_rpm: 3500, rpm_nominal: 1800, make: "Generic CNC lathe", year: 2010}
+    vibration:
+      profile: demo-iso10816-3-g2-rigid
+      foundation: rigid
+      measurement_location: bearing_housing
+      sensor_axis: radial
+      stream_band_hz: [10, 1000]
+    thresholds:
+      process_temp_limit_k: 315.5
+      tool_wear_warn_min: 180.0
+      tool_wear_forecast_min: 200.0
+      tool_wear_limit_min: 235.0
+      vibration_trip_mm_s: 9.94
+      cooling_loss_alert_pct: 30.0
+      cooling_loss_rearm_pct: 20.0
+      calibration_event_min_delta: 0.10
+      calibration_event_min_interval_s: 30.0
+      overload_load_pct: 85.0
+      overtemp_derate_horizon_min: 1.0
+      alert_sustain_s: 3.0
+  bar_saw:
+    prefix: SAW
+    machine_class: bar_saw
+    ml: {failure_model: null, bearing_model: false}
+    nameplate: {rated_kw: 2.2, max_rpm: 1400, rpm_nominal: 900, make: "Generic bar saw", year: 2008}
+    vibration:
+      profile: demo-iso10816-3-g2-rigid
+      foundation: rigid
+      measurement_location: bearing_housing
+      sensor_axis: radial
+      stream_band_hz: [10, 1000]
+    thresholds:
+      blade_wear_medium_pct: 75.0
+      blade_wear_high_pct: 90.0
+      blade_wear_trip_pct: 95.0
+      vibration_trip_mm_s: 9.94
+  air_compressor:
+    prefix: COMP
+    machine_class: air_compressor
+    ml: {failure_model: null, bearing_model: true}    # motor-driven rotating asset with rolling bearings
+    nameplate: {rated_kw: 7.5, rated_pressure_bar: 8.0, make: "Generic screw compressor", year: 2015}
+    vibration:
+      profile: demo-iso10816-3-g2-flexible
+      foundation: flexible
+      measurement_location: bearing_housing
+      sensor_axis: radial
+      stream_band_hz: [10, 1000]
+    thresholds:
+      pressure_min_bar: 6.0             # below this the CNCs are derated (common cause)
+      pressure_warn_bar: 6.5
+
+# Per-machine overrides. Any key from the template may be overridden here.
+machines:
+  VMC-01:
+    template: cnc_mill
+  LATHE-01:
+    template: cnc_lathe
+  SAW-01:
+    template: bar_saw
+  COMP-01:
+    template: air_compressor

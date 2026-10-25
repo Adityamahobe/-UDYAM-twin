@@ -1,0 +1,1351 @@
+{
+  "trained_at": "2026-10-24T17:48:41+00:00",
+  "dataset": {
+    "name": "CWRU Bearing Data Center: 12k drive-end faults + normal baseline (subset)",
+    "source": "https://engineering.case.edu/bearingdatacenter (Case Western Reserve University)",
+    "license": "No licence or terms of use stated on the data pages (checked 2026-10-24); publicly downloadable. Cite the CWRU Bearing Data Center when using results.",
+    "synthetic": false,
+    "label_definition": "Bearing condition as documented by CWRU: normal, or a seeded EDM single-point fault on the drive-end bearing at the inner race, ball, or outer race (centred @6:00). Fault sizes 0.007/0.014/0.021 in are merged per location.",
+    "description": "Drive-end accelerometer, 1 s windows at 12 kHz. Files: 97.mat, 98.mat, 99.mat, 100.mat, 105.mat, 106.mat, 107.mat, 108.mat, 118.mat, 119.mat, 120.mat, 121.mat, 130.mat, 131.mat, 132.mat, 133.mat, 169.mat, 170.mat, 171.mat, 172.mat, 185.mat, 186.mat, 187.mat, 188.mat, 197.mat, 198.mat, 199.mat, 200.mat, 209.mat, 210.mat, 211.mat, 212.mat, 222.mat, 223.mat, 224.mat, 225.mat, 234.mat, 235.mat, 236.mat, 237.mat",
+    "units_note": "Units not stated by the source; treated as g (assumption).",
+    "preprocessing": "Normal baseline decimated 48 kHz \u2192 12 kHz (\u00d74, zero-phase FIR). Non-overlapping 12,000-sample windows.",
+    "limitations": "One laboratory test rig with artificially seeded faults; the same physical bearings are recorded at every load, and there is one normal bearing. Results do not transfer to the UDYAM-Twin CNC machines without retraining/validation on their own recordings."
+  },
+  "target": "label (multi-class fault / condition per recording)",
+  "labels": [
+    "ball",
+    "inner_race",
+    "normal",
+    "outer_race"
+  ],
+  "feature_columns": [
+    "velocity_rms_mm_s",
+    "accel_rms_m_s2",
+    "accel_peak_m_s2",
+    "crest_factor",
+    "kurtosis",
+    "dominant_freq_hz",
+    "dominant_order",
+    "disp_pp_um",
+    "rpm",
+    "load_pct"
+  ],
+  "excluded_columns": [
+    "group_id",
+    "label",
+    "machine_id",
+    "recorded_at",
+    "recording_id",
+    "signal_path"
+  ],
+  "training_missing_fraction": {
+    "velocity_rms_mm_s": 0.0,
+    "accel_rms_m_s2": 0.0,
+    "accel_peak_m_s2": 0.0,
+    "crest_factor": 0.0,
+    "kurtosis": 0.0,
+    "dominant_freq_hz": 0.0,
+    "dominant_order": 0.0,
+    "disp_pp_um": 0.0,
+    "rpm": 0.0,
+    "load_pct": 0.0
+  },
+  "band_hz": [
+    10.0,
+    1000.0
+  ],
+  "input_spec": {
+    "sampling_rate_hz": [
+      12000.0
+    ],
+    "machine_types": [
+      "induction_motor_test_rig"
+    ]
+  },
+  "seed": 42,
+  "split": {
+    "strategy": "machine",
+    "sizes": {
+      "train": 200,
+      "validation": 95,
+      "test": 100
+    },
+    "group_column": "group_id",
+    "group_definition": "group_id = motor load (0-3 hp). Windows of one recording always share a group.",
+    "machines": {
+      "train": [
+        "load_2hp",
+        "load_3hp"
+      ],
+      "validation": [
+        "load_0hp"
+      ],
+      "test": [
+        "load_1hp"
+      ]
+    },
+    "class_distribution": {
+      "train": {
+        "ball": 60,
+        "inner_race": 60,
+        "normal": 20,
+        "outer_race": 60
+      },
+      "validation": {
+        "ball": 30,
+        "inner_race": 30,
+        "normal": 5,
+        "outer_race": 30
+      },
+      "test": {
+        "ball": 30,
+        "inner_race": 30,
+        "normal": 10,
+        "outer_race": 30
+      }
+    }
+  },
+  "selected_model": "random_forest",
+  "selection_criterion": "highest validation macro F1 (majority baseline excluded); test set used only for reporting",
+  "imbalance_handling": "class weights computed on the training split; validation/test distributions unchanged",
+  "probability_calibrated": false,
+  "rejected_recordings": [],
+  "sklearn_version": "1.9.1",
+  "results": {
+    "majority_class_baseline": {
+      "validation": {
+        "n": 95,
+        "macro_precision": 0.0789,
+        "macro_recall": 0.25,
+        "macro_f1": 0.12,
+        "balanced_accuracy": 0.25,
+        "per_class": {
+          "ball": {
+            "precision": 0.3158,
+            "recall": 1.0,
+            "f1": 0.48,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 30
+          },
+          "normal": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 5
+          },
+          "outer_race": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              30,
+              0,
+              0,
+              0
+            ],
+            [
+              30,
+              0,
+              0,
+              0
+            ],
+            [
+              5,
+              0,
+              0,
+              0
+            ],
+            [
+              30,
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "test": {
+        "n": 100,
+        "macro_precision": 0.075,
+        "macro_recall": 0.25,
+        "macro_f1": 0.1154,
+        "balanced_accuracy": 0.25,
+        "per_class": {
+          "ball": {
+            "precision": 0.3,
+            "recall": 1.0,
+            "f1": 0.4615,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 30
+          },
+          "normal": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 10
+          },
+          "outer_race": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              30,
+              0,
+              0,
+              0
+            ],
+            [
+              30,
+              0,
+              0,
+              0
+            ],
+            [
+              10,
+              0,
+              0,
+              0
+            ],
+            [
+              30,
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    "logistic_regression_baseline": {
+      "validation": {
+        "n": 95,
+        "macro_precision": 0.6705,
+        "macro_recall": 0.7083,
+        "macro_f1": 0.6819,
+        "balanced_accuracy": 0.7083,
+        "per_class": {
+          "ball": {
+            "precision": 0.6667,
+            "recall": 0.6667,
+            "f1": 0.6667,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.871,
+            "recall": 0.9,
+            "f1": 0.8852,
+            "support": 30
+          },
+          "normal": {
+            "precision": 0.375,
+            "recall": 0.6,
+            "f1": 0.4615,
+            "support": 5
+          },
+          "outer_race": {
+            "precision": 0.7692,
+            "recall": 0.6667,
+            "f1": 0.7143,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              20,
+              3,
+              4,
+              3
+            ],
+            [
+              1,
+              27,
+              0,
+              2
+            ],
+            [
+              1,
+              0,
+              3,
+              1
+            ],
+            [
+              8,
+              1,
+              1,
+              20
+            ]
+          ]
+        }
+      },
+      "test": {
+        "n": 100,
+        "macro_precision": 0.7419,
+        "macro_recall": 0.7833,
+        "macro_f1": 0.719,
+        "balanced_accuracy": 0.7833,
+        "per_class": {
+          "ball": {
+            "precision": 0.6,
+            "recall": 0.5,
+            "f1": 0.5455,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.9677,
+            "recall": 1.0,
+            "f1": 0.9836,
+            "support": 30
+          },
+          "normal": {
+            "precision": 0.4,
+            "recall": 1.0,
+            "f1": 0.5714,
+            "support": 10
+          },
+          "outer_race": {
+            "precision": 1.0,
+            "recall": 0.6333,
+            "f1": 0.7755,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              15,
+              0,
+              15,
+              0
+            ],
+            [
+              0,
+              30,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              10,
+              0
+            ],
+            [
+              10,
+              1,
+              0,
+              19
+            ]
+          ]
+        }
+      }
+    },
+    "random_forest": {
+      "validation": {
+        "n": 95,
+        "macro_precision": 0.8504,
+        "macro_recall": 0.8333,
+        "macro_f1": 0.8312,
+        "balanced_accuracy": 0.8333,
+        "per_class": {
+          "ball": {
+            "precision": 0.9524,
+            "recall": 0.6667,
+            "f1": 0.7843,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.7241,
+            "recall": 0.7,
+            "f1": 0.7119,
+            "support": 30
+          },
+          "normal": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 5
+          },
+          "outer_race": {
+            "precision": 0.725,
+            "recall": 0.9667,
+            "f1": 0.8286,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              20,
+              8,
+              0,
+              2
+            ],
+            [
+              0,
+              21,
+              0,
+              9
+            ],
+            [
+              0,
+              0,
+              5,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              29
+            ]
+          ]
+        }
+      },
+      "test": {
+        "n": 100,
+        "macro_precision": 0.9844,
+        "macro_recall": 0.9833,
+        "macro_f1": 0.9833,
+        "balanced_accuracy": 0.9833,
+        "per_class": {
+          "ball": {
+            "precision": 1.0,
+            "recall": 0.9333,
+            "f1": 0.9655,
+            "support": 30
+          },
+          "inner_race": {
+            "precision": 0.9375,
+            "recall": 1.0,
+            "f1": 0.9677,
+            "support": 30
+          },
+          "normal": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 10
+          },
+          "outer_race": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 30
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "ball",
+            "inner_race",
+            "normal",
+            "outer_race"
+          ],
+          "rows_true_cols_pred": [
+            [
+              28,
+              2,
+              0,
+              0
+            ],
+            [
+              0,
+              30,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              10,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              30
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "leave_one_group_out": {
+    "majority_class_baseline": {
+      "per_group": {
+        "load_0hp": {
+          "n": 95,
+          "macro_precision": 0.0789,
+          "macro_recall": 0.25,
+          "macro_f1": 0.12,
+          "balanced_accuracy": 0.25,
+          "per_class": {
+            "ball": {
+              "precision": 0.3158,
+              "recall": 1.0,
+              "f1": 0.48,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 5
+            },
+            "outer_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                5,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ]
+            ]
+          }
+        },
+        "load_1hp": {
+          "n": 100,
+          "macro_precision": 0.075,
+          "macro_recall": 0.25,
+          "macro_f1": 0.1154,
+          "balanced_accuracy": 0.25,
+          "per_class": {
+            "ball": {
+              "precision": 0.3,
+              "recall": 1.0,
+              "f1": 0.4615,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                10,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ]
+            ]
+          }
+        },
+        "load_2hp": {
+          "n": 100,
+          "macro_precision": 0.075,
+          "macro_recall": 0.25,
+          "macro_f1": 0.1154,
+          "balanced_accuracy": 0.25,
+          "per_class": {
+            "ball": {
+              "precision": 0.3,
+              "recall": 1.0,
+              "f1": 0.4615,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                10,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ]
+            ]
+          }
+        },
+        "load_3hp": {
+          "n": 100,
+          "macro_precision": 0.075,
+          "macro_recall": 0.25,
+          "macro_f1": 0.1154,
+          "balanced_accuracy": 0.25,
+          "per_class": {
+            "ball": {
+              "precision": 0.3,
+              "recall": 1.0,
+              "f1": 0.4615,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                10,
+                0,
+                0,
+                0
+              ],
+              [
+                30,
+                0,
+                0,
+                0
+              ]
+            ]
+          }
+        }
+      },
+      "macro_f1_mean": 0.1166,
+      "macro_f1_std": 0.002,
+      "macro_f1_min": 0.1154
+    },
+    "logistic_regression_baseline": {
+      "per_group": {
+        "load_0hp": {
+          "n": 95,
+          "macro_precision": 0.544,
+          "macro_recall": 0.55,
+          "macro_f1": 0.5381,
+          "balanced_accuracy": 0.55,
+          "per_class": {
+            "ball": {
+              "precision": 0.7,
+              "recall": 0.4667,
+              "f1": 0.56,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.8182,
+              "recall": 0.9,
+              "f1": 0.8571,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 5
+            },
+            "outer_race": {
+              "precision": 0.6579,
+              "recall": 0.8333,
+              "f1": 0.7353,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                14,
+                5,
+                3,
+                8
+              ],
+              [
+                0,
+                27,
+                0,
+                3
+              ],
+              [
+                3,
+                0,
+                0,
+                2
+              ],
+              [
+                3,
+                1,
+                1,
+                25
+              ]
+            ]
+          }
+        },
+        "load_1hp": {
+          "n": 100,
+          "macro_precision": 0.715,
+          "macro_recall": 0.7667,
+          "macro_f1": 0.7054,
+          "balanced_accuracy": 0.7667,
+          "per_class": {
+            "ball": {
+              "precision": 0.6154,
+              "recall": 0.5333,
+              "f1": 0.5714,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.9643,
+              "recall": 0.9,
+              "f1": 0.931,
+              "support": 30
+            },
+            "normal": {
+              "precision": 0.4167,
+              "recall": 1.0,
+              "f1": 0.5882,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.8636,
+              "recall": 0.6333,
+              "f1": 0.7308,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                16,
+                0,
+                14,
+                0
+              ],
+              [
+                0,
+                27,
+                0,
+                3
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                10,
+                1,
+                0,
+                19
+              ]
+            ]
+          }
+        },
+        "load_2hp": {
+          "n": 100,
+          "macro_precision": 0.7655,
+          "macro_recall": 0.7583,
+          "macro_f1": 0.7537,
+          "balanced_accuracy": 0.7583,
+          "per_class": {
+            "ball": {
+              "precision": 0.55,
+              "recall": 0.3667,
+              "f1": 0.44,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 1.0,
+              "recall": 0.9667,
+              "f1": 0.9831,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.5122,
+              "recall": 0.7,
+              "f1": 0.5915,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                11,
+                0,
+                0,
+                19
+              ],
+              [
+                0,
+                29,
+                0,
+                1
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                9,
+                0,
+                0,
+                21
+              ]
+            ]
+          }
+        },
+        "load_3hp": {
+          "n": 100,
+          "macro_precision": 0.8673,
+          "macro_recall": 0.825,
+          "macro_f1": 0.8298,
+          "balanced_accuracy": 0.825,
+          "per_class": {
+            "ball": {
+              "precision": 0.6,
+              "recall": 0.9,
+              "f1": 0.72,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.9167,
+              "recall": 0.7333,
+              "f1": 0.8148,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.9524,
+              "recall": 0.6667,
+              "f1": 0.7843,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                27,
+                2,
+                0,
+                1
+              ],
+              [
+                8,
+                22,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                10,
+                0,
+                0,
+                20
+              ]
+            ]
+          }
+        }
+      },
+      "macro_f1_mean": 0.7067,
+      "macro_f1_std": 0.107,
+      "macro_f1_min": 0.5381
+    },
+    "random_forest": {
+      "per_group": {
+        "load_0hp": {
+          "n": 95,
+          "macro_precision": 0.8446,
+          "macro_recall": 0.825,
+          "macro_f1": 0.8212,
+          "balanced_accuracy": 0.825,
+          "per_class": {
+            "ball": {
+              "precision": 0.9474,
+              "recall": 0.6,
+              "f1": 0.7347,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.6875,
+              "recall": 0.7333,
+              "f1": 0.7097,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 5
+            },
+            "outer_race": {
+              "precision": 0.7436,
+              "recall": 0.9667,
+              "f1": 0.8406,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                18,
+                10,
+                0,
+                2
+              ],
+              [
+                0,
+                22,
+                0,
+                8
+              ],
+              [
+                0,
+                0,
+                5,
+                0
+              ],
+              [
+                1,
+                0,
+                0,
+                29
+              ]
+            ]
+          }
+        },
+        "load_1hp": {
+          "n": 100,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0,
+          "balanced_accuracy": 1.0,
+          "per_class": {
+            "ball": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                30,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                30,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                30
+              ]
+            ]
+          }
+        },
+        "load_2hp": {
+          "n": 100,
+          "macro_precision": 0.9597,
+          "macro_recall": 0.9583,
+          "macro_f1": 0.9578,
+          "balanced_accuracy": 0.9583,
+          "per_class": {
+            "ball": {
+              "precision": 0.963,
+              "recall": 0.8667,
+              "f1": 0.9123,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.9667,
+              "recall": 0.9667,
+              "f1": 0.9667,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 0.9091,
+              "recall": 1.0,
+              "f1": 0.9524,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                26,
+                1,
+                0,
+                3
+              ],
+              [
+                1,
+                29,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                30
+              ]
+            ]
+          }
+        },
+        "load_3hp": {
+          "n": 100,
+          "macro_precision": 0.9491,
+          "macro_recall": 0.9417,
+          "macro_f1": 0.9412,
+          "balanced_accuracy": 0.9417,
+          "per_class": {
+            "ball": {
+              "precision": 0.8286,
+              "recall": 0.9667,
+              "f1": 0.8923,
+              "support": 30
+            },
+            "inner_race": {
+              "precision": 0.9677,
+              "recall": 1.0,
+              "f1": 0.9836,
+              "support": 30
+            },
+            "normal": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 10
+            },
+            "outer_race": {
+              "precision": 1.0,
+              "recall": 0.8,
+              "f1": 0.8889,
+              "support": 30
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "ball",
+              "inner_race",
+              "normal",
+              "outer_race"
+            ],
+            "rows_true_cols_pred": [
+              [
+                29,
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                30,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                6,
+                0,
+                0,
+                24
+              ]
+            ]
+          }
+        }
+      },
+      "macro_f1_mean": 0.9301,
+      "macro_f1_std": 0.0664,
+      "macro_f1_min": 0.8212
+    }
+  }
+}

@@ -1,0 +1,857 @@
+{
+  "dataset": "udyam_sim_v1",
+  "data_kind": "SYNTHETIC (UDYAM-TWIN virtual line). Labels = injected ground-truth faults.",
+  "split": "by episode (80/20) + out-of-distribution heavier-machine episodes",
+  "features": [
+    "temp_mean",
+    "temp_std",
+    "temp_slope",
+    "temp_max",
+    "vib_mean",
+    "vib_std",
+    "vib_slope",
+    "vib_max",
+    "cur_mean",
+    "cur_std",
+    "cur_slope",
+    "cur_max",
+    "torque_mean",
+    "torque_std",
+    "torque_slope",
+    "torque_max",
+    "rpm_mean",
+    "rpm_std",
+    "rpm_slope",
+    "rpm_max",
+    "wear_mean",
+    "wear_std",
+    "wear_slope",
+    "wear_max",
+    "air_temp_mean",
+    "delta_t",
+    "dq_bad_frac",
+    "derate_pct",
+    "air_pressure_bar",
+    "resid_mean",
+    "resid_std",
+    "resid_slope",
+    "resid_max",
+    "resid_ewma",
+    "resid_cusum",
+    "h_cool_est",
+    "h_cool_drift",
+    "k_wear_est",
+    "calib_frozen",
+    "twin_forecast_min"
+  ],
+  "classes": [
+    "normal",
+    "coolant_degradation",
+    "bearing_defect",
+    "overload",
+    "tool_wear_accel",
+    "sensor_stuck",
+    "pressure_drop",
+    "order_surge"
+  ],
+  "results": {
+    "test_in_distribution": {
+      "rows": 14000,
+      "episodes": 80,
+      "random_forest": {
+        "accuracy": 0.9929,
+        "macro_f1": 0.9933,
+        "per_class": {
+          "normal": {
+            "precision": 0.987,
+            "recall": 0.996,
+            "f1": 0.991,
+            "support": 5701
+          },
+          "coolant_degradation": {
+            "precision": 0.989,
+            "recall": 0.978,
+            "f1": 0.983,
+            "support": 1147
+          },
+          "bearing_defect": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 1271
+          },
+          "overload": {
+            "precision": 1.0,
+            "recall": 0.996,
+            "f1": 0.998,
+            "support": 1134
+          },
+          "tool_wear_accel": {
+            "precision": 0.989,
+            "recall": 0.963,
+            "f1": 0.976,
+            "support": 1040
+          },
+          "sensor_stuck": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 584
+          },
+          "pressure_drop": {
+            "precision": 1.0,
+            "recall": 0.996,
+            "f1": 0.998,
+            "support": 1628
+          },
+          "order_surge": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 1495
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "normal",
+            "coolant_degradation",
+            "bearing_defect",
+            "overload",
+            "tool_wear_accel",
+            "sensor_stuck",
+            "pressure_drop",
+            "order_surge"
+          ],
+          "matrix": [
+            [
+              5677,
+              13,
+              0,
+              0,
+              11,
+              0,
+              0,
+              0
+            ],
+            [
+              25,
+              1122,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              1271,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              5,
+              0,
+              0,
+              1129,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              38,
+              0,
+              0,
+              0,
+              1002,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              584,
+              0,
+              0
+            ],
+            [
+              7,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1621,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1495
+            ]
+          ]
+        }
+      },
+      "rule_baseline": {
+        "accuracy": 0.8939,
+        "macro_f1": 0.8568,
+        "per_class": {
+          "normal": {
+            "precision": 0.8,
+            "recall": 0.985,
+            "f1": 0.883,
+            "support": 5701
+          },
+          "coolant_degradation": {
+            "precision": 0.543,
+            "recall": 0.088,
+            "f1": 0.152,
+            "support": 1147
+          },
+          "bearing_defect": {
+            "precision": 1.0,
+            "recall": 0.997,
+            "f1": 0.998,
+            "support": 1271
+          },
+          "overload": {
+            "precision": 1.0,
+            "recall": 0.978,
+            "f1": 0.989,
+            "support": 1134
+          },
+          "tool_wear_accel": {
+            "precision": 1.0,
+            "recall": 0.754,
+            "f1": 0.86,
+            "support": 1040
+          },
+          "sensor_stuck": {
+            "precision": 1.0,
+            "recall": 0.986,
+            "f1": 0.993,
+            "support": 584
+          },
+          "pressure_drop": {
+            "precision": 1.0,
+            "recall": 0.978,
+            "f1": 0.989,
+            "support": 1628
+          },
+          "order_surge": {
+            "precision": 1.0,
+            "recall": 0.982,
+            "f1": 0.991,
+            "support": 1495
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "normal",
+            "coolant_degradation",
+            "bearing_defect",
+            "overload",
+            "tool_wear_accel",
+            "sensor_stuck",
+            "pressure_drop",
+            "order_surge"
+          ],
+          "matrix": [
+            [
+              5617,
+              84,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              1046,
+              101,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              4,
+              0,
+              1267,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              25,
+              0,
+              0,
+              1109,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              255,
+              1,
+              0,
+              0,
+              784,
+              0,
+              0,
+              0
+            ],
+            [
+              8,
+              0,
+              0,
+              0,
+              0,
+              576,
+              0,
+              0
+            ],
+            [
+              36,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1592,
+              0
+            ],
+            [
+              27,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1468
+            ]
+          ]
+        }
+      },
+      "detection_delay_rf": {
+        "bearing_defect": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 4.5
+        },
+        "pressure_drop": {
+          "episodes": 11,
+          "detected": 11,
+          "median_delay_s": 12.0
+        },
+        "overload": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 10.2
+        },
+        "coolant_degradation": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 33.0
+        },
+        "order_surge": {
+          "episodes": 10,
+          "detected": 10,
+          "median_delay_s": 7.3
+        },
+        "sensor_stuck": {
+          "episodes": 4,
+          "detected": 4,
+          "median_delay_s": 6.5
+        },
+        "tool_wear_accel": {
+          "episodes": 7,
+          "detected": 7,
+          "median_delay_s": 9.1
+        }
+      },
+      "detection_delay_rules": {
+        "bearing_defect": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 9.4
+        },
+        "pressure_drop": {
+          "episodes": 11,
+          "detected": 11,
+          "median_delay_s": 36.4
+        },
+        "overload": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 30.2
+        },
+        "coolant_degradation": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 33.0
+        },
+        "order_surge": {
+          "episodes": 10,
+          "detected": 10,
+          "median_delay_s": 31.4
+        },
+        "sensor_stuck": {
+          "episodes": 4,
+          "detected": 4,
+          "median_delay_s": 26.5
+        },
+        "tool_wear_accel": {
+          "episodes": 7,
+          "detected": 7,
+          "median_delay_s": 19.1
+        }
+      },
+      "time_to_limit": {
+        "mae_min_all": 2.22,
+        "mae_min_when_limit_ahead": 5.31
+      }
+    },
+    "test_ood_heavier_machines": {
+      "rows": 7000,
+      "episodes": 40,
+      "random_forest": {
+        "accuracy": 0.8103,
+        "macro_f1": 0.8512,
+        "per_class": {
+          "normal": {
+            "precision": 0.937,
+            "recall": 0.683,
+            "f1": 0.791,
+            "support": 2786
+          },
+          "coolant_degradation": {
+            "precision": 0.885,
+            "recall": 0.982,
+            "f1": 0.931,
+            "support": 164
+          },
+          "bearing_defect": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 742
+          },
+          "overload": {
+            "precision": 0.391,
+            "recall": 0.999,
+            "f1": 0.562,
+            "support": 752
+          },
+          "tool_wear_accel": {
+            "precision": 1.0,
+            "recall": 0.796,
+            "f1": 0.887,
+            "support": 889
+          },
+          "sensor_stuck": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 0
+          },
+          "pressure_drop": {
+            "precision": 1.0,
+            "recall": 0.994,
+            "f1": 0.997,
+            "support": 906
+          },
+          "order_surge": {
+            "precision": 0.981,
+            "recall": 0.664,
+            "f1": 0.792,
+            "support": 761
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "normal",
+            "coolant_degradation",
+            "bearing_defect",
+            "overload",
+            "tool_wear_accel",
+            "sensor_stuck",
+            "pressure_drop",
+            "order_surge"
+          ],
+          "matrix": [
+            [
+              1904,
+              20,
+              0,
+              862,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              161,
+              0,
+              3,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              742,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              751,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              123,
+              0,
+              0,
+              48,
+              708,
+              0,
+              0,
+              10
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              3,
+              1,
+              0,
+              1,
+              0,
+              0,
+              901,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              256,
+              0,
+              0,
+              0,
+              505
+            ]
+          ]
+        }
+      },
+      "rule_baseline": {
+        "accuracy": 0.835,
+        "macro_f1": 0.6595,
+        "per_class": {
+          "normal": {
+            "precision": 0.884,
+            "recall": 0.982,
+            "f1": 0.93,
+            "support": 2786
+          },
+          "coolant_degradation": {
+            "precision": 0.227,
+            "recall": 0.091,
+            "f1": 0.13,
+            "support": 164
+          },
+          "bearing_defect": {
+            "precision": 1.0,
+            "recall": 0.996,
+            "f1": 0.998,
+            "support": 742
+          },
+          "overload": {
+            "precision": 0.5,
+            "recall": 0.991,
+            "f1": 0.664,
+            "support": 752
+          },
+          "tool_wear_accel": {
+            "precision": 1.0,
+            "recall": 0.813,
+            "f1": 0.897,
+            "support": 889
+          },
+          "sensor_stuck": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 0
+          },
+          "pressure_drop": {
+            "precision": 1.0,
+            "recall": 0.977,
+            "f1": 0.988,
+            "support": 906
+          },
+          "order_surge": {
+            "precision": 1.0,
+            "recall": 0.004,
+            "f1": 0.008,
+            "support": 761
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "normal",
+            "coolant_degradation",
+            "bearing_defect",
+            "overload",
+            "tool_wear_accel",
+            "sensor_stuck",
+            "pressure_drop",
+            "order_surge"
+          ],
+          "matrix": [
+            [
+              2735,
+              51,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              149,
+              15,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              3,
+              0,
+              739,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              7,
+              0,
+              0,
+              745,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              166,
+              0,
+              0,
+              0,
+              723,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              21,
+              0,
+              0,
+              0,
+              0,
+              0,
+              885,
+              0
+            ],
+            [
+              12,
+              0,
+              0,
+              746,
+              0,
+              0,
+              0,
+              3
+            ]
+          ]
+        }
+      },
+      "detection_delay_rf": {
+        "overload": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 8.3
+        },
+        "bearing_defect": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 3.4
+        },
+        "tool_wear_accel": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 9.8
+        },
+        "order_surge": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 1.0
+        },
+        "pressure_drop": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 11.3
+        },
+        "coolant_degradation": {
+          "episodes": 1,
+          "detected": 1,
+          "median_delay_s": 36.0
+        }
+      },
+      "detection_delay_rules": {
+        "overload": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 18.3
+        },
+        "bearing_defect": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 11.0
+        },
+        "tool_wear_accel": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 21.2
+        },
+        "order_surge": {
+          "episodes": 5,
+          "detected": 1,
+          "median_delay_s": 29.1
+        },
+        "pressure_drop": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 39.5
+        },
+        "coolant_degradation": {
+          "episodes": 1,
+          "detected": 1,
+          "median_delay_s": 36.0
+        }
+      },
+      "time_to_limit": {
+        "mae_min_all": 2.04,
+        "mae_min_when_limit_ahead": 4.22
+      }
+    }
+  },
+  "top_features": [
+    {
+      "feature": "wear_std",
+      "importance": 0.0969
+    },
+    {
+      "feature": "h_cool_est",
+      "importance": 0.0834
+    },
+    {
+      "feature": "rpm_max",
+      "importance": 0.0607
+    },
+    {
+      "feature": "vib_mean",
+      "importance": 0.0565
+    },
+    {
+      "feature": "calib_frozen",
+      "importance": 0.0547
+    },
+    {
+      "feature": "torque_mean",
+      "importance": 0.0535
+    },
+    {
+      "feature": "vib_max",
+      "importance": 0.0532
+    },
+    {
+      "feature": "wear_slope",
+      "importance": 0.0532
+    },
+    {
+      "feature": "dq_bad_frac",
+      "importance": 0.052
+    },
+    {
+      "feature": "rpm_mean",
+      "importance": 0.0509
+    },
+    {
+      "feature": "torque_max",
+      "importance": 0.0506
+    },
+    {
+      "feature": "air_pressure_bar",
+      "importance": 0.0459
+    }
+  ],
+  "caveat": "Scores measure how well the model learns OUR simulator. Real-machine accuracy must be measured on a pilot (ESP32 / shop-floor data) before any claim.",
+  "trained_in_s": 76.7
+}

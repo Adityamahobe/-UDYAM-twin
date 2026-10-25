@@ -1,0 +1,234 @@
+{
+  "dataset": "udyam_sim_v1",
+  "episodes_in_distribution": 400,
+  "minutes_per_episode": 30.0,
+  "faults": {
+    "bearing_defect": {
+      "episodes": 49,
+      "no_action": {
+        "episodes": 27,
+        "pct_reached_limit": 100.0,
+        "median_min_onset_to_limit": 0.12,
+        "mean_parts_per_30min": 35.7
+      },
+      "auto_derate": {
+        "episodes": 22,
+        "pct_reached_limit": 100.0,
+        "median_min_onset_to_limit": 0.14,
+        "mean_parts_per_30min": 32.3
+      }
+    },
+    "coolant_degradation": {
+      "episodes": 52,
+      "no_action": {
+        "episodes": 24,
+        "pct_reached_limit": 58.3,
+        "median_min_onset_to_limit": 1.98,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 28,
+        "pct_reached_limit": 10.7,
+        "median_min_onset_to_limit": 2.04,
+        "mean_parts_per_30min": 52.8
+      }
+    },
+    "normal": {
+      "episodes": 94,
+      "no_action": {
+        "episodes": 46,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 48,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      }
+    },
+    "order_surge": {
+      "episodes": 45,
+      "no_action": {
+        "episodes": 16,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 29,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 59.1
+      }
+    },
+    "overload": {
+      "episodes": 43,
+      "no_action": {
+        "episodes": 19,
+        "pct_reached_limit": 26.3,
+        "median_min_onset_to_limit": 0.71,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 24,
+        "pct_reached_limit": 4.2,
+        "median_min_onset_to_limit": 0.5,
+        "mean_parts_per_30min": 56.1
+      }
+    },
+    "pressure_drop": {
+      "episodes": 50,
+      "no_action": {
+        "episodes": 23,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 46.7
+      },
+      "auto_derate": {
+        "episodes": 27,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 47.1
+      }
+    },
+    "sensor_stuck": {
+      "episodes": 34,
+      "no_action": {
+        "episodes": 15,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 19,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      }
+    },
+    "tool_wear_accel": {
+      "episodes": 33,
+      "no_action": {
+        "episodes": 15,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      },
+      "auto_derate": {
+        "episodes": 18,
+        "pct_reached_limit": 0.0,
+        "median_min_onset_to_limit": null,
+        "mean_parts_per_30min": 60.0
+      }
+    }
+  },
+  "model_summary": {
+    "test_in_distribution": {
+      "rf_macro_f1": 0.9933,
+      "rules_macro_f1": 0.8568,
+      "detection_delay_rf": {
+        "bearing_defect": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 4.5
+        },
+        "pressure_drop": {
+          "episodes": 11,
+          "detected": 11,
+          "median_delay_s": 12.0
+        },
+        "overload": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 10.2
+        },
+        "coolant_degradation": {
+          "episodes": 8,
+          "detected": 8,
+          "median_delay_s": 33.0
+        },
+        "order_surge": {
+          "episodes": 10,
+          "detected": 10,
+          "median_delay_s": 7.3
+        },
+        "sensor_stuck": {
+          "episodes": 4,
+          "detected": 4,
+          "median_delay_s": 6.5
+        },
+        "tool_wear_accel": {
+          "episodes": 7,
+          "detected": 7,
+          "median_delay_s": 9.1
+        }
+      },
+      "time_to_limit_mae_min": 5.31
+    },
+    "test_ood_heavier_machines": {
+      "rf_macro_f1": 0.8512,
+      "rules_macro_f1": 0.6595,
+      "detection_delay_rf": {
+        "overload": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 8.3
+        },
+        "bearing_defect": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 3.4
+        },
+        "tool_wear_accel": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 9.8
+        },
+        "order_surge": {
+          "episodes": 5,
+          "detected": 5,
+          "median_delay_s": 1.0
+        },
+        "pressure_drop": {
+          "episodes": 6,
+          "detected": 6,
+          "median_delay_s": 11.3
+        },
+        "coolant_degradation": {
+          "episodes": 1,
+          "detected": 1,
+          "median_delay_s": 36.0
+        }
+      },
+      "time_to_limit_mae_min": 4.22
+    }
+  },
+  "top_features": [
+    {
+      "feature": "wear_std",
+      "importance": 0.0969
+    },
+    {
+      "feature": "h_cool_est",
+      "importance": 0.0834
+    },
+    {
+      "feature": "rpm_max",
+      "importance": 0.0607
+    },
+    {
+      "feature": "vib_mean",
+      "importance": 0.0565
+    },
+    {
+      "feature": "calib_frozen",
+      "importance": 0.0547
+    },
+    {
+      "feature": "torque_mean",
+      "importance": 0.0535
+    }
+  ]
+}

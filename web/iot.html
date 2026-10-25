@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UDYAM-TWIN IoT Hub</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); }
+    .hub { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+    .hub h1 { font-size: 20px; margin-bottom: 4px; }
+    .hub .sub { color: var(--text-secondary); font-size: 13px; margin-bottom: 20px; }
+    .hub .sub a { color: var(--accent-cyan); }
+    .panel { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+    .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input, select, button { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); }
+    button { cursor: pointer; background: var(--accent-blue); border-color: var(--accent-blue); }
+    button.ghost { background: transparent; border-color: var(--border-subtle); }
+    button.danger { background: transparent; border-color: var(--status-crit); color: var(--status-crit); }
+    .stats { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+    .stats b { color: var(--text-primary); font-family: var(--font-mono); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+    th { color: var(--text-muted); font-weight: 500; }
+    td.mono { font-family: var(--font-mono); font-size: 12px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .ONLINE { background: rgba(16,185,129,.15); color: var(--status-ok); }
+    .STALE { background: rgba(245,158,11,.15); color: var(--status-warn); }
+    .OFFLINE { background: rgba(239,68,68,.15); color: var(--status-crit); }
+    .NEVER_SEEN { background: rgba(107,114,128,.2); color: var(--text-secondary); }
+    .token { margin-top: 12px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface);
+      border: 1px dashed var(--status-warn); font-family: var(--font-mono); font-size: 12px; word-break: break-all; display: none; }
+    .err { color: var(--status-crit); font-size: 13px; margin-top: 8px; min-height: 1em; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <div class="hub">
+    <h1>IoT Hub</h1>
+    <p class="sub">Sensor nodes linked to a machine replace its simulated signals, and its stream shows <code>source_mode: LIVE</code>. <a href="/">← Dashboard</a></p>
+
+    <div class="panel">
+      <h2>Hub status</h2>
+      <div class="stats" id="stats">Loading…</div>
+    </div>
+
+    <div class="panel">
+      <h2>Register a device</h2>
+      <div class="row">
+        <input id="newId" placeholder="Device ID, e.g. ESP32-01" maxlength="64">
+        <input id="newName" placeholder="Name (optional)">
+        <select id="newMachine"></select>
+        <button id="createBtn">Register</button>
+      </div>
+      <div class="token" id="tokenBox"></div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Devices</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Device</th><th>Status</th><th>Machine</th><th>Last reading</th><th>DQ</th><th>Msgs</th><th></th></tr></thead>
+          <tbody id="devices"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let machines = [];
+
+    async function api(method, url, body) {
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      return data;
+    }
+
+    function showError(e) { $("err").textContent = e ? e.message : ""; }
+
+    function showToken(id, token) {
+      const box = $("tokenBox");
+      box.style.display = "block";
+      box.textContent = `Token for ${id} (shown once, flash it into the device): ${token}`;
+    }
+
+    function machineOptions(selected) {
+      return `<option value="">(unbound)</option>` + machines.map(m =>
+        `<option value="${m.machine_id}" ${m.machine_id === selected ? "selected" : ""}>${m.machine_id} · ${m.name}</option>`).join("");
+    }
+
+    function fmtReading(r) {
+      const parts = Object.entries(r || {}).map(([k, v]) => `${k}=${v === null ? "null" : v}`);
+      return parts.length ? parts.join("<br>") : "—";
+    }
+
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    async function refresh() {
+      try {
+        const [status, devices, reg] = await Promise.all([api("GET", "/api/iot/status"), api("GET", "/api/iot/devices"), api("GET", "/api/registry")]);
+        machines = reg.machines;
+        if (!$("newMachine").options.length) $("newMachine").innerHTML = machineOptions("");
+        const mq = status.transports.mqtt;
+        const by = status.by_status;
+        $("stats").innerHTML = [
+          `Devices <b>${status.devices}</b>`,
+          `Online <b>${by.ONLINE || 0}</b>`,
+          `Stale <b>${by.STALE || 0}</b>`,
+          `Offline <b>${by.OFFLINE || 0}</b>`,
+          `MQTT <b>${mq.enabled ? (mq.connected ? "connected " + mq.broker : "disconnected") : "off"}</b>`,
+        ].map(s => `<span>${s}</span>`).join("");
+
+        const active = document.activeElement;
+        if (active && active.tagName === "SELECT" && active.closest("#devices")) return;
+        $("devices").innerHTML = devices.length ? devices.map(d => `
+          <tr>
+            <td><b>${esc(d.device_id)}</b><br><span style="color:var(--text-muted)">${esc(d.name)}</span></td>
+            <td><span class="pill ${d.status}">${d.status}</span><br><span style="color:var(--text-muted)">${d.age_s === null ? "" : d.age_s + " s ago · " + d.last_transport}</span></td>
+            <td><select data-bind="${esc(d.device_id)}">${machineOptions(d.machine_id)}</select></td>
+            <td class="mono">${fmtReading(d.last_reading)}${d.temp_offset_k ? `<br>offset ${d.temp_offset_k} K` : ""}</td>
+            <td class="mono">${d.dq_flag}</td>
+            <td class="mono">${d.msg_count}${d.rejected_count ? ` / ${d.rejected_count} rej` : ""}</td>
+            <td><div class="actions">
+              <button class="ghost" data-tare="${esc(d.device_id)}" title="Set the offset so the probe matches the twin's predicted temperature">Tare</button>
+              <button class="ghost" data-token="${esc(d.device_id)}">New token</button>
+              <button class="danger" data-del="${esc(d.device_id)}">Delete</button>
+            </div></td>
+          </tr>`).join("") : `<tr><td colspan="7" style="color:var(--text-muted)">No devices yet. Register one above, or run <code>python -m tools.fake_device</code>.</td></tr>`;
+      } catch (e) { showError(e); }
+    }
+
+    $("createBtn").onclick = async () => {
+      showError(null);
+      try {
+        const d = await api("POST", "/api/iot/devices", { device_id: $("newId").value, name: $("newName").value || null, machine_id: $("newMachine").value || null });
+        showToken(d.device_id, d.token);
+        $("newId").value = ""; $("newName").value = "";
+        refresh();
+      } catch (e) { showError(e); }
+    };
+
+    $("devices").addEventListener("change", async (ev) => {
+      const id = ev.target.dataset.bind;
+      if (!id) return;
+      showError(null);
+      try { await api("POST", `/api/iot/devices/${encodeURIComponent(id)}/bind`, { machine_id: ev.target.value || null }); }
+      catch (e) { showError(e); }
+      ev.target.blur();
+      refresh();
+    });
+
+    $("devices").addEventListener("click", async (ev) => {
+      const t = ev.target.dataset;
+      showError(null);
+      try {
+        if (t.tare) await api("POST", `/api/iot/devices/${encodeURIComponent(t.tare)}/tare`, {});
+        else if (t.token) { const r = await api("POST", `/api/iot/devices/${encodeURIComponent(t.token)}/token`); showToken(r.device_id, r.token); }
+        else if (t.del) { if (!confirm(`Delete ${t.del}?`)) return; await api("DELETE", `/api/iot/devices/${encodeURIComponent(t.del)}`); }
+        else return;
+        refresh();
+      } catch (e) { showError(e); }
+    });
+
+    refresh();
+    setInterval(refresh, 1500);
+  </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+{
+  "dataset": {
+    "name": "AI4I 2020 Predictive Maintenance Dataset",
+    "source": "https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset",
+    "license": "CC BY 4.0",
+    "citation": "Matzka, S. (2020). Explainable Artificial Intelligence for Predictive Maintenance Applications. AI4I 2020. UCI Machine Learning Repository.",
+    "sha256": "dc6630cd9b1f0f853922fad78a1b6436570d3f1ec863f1dd5c4340ac56bc8a8e",
+    "rows": 10000,
+    "failure_rate": 0.0339,
+    "positives": {
+      "machine_failure": 339,
+      "TWF": 46,
+      "HDF": 115,
+      "PWF": 95,
+      "OSF": 98,
+      "RNF": 19
+    },
+    "synthetic_source": true,
+    "about": "AI4I 2020 is itself a synthetic dataset that reflects a real milling process; it is not data from this shop's machines."
+  },
+  "trained_at": "2026-10-24T18:54:27+00:00",
+  "model": "RandomForestClassifier per target (n_estimators=150, min_samples_leaf=2, class_weight=balanced, random_state=42)",
+  "features": [
+    "air_temp_k",
+    "process_temp_k",
+    "rpm",
+    "torque_nm",
+    "tool_wear_min"
+  ],
+  "targets": [
+    "machine_failure",
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "split": {
+    "strategy": "stratified on Machine failure",
+    "test_size": 0.2,
+    "seed": 42,
+    "train_rows": 8000,
+    "test_rows": 2000
+  },
+  "threshold": 0.5,
+  "per_class": {
+    "machine_failure": {
+      "label": "Machine failure",
+      "support_positive": 68,
+      "precision": 0.5955,
+      "recall": 0.7794,
+      "f1": 0.6752,
+      "false_positive_rate": 0.0186,
+      "confusion_matrix": {
+        "true_negatives": 1896,
+        "false_positives": 36,
+        "false_negatives": 15,
+        "true_positives": 53
+      },
+      "roc_auc": 0.973,
+      "pr_auc": 0.7785
+    },
+    "TWF": {
+      "label": "Tool wear failure",
+      "support_positive": 10,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "false_positive_rate": 0.0045,
+      "confusion_matrix": {
+        "true_negatives": 1981,
+        "false_positives": 9,
+        "false_negatives": 10,
+        "true_positives": 0
+      },
+      "roc_auc": 0.8637,
+      "pr_auc": 0.0563
+    },
+    "HDF": {
+      "label": "Heat dissipation failure",
+      "support_positive": 29,
+      "precision": 0.7647,
+      "recall": 0.8966,
+      "f1": 0.8254,
+      "false_positive_rate": 0.0041,
+      "confusion_matrix": {
+        "true_negatives": 1963,
+        "false_positives": 8,
+        "false_negatives": 3,
+        "true_positives": 26
+      },
+      "roc_auc": 0.9971,
+      "pr_auc": 0.8957
+    },
+    "PWF": {
+      "label": "Power failure",
+      "support_positive": 13,
+      "precision": 0.7059,
+      "recall": 0.9231,
+      "f1": 0.8,
+      "false_positive_rate": 0.0025,
+      "confusion_matrix": {
+        "true_negatives": 1982,
+        "false_positives": 5,
+        "false_negatives": 1,
+        "true_positives": 12
+      },
+      "roc_auc": 0.9994,
+      "pr_auc": 0.8892
+    },
+    "OSF": {
+      "label": "Overstrain failure",
+      "support_positive": 16,
+      "precision": 0.6364,
+      "recall": 0.875,
+      "f1": 0.7368,
+      "false_positive_rate": 0.004,
+      "confusion_matrix": {
+        "true_negatives": 1976,
+        "false_positives": 8,
+        "false_negatives": 2,
+        "true_positives": 14
+      },
+      "roc_auc": 0.9982,
+      "pr_auc": 0.733
+    },
+    "RNF": {
+      "label": "Random failure",
+      "support_positive": 4,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "false_positive_rate": 0.0005,
+      "confusion_matrix": {
+        "true_negatives": 1995,
+        "false_positives": 1,
+        "false_negatives": 4,
+        "true_positives": 0
+      },
+      "roc_auc": 0.6318,
+      "pr_auc": 0.0062
+    }
+  },
+  "random_forest": {
+    "support_positive": 68,
+    "precision": 0.5955,
+    "recall": 0.7794,
+    "f1": 0.6752,
+    "false_positive_rate": 0.0186,
+    "confusion_matrix": {
+      "true_negatives": 1896,
+      "false_positives": 36,
+      "false_negatives": 15,
+      "true_positives": 53
+    },
+    "roc_auc": 0.973,
+    "pr_auc": 0.7785,
+    "feature_importances": {
+      "air_temp_k": 0.0815,
+      "process_temp_k": 0.0531,
+      "rpm": 0.3019,
+      "torque_nm": 0.3421,
+      "tool_wear_min": 0.2215
+    }
+  },
+  "cv_machine_failure_f1": {
+    "folds": 5,
+    "mean": 0.6701,
+    "std": 0.0273
+  },
+  "rule_baseline": {
+    "support_positive": 68,
+    "precision": 0.3052,
+    "recall": 0.9559,
+    "f1": 0.4626,
+    "false_positive_rate": 0.0766,
+    "confusion_matrix": {
+      "true_negatives": 1784,
+      "false_positives": 148,
+      "false_negatives": 3,
+      "true_positives": 65
+    },
+    "per_mode": {
+      "TWF": {
+        "support_positive": 10,
+        "precision": 0.0465,
+        "recall": 0.8,
+        "f1": 0.0879,
+        "false_positive_rate": 0.0824,
+        "confusion_matrix": {
+          "true_negatives": 1826,
+          "false_positives": 164,
+          "false_negatives": 2,
+          "true_positives": 8
+        }
+      },
+      "HDF": {
+        "support_positive": 29,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_positive_rate": 0.0,
+        "confusion_matrix": {
+          "true_negatives": 1971,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_positives": 29
+        }
+      },
+      "PWF": {
+        "support_positive": 13,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_positive_rate": 0.0,
+        "confusion_matrix": {
+          "true_negatives": 1987,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_positives": 13
+        }
+      },
+      "OSF": {
+        "support_positive": 16,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_positive_rate": 0.0,
+        "confusion_matrix": {
+          "true_negatives": 1984,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_positives": 16
+        }
+      }
+    },
+    "note": "AI4I labels were generated from these rules (plus randomness), so the rule baseline is expected to score well; it shows what the dataset encodes, not field performance."
+  },
+  "vibration_and_current_excluded_from_ml": true,
+  "probability_calibrated": false,
+  "honest_disclaimer": "Metrics are on a held-out 20 % of AI4I 2020, a synthetic dataset modelled on a real milling process. They show the model learned that dataset, not that it predicts failures on this shop's machines; that needs validation on recorded field data. Risk % is a Random Forest vote share, not a calibrated probability. RNF failures are random by construction and are not predictable."
+}

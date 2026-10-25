@@ -1,0 +1,52 @@
+{
+  "dataset": "AI4I 2020 Predictive Maintenance Dataset (UCI / Synthetic standard)",
+  "samples_total": 10000,
+  "train_samples": 8000,
+  "test_samples": 2000,
+  "failure_rate": 0.0339,
+  "features": [
+    "air_temp_k",
+    "process_temp_k",
+    "rpm",
+    "torque_nm",
+    "tool_wear_min",
+    "power_kw",
+    "delta_t"
+  ],
+  "vibration_and_current_excluded_from_ml": true,
+  "rule_baseline": {
+    "precision": 0.307,
+    "recall": 0.9706,
+    "f1": 0.4664,
+    "confusion_matrix": {
+      "true_negatives": 1783,
+      "false_positives": 149,
+      "false_negatives": 2,
+      "true_positives": 66
+    }
+  },
+  "random_forest": {
+    "precision": 0.7237,
+    "recall": 0.8088,
+    "f1": 0.7639,
+    "roc_auc": 0.9787,
+    "pr_auc": 0.8245,
+    "false_positive_rate": 0.0109,
+    "confusion_matrix": {
+      "true_negatives": 1911,
+      "false_positives": 21,
+      "false_negatives": 13,
+      "true_positives": 55
+    },
+    "feature_importances": {
+      "air_temp_k": 0.0432,
+      "process_temp_k": 0.0296,
+      "rpm": 0.214,
+      "torque_nm": 0.2018,
+      "tool_wear_min": 0.2101,
+      "power_kw": 0.2044,
+      "delta_t": 0.097
+    }
+  },
+  "honest_disclaimer": "AI4I labels are synthetically generated from rules; high evaluation scores are expected and demonstrate algorithmic reproducibility rather than real-world validation. Real-world MSME validation occurs in subsequent pilot stages."
+}
