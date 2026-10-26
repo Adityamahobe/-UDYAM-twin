@@ -1,43 +1,98 @@
-// three_mill.js – Photorealistic 3D Digital Twin Visualizer
-// Loads high-fidelity Blender GLB assets exported from udyam_factory.blend with seamless procedural fallbacks.
-// Assets:
-// 1. VMC-01: 3-Axis Vertical Machining Center (Spindle, BT40 Tool, Worktable, Coolant System, Enclosure)
-// 2. LATHE-01: CNC Slant-Bed Lathe (Spindle, 3-Jaw Chuck, Bar Stock, 8-Tool Turret, Tailstock)
-// 3. SAW-01: Industrial Metal Band Saw (Roller Conveyor, Vise, Cutting Bow, Moving Blade)
-// 4. COMP-01: Shared Rotary Air Compressor (Receiver Vessel, Motor, Cooling Fan, Live Pressure Gauge)
-// 5. FACTORY: Full Factory Scene (4 Stations, Safety Demarcation, Utility Air Header, Lighting)
+// three_mill.js — Production Three.js 3D Factory Viewer & Simulation Engine
+// Integrates UDYAM-TWIN Blender Factory Model (factory_scene.glb / udyam-twin-factory.glb)
+// Featuring 7 synchronized 120-frame animation tracks, OrbitControls with safety boundaries,
+// interactive raycasting object selection, machine highlighting, and Apple-inspired aesthetic.
 
 let threeRenderer = null;
 let threeScene = null;
 let threeCamera = null;
 let orbitControls = null;
 let animationId = null;
-let animating = true;
-let currentMachineId = null;
-let currentTemplate = null;
+let animClock = null;
+let animMixer = null;
+let activeActions = [];
+let isSimPlaying = true;
+let currentMachineId = "FACTORY";
 let currentModelSource = "loading";
-
-// Dynamic animated components and telemetry bindings
-let animComponents = {
-  rotatingGroup: null,
-  rotatingElements: [],
-  rotationAxis: "y",
-  speed: 0.02,
-  hotMesh: null,
-  coolantIndicator: null,
-  gaugeNeedle: null,
-  tankMesh: null,
-  airInlet: null,
-  bladeMesh: null,
-  statusIndicator: null,
-  allSpindles: [], // for full factory scene overview
+let cameraTween = null;
+let raycaster = null;
+let mouseCoords = null;
+let interactiveMeshes = [];
+let machineMeshMap = {
+  "SAW-01": [],
+  "LATHE-01": [],
+  "VMC-01": [],
+  "COMP-01": []
 };
+let originalMaterials = new Map();
+
+// Camera Presets derived directly from Blender 5.2 coordinates
+// Camera Presets derived directly from Blender 5.2 coordinates
+// (Blender: X=Right, Y=Depth, Z=Up -> Three.js: X=Right, Y=Up, Z=-Y_depth)
+const CAMERA_PRESET_CONFIGS = {
+  FACTORY: {
+    name: "Complete Factory Floor",
+    pos: [-12.0, 9.5, 17.5],
+    target: [-2.0, 1.5, -1.0]
+  },
+  FRONT: {
+    name: "Main Entrance (Gate View)",
+    pos: [-8.8, 2.6, 13.5],
+    target: [-8.8, 1.8, 0.0]
+  },
+  TOP: {
+    name: "Overhead Floorplan",
+    pos: [-2.0, 22.0, -1.0],
+    target: [-2.0, 0.0, -1.0]
+  },
+  "SAW-01": {
+    name: "Bar-Cutting Saw (SAW-01)",
+    pos: [-4.2, 2.2, 1.6],
+    target: [-6.7, 0.9, -0.8]
+  },
+  "LATHE-01": {
+    name: "CNC Turning Lathe (LATHE-01)",
+    pos: [-2.1, 2.0, 2.2],
+    target: [-2.05, 1.0, -1.3]
+  },
+  "VMC-01": {
+    name: "CNC Milling Machine (VMC-01)",
+    pos: [2.2, 2.8, 3.2],
+    target: [3.6, 1.6, -1.1]
+  },
+  "COMP-01": {
+    name: "Rotary Air Compressor (COMP-01)",
+    pos: [-7.6, 2.6, -2.4],
+    target: [-8.9, 2.0, -6.0]
+  }
+};
+
+function getCameraPreset(key) {
+  const cfg = CAMERA_PRESET_CONFIGS[key] || CAMERA_PRESET_CONFIGS.FACTORY;
+  return {
+    name: cfg.name,
+    pos: (typeof THREE !== "undefined") ? new THREE.Vector3(cfg.pos[0], cfg.pos[1], cfg.pos[2]) : { x: cfg.pos[0], y: cfg.pos[1], z: cfg.pos[2] },
+    target: (typeof THREE !== "undefined") ? new THREE.Vector3(cfg.target[0], cfg.target[1], cfg.target[2]) : { x: cfg.target[0], y: cfg.target[1], z: cfg.target[2] }
+  };
+}
+
+// Procedural fallback animation targets
+let fallbackAnimElements = [];
 
 function disposeThree() {
   if (animationId) {
     cancelAnimationFrame(animationId);
     animationId = null;
   }
+  if (cameraTween) {
+    cancelAnimationFrame(cameraTween);
+    cameraTween = null;
+  }
+  if (animMixer) {
+    animMixer.stopAllAction();
+    animMixer = null;
+  }
+  activeActions = [];
   if (orbitControls) {
     orbitControls.dispose();
     orbitControls = null;
@@ -64,41 +119,64 @@ function disposeThree() {
   }
   threeScene = null;
   threeCamera = null;
-  currentMachineId = null;
-  currentTemplate = null;
+  currentMachineId = "FACTORY";
   currentModelSource = "none";
-  animComponents = {
-    rotatingGroup: null,
-    rotatingElements: [],
-    rotationAxis: "y",
-    speed: 0.02,
-    hotMesh: null,
-    coolantIndicator: null,
-    gaugeNeedle: null,
-    tankMesh: null,
-    airInlet: null,
-    bladeMesh: null,
-    statusIndicator: null,
-    allSpindles: [],
-  };
+  interactiveMeshes = [];
+  machineMeshMap = { "SAW-01": [], "LATHE-01": [], "VMC-01": [], "COMP-01": [] };
+  originalMaterials.clear();
+  fallbackAnimElements = [];
 }
 
 function updateModelSourceBadge(text, isGlb) {
   const badge = document.getElementById("threeModelBadge");
   if (badge) {
     badge.textContent = text;
-    badge.style.color = isGlb ? "var(--status-ok, #22c55e)" : "var(--status-warn, #f59e0b)";
+    badge.style.color = isGlb ? "var(--status-normal-text, #30D158)" : "var(--status-attention-text, #FF9F0A)";
   }
 }
 
-function initThreeView(machineId) {
+// Apple-style cubic ease-out camera interpolation
+function smoothMoveCamera(toPos, toTarget, durationMs = 850) {
+  if (!threeCamera || !orbitControls) return;
+  const startPos = threeCamera.position.clone();
+  const startTarget = orbitControls.target.clone();
+  const startTime = performance.now();
+
+  function step(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+    const t = 1 - Math.pow(1 - progress, 3);
+
+    threeCamera.position.lerpVectors(startPos, toPos, t);
+    orbitControls.target.lerpVectors(startTarget, toTarget, t);
+    orbitControls.update();
+
+    if (progress < 1) {
+      cameraTween = requestAnimationFrame(step);
+    } else {
+      cameraTween = null;
+    }
+  }
+
+  if (cameraTween) cancelAnimationFrame(cameraTween);
+  cameraTween = requestAnimationFrame(step);
+}
+
+// Master Initialization of Three.js Viewport
+function initThreeView(initialTarget = "FACTORY") {
+  // If scene already initialized, just switch camera
+  if (threeScene && threeCamera && orbitControls) {
+    window.focusCameraOnMachine(initialTarget);
+    return;
+  }
+
   disposeThree();
 
-  const wrapper = document.getElementById("threeCanvasWrapper") || document.getElementById("detailView");
+  const wrapper = document.getElementById("threeCanvasWrapper");
   if (!wrapper) return;
 
   if (typeof THREE === "undefined") {
-    wrapper.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-muted); font-size:13px;">3D visualizer requires Three.js. (Offline/CDN fallback mode).</div>';
+    wrapper.innerHTML = '<div style="padding:48px; text-align:center; color:#A1A1A6; font-size:14px;">Three.js library is loading. Please check network connection or reload.</div>';
     return;
   }
 
@@ -107,106 +185,77 @@ function initThreeView(machineId) {
   const canvas = document.createElement("canvas");
   canvas.id = "threeCanvas";
   canvas.style.width = "100%";
-  canvas.style.height = "360px";
+  canvas.style.height = "100%";
   canvas.style.display = "block";
-  canvas.style.borderRadius = "var(--radius-sm, 6px)";
-  canvas.style.background = "#090d16";
   wrapper.appendChild(canvas);
 
-  const width = wrapper.clientWidth || 500;
-  const height = 360;
+  const width = Math.max(wrapper.clientWidth || 0, 960);
+  const height = Math.max(wrapper.clientHeight || 0, 560);
 
-  threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  threeRenderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+  });
   threeRenderer.setSize(width, height);
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (THREE.sRGBEncoding) {
+    threeRenderer.outputEncoding = THREE.sRGBEncoding;
+  }
+  if (THREE.ACESFilmicToneMapping) {
+    threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    threeRenderer.toneMappingExposure = 1.05;
+  }
 
   threeScene = new THREE.Scene();
   threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
 
-  // Default camera angle
-  if (machineId === "FACTORY") {
-    threeCamera.position.set(0.5, 7.5, 11.0);
-  } else {
-    threeCamera.position.set(2.4, 2.0, 3.2);
-  }
+  // Set default factory overview position
+  const defaultPreset = getCameraPreset(initialTarget);
+  threeCamera.position.copy(defaultPreset.pos);
 
-  // Realistic Industrial Lighting
-  const ambient = new THREE.AmbientLight(0xffffff, 0.75);
-  threeScene.add(ambient);
-
-  const sunKey = new THREE.DirectionalLight(0xfffaed, 0.95);
-  sunKey.position.set(6, 12, 8);
-  threeScene.add(sunKey);
-
-  const fillCool = new THREE.DirectionalLight(0x4080ff, 0.45);
-  fillCool.position.set(-8, -2, -6);
-  threeScene.add(fillCool);
-
-  // Ground Grid
-  const gridHelper = new THREE.GridHelper(machineId === "FACTORY" ? 22 : 6, machineId === "FACTORY" ? 22 : 12, 0x3d4b64, 0x141a29);
-  gridHelper.position.y = -0.01;
-  threeScene.add(gridHelper);
-
-  // Determine template and GLB file mapping
-  let template = "cnc_mill";
-  let glbFile = "vmc_01.glb";
-
-  if (machineId === "FACTORY") {
-    template = "factory_scene";
-    glbFile = "factory_scene.glb";
-  } else if (typeof state !== "undefined" && state.machines && state.machines[machineId]) {
-    template = state.machines[machineId].template;
-    if (template === "cnc_mill") glbFile = "vmc_01.glb";
-    else if (template === "cnc_lathe") glbFile = "lathe_01.glb";
-    else if (template === "bar_saw") glbFile = "saw_01.glb";
-    else if (template === "air_compressor") glbFile = "comp_01.glb";
-  } else if (machineId.includes("LATHE")) {
-    template = "cnc_lathe";
-    glbFile = "lathe_01.glb";
-  } else if (machineId.includes("SAW")) {
-    template = "bar_saw";
-    glbFile = "saw_01.glb";
-  } else if (machineId.includes("COMP")) {
-    template = "air_compressor";
-    glbFile = "comp_01.glb";
-  }
-
-  currentMachineId = machineId;
-  currentTemplate = template;
-
-  // Initialize OrbitControls
+  // OrbitControls with strict safety limits for older owners
   orbitControls = new THREE.OrbitControls(threeCamera, threeRenderer.domElement);
   orbitControls.enableDamping = true;
   orbitControls.dampingFactor = 0.05;
-  orbitControls.minDistance = 0.8;
-  orbitControls.maxDistance = machineId === "FACTORY" ? 25 : 12;
+  orbitControls.target.copy(defaultPreset.target);
+  orbitControls.minDistance = 1.5;
+  orbitControls.maxDistance = 42.0;
+  orbitControls.minPolarAngle = 0.05; // overhead clamp
+  orbitControls.maxPolarAngle = Math.PI / 2 - 0.04; // ground clamp (~87deg) prevents camera from sinking below floor
 
-  if (machineId === "FACTORY") {
-    orbitControls.target.set(0.5, 0.8, 0);
-  } else {
-    orbitControls.target.set(0, 0.65, 0);
-  }
+  // Photometric Real-Time Lighting Setup
+  setupSceneLighting();
 
-  // Load Blender GLB Model with Procedural Fallback
-  loadMachineModel(machineId, template, glbFile);
+  // Raycaster & Mouse coordinates for interaction
+  raycaster = new THREE.Raycaster();
+  mouseCoords = new THREE.Vector2();
 
-  // Animation Loop
+  // Animation Clock
+  animClock = new THREE.Clock();
+
+  // Load Blender Model with graceful procedural fallback
+  loadBlenderModel(initialTarget);
+
+  // Setup Interaction Handlers
+  setupInteractionEvents(canvas);
+
+  // Render Loop
   function animate() {
     animationId = requestAnimationFrame(animate);
 
-    if (animating) {
-      // 1. Single Machine Active Spindle / Fan / Blade Rotation
-      if (animComponents.rotatingGroup) {
-        const axis = animComponents.rotationAxis || "y";
-        animComponents.rotatingGroup.rotation[axis] += animComponents.speed;
-      }
-      for (const elem of animComponents.rotatingElements) {
-        elem.obj.rotation[elem.axis] += animComponents.speed;
-      }
+    const delta = animClock ? animClock.getDelta() : 0.016;
 
-      // 2. Full Factory Scene Spindles (Animates all 4 stations concurrently)
-      for (const s of animComponents.allSpindles) {
-        s.obj.rotation[s.axis] += s.speed;
+    // Advance real Blender GLB animations
+    if (animMixer && isSimPlaying) {
+      animMixer.update(delta);
+    }
+
+    // Advance procedural fallback elements if active
+    if (fallbackAnimElements.length > 0 && isSimPlaying) {
+      for (const el of fallbackAnimElements) {
+        el.mesh.rotation[el.axis] += el.speed;
       }
     }
 
@@ -219,447 +268,440 @@ function initThreeView(machineId) {
 }
 
 // -----------------------------------------------------------------------------
-// GLTF Loader & Mesh Telemetry Node Binder
+// Lighting System matching Blender EEVEE / Photometric Daylight
 // -----------------------------------------------------------------------------
+function setupSceneLighting() {
+  // Soft ambient fill
+  const ambient = new THREE.AmbientLight(0xffffff, 0.95);
+  threeScene.add(ambient);
 
-function loadMachineModel(machineId, template, glbFileName) {
-  updateModelSourceBadge("Loading Blender 3D asset...", true);
+  // Main Key Sun Light (Warm industrial skylight)
+  const sunKey = new THREE.DirectionalLight(0xfffaee, 1.25);
+  sunKey.position.set(12, 22, 16);
+  threeScene.add(sunKey);
 
-  const fallbackFn = () => {
-    updateModelSourceBadge("Procedural WebGL Fallback", false);
-    buildProceduralFallback(template);
-  };
+  // Cool Sky Fill Light
+  const fillCool = new THREE.DirectionalLight(0xdce8ff, 0.65);
+  fillCool.position.set(-14, 8, -12);
+  threeScene.add(fillCool);
 
-  if (typeof THREE.GLTFLoader !== "undefined" && glbFileName) {
+  // High-Bay LED fixture washes
+  const bayNorth = new THREE.DirectionalLight(0xffffff, 0.55);
+  bayNorth.position.set(-6, 8, 2);
+  threeScene.add(bayNorth);
+
+  const baySouth = new THREE.DirectionalLight(0xffffff, 0.55);
+  baySouth.position.set(3, 8, 2);
+  threeScene.add(baySouth);
+
+  // Bottom bounce light to illuminate machine undersides
+  const bounceLight = new THREE.DirectionalLight(0xffffff, 0.35);
+  bounceLight.position.set(0, -6, 0);
+  threeScene.add(bounceLight);
+
+  // Precision Industrial Ground Grid
+  const gridHelper = new THREE.GridHelper(36, 36, 0x5a6578, 0x222630);
+  gridHelper.position.y = -0.01;
+  threeScene.add(gridHelper);
+}
+
+// -----------------------------------------------------------------------------
+// GLTF Loader & Animation Mixer Integration
+// -----------------------------------------------------------------------------
+function loadBlenderModel(initialTarget) {
+  updateModelSourceBadge("Loading Blender 3D Model...", true);
+
+  const candidateUrls = ["/assets/3d/factory_scene.glb"];  // served by the backend from assets/3d
+
+  if (typeof THREE.GLTFLoader !== "undefined") {
     const loader = new THREE.GLTFLoader();
-    const url = `/assets/3d/${glbFileName}`;
+    let attemptIdx = 0;
 
-    loader.load(
-      url,
-      (gltf) => {
-        // Discard if user switched active selection during fetch
-        if (currentMachineId !== machineId) return;
-
-        const model = gltf.scene;
-        threeScene.add(model);
-        currentModelSource = "blender_glb";
-        updateModelSourceBadge("Blender Photorealistic GLB", true);
-
-        // Bind model hierarchy to telemetry components
-        bindModelTelemetryNodes(machineId, template, model);
-
-        // Re-apply latest telemetry if state is available
-        if (typeof state !== "undefined" && state.obs) {
-          const obs = machineId === "FACTORY" ? state.obs["VMC-01"] : state.obs[machineId];
-          const twin = state.twin ? state.twin[machineId] : null;
-          if (obs) window.updateMachineVisualization(machineId, obs, twin);
+    function tryLoadNext() {
+      if (attemptIdx >= candidateUrls.length) {
+        console.warn("[Three.js] All GLB URLs exhausted. Building procedural digital twin.");
+        buildProceduralFallback();
+        if (initialTarget && initialTarget !== "FACTORY") {
+          window.focusCameraOnMachine(initialTarget);
         }
-      },
-      undefined,
-      (err) => {
-        console.warn(`GLB load failed for ${url}, switching to procedural fallback:`, err);
-        fallbackFn();
+        return;
       }
-    );
+
+      const url = candidateUrls[attemptIdx++];
+      loader.load(
+        url,
+        (gltf) => {
+          const model = gltf.scene;
+          threeScene.add(model);
+          currentModelSource = "blender_glb";
+          updateModelSourceBadge("Blender Photorealistic GLB (Active)", true);
+
+          // Process animations
+          if (gltf.animations && gltf.animations.length > 0) {
+            animMixer = new THREE.AnimationMixer(model);
+            activeActions = [];
+            gltf.animations.forEach((clip) => {
+              const action = animMixer.clipAction(clip);
+              action.setLoop(THREE.LoopRepeat);
+              action.play();
+              activeActions.push(action);
+            });
+            const animBadge = document.getElementById("simStatusPill");
+            if (animBadge) animBadge.textContent = `● 4 Stations Active · ${gltf.animations.length} Action Loops`;
+          }
+
+          // Map meshes to machine IDs and store original materials
+          indexModelMeshes(model);
+
+          // Focus initial target if specified
+          if (initialTarget && initialTarget !== "FACTORY") {
+            window.focusCameraOnMachine(initialTarget);
+          }
+        },
+        undefined,
+        (err) => {
+          console.warn(`[Three.js] Notice loading ${url}:`, err);
+          tryLoadNext();
+        }
+      );
+    }
+
+    tryLoadNext();
   } else {
-    fallbackFn();
+    buildProceduralFallback();
   }
 }
 
-function bindModelTelemetryNodes(machineId, template, model) {
-  // Clear previous binds
-  animComponents.rotatingElements = [];
-  animComponents.allSpindles = [];
+// Index model objects into interactive machine categories
+function indexModelMeshes(model) {
+  interactiveMeshes = [];
+  machineMeshMap = { "SAW-01": [], "LATHE-01": [], "VMC-01": [], "COMP-01": [] };
+  originalMaterials.clear();
 
-  if (template === "cnc_lathe") {
-    const spindle = model.getObjectByName("LATHE_01_SPINDLE");
-    if (spindle) {
-      animComponents.rotatingGroup = spindle;
-      animComponents.rotationAxis = "x";
-    }
-    animComponents.hotMesh = model.getObjectByName("LATHE_01_WORKPIECE") || model.getObjectByName("LATHE_01_CARBIDE_INSERT");
-    animComponents.statusIndicator = model.getObjectByName("LATHE_01_STATUS_INDICATOR");
-    animComponents.airInlet = model.getObjectByName("LATHE_01_AIR_INLET");
-  } else if (template === "cnc_mill") {
-    const spindle = model.getObjectByName("VMC_01_SPINDLE");
-    if (spindle) {
-      animComponents.rotatingGroup = spindle;
-      animComponents.rotationAxis = "y";
-    }
-    animComponents.hotMesh = model.getObjectByName("VMC_01_ENDMILL") || model.getObjectByName("VMC_01_WORKPIECE");
-    animComponents.coolantIndicator = model.getObjectByName("VMC_01_COOLANT_INDICATOR");
-    animComponents.statusIndicator = model.getObjectByName("VMC_01_STATUS_INDICATOR");
-    animComponents.airInlet = model.getObjectByName("VMC_01_AIR_INLET");
-  } else if (template === "bar_saw") {
-    const blade = model.getObjectByName("SAW_01_BLADE");
-    const driveWheel = model.getObjectByName("SAW_01_DRIVE_WHEEL");
-    if (blade) {
-      animComponents.rotatingGroup = blade;
-      animComponents.rotationAxis = "x";
-    }
-    if (driveWheel) {
-      animComponents.rotatingElements.push({ obj: driveWheel, axis: "x" });
-    }
-    animComponents.bladeMesh = model.getObjectByName("SAW_01_BLADE_RIBBON");
-    animComponents.statusIndicator = model.getObjectByName("SAW_01_STATUS_INDICATOR");
-  } else if (template === "air_compressor") {
-    const fan = model.getObjectByName("COMP_01_FAN");
-    if (fan) {
-      animComponents.rotatingGroup = fan;
-      animComponents.rotationAxis = "x";
-    }
-    animComponents.tankMesh = model.getObjectByName("COMP_01_TANK");
-    animComponents.gaugeNeedle = model.getObjectByName("COMP_01_GAUGE_NEEDLE");
-    animComponents.statusIndicator = model.getObjectByName("COMP_01_STATUS_INDICATOR");
-  } else if (template === "factory_scene") {
-    // Multi-asset scene binds all 4 rotating components
-    const vmcSpindle = model.getObjectByName("VMC_01_SPINDLE");
-    const latheSpindle = model.getObjectByName("LATHE_01_SPINDLE");
-    const sawBlade = model.getObjectByName("SAW_01_BLADE");
-    const compFan = model.getObjectByName("COMP_01_FAN");
+  model.traverse((child) => {
+    if (child.isMesh) {
+      const name = (child.name || "").toUpperCase();
 
-    if (vmcSpindle) animComponents.allSpindles.push({ obj: vmcSpindle, axis: "y", speed: 0.05 });
-    if (latheSpindle) animComponents.allSpindles.push({ obj: latheSpindle, axis: "x", speed: 0.05 });
-    if (sawBlade) animComponents.allSpindles.push({ obj: sawBlade, axis: "x", speed: 0.04 });
-    if (compFan) animComponents.allSpindles.push({ obj: compFan, axis: "x", speed: 0.08 });
+      // Determine machine ownership
+      let machineId = null;
+      if (name.includes("SAW")) machineId = "SAW-01";
+      else if (name.includes("LATHE")) machineId = "LATHE-01";
+      else if (name.includes("VMC")) machineId = "VMC-01";
+      else if (name.includes("COMP")) machineId = "COMP-01";
 
-    animComponents.gaugeNeedle = model.getObjectByName("COMP_01_GAUGE_NEEDLE");
-    animComponents.tankMesh = model.getObjectByName("COMP_01_TANK");
-    animComponents.statusIndicator = model.getObjectByName("VMC_01_STATUS_INDICATOR");
-  }
-}
+      if (machineId) {
+        child.userData.machineId = machineId;
+        machineMeshMap[machineId].push(child);
+        interactiveMeshes.push(child);
 
-// -----------------------------------------------------------------------------
-// Live Telemetry & Digital Twin State Binding
-// -----------------------------------------------------------------------------
-
-window.updateMachineVisualization = function (machineId, obs, twin) {
-  if (!obs) return;
-
-  const rpmBadge = document.getElementById("threeSpindleRpm");
-
-  // 1. Spindle / Motor / Blade Speed Binding
-  if (typeof obs.rpm === "number" && Number.isFinite(obs.rpm)) {
-    animComponents.speed = Math.min(0.5, (obs.rpm / 60) * (2 * Math.PI) / 60);
-    if (rpmBadge) rpmBadge.textContent = `${obs.rpm.toFixed(0)} RPM`;
-  } else if (typeof obs.duty_pct === "number") {
-    animComponents.speed = (obs.duty_pct / 100) * 0.15;
-    if (rpmBadge) rpmBadge.textContent = `${obs.duty_pct.toFixed(0)}% DUTY`;
-  }
-
-  // 2. Machine Operational Status Light & Andon Indicator
-  if (animComponents.statusIndicator && animComponents.statusIndicator.material) {
-    const mat = animComponents.statusIndicator.material;
-    let color = 0x22c55e; // Nominal Green
-    let intensity = 2.0;
-
-    const plc = obs.plc_state || "RUN";
-    const risk = twin && twin.risk && twin.risk.rules;
-
-    if (plc === "ALARM" || risk === "HIGH") {
-      color = 0xef4444; // Alarm Red
-      intensity = 3.0;
-    } else if (plc === "WARN" || risk === "MEDIUM" || (typeof obs.derate_pct === "number" && obs.derate_pct > 0)) {
-      color = 0xf59e0b; // Warning Amber
-      intensity = 2.2;
-    } else if (plc === "MAINT") {
-      color = 0x3b82f6; // Maintenance Blue
-      intensity = 2.0;
-    }
-
-    if (mat.emissive) {
-      mat.emissive.setHex(color);
-      mat.emissiveIntensity = intensity;
-    }
-  }
-
-  // 3. Thermal State & Process Temperature Glow Highlighting
-  if (animComponents.hotMesh && typeof obs.process_temp_k === "number" && animComponents.hotMesh.material) {
-    const tempK = obs.process_temp_k;
-    const warning = twin && twin.forecast && twin.forecast.warning;
-    const anomaly = twin && twin.residual && twin.residual.state === "ANOMALY";
-    const mat = animComponents.hotMesh.material;
-
-    if (tempK > 316.0 || warning === "OVERTEMP") {
-      mat.emissive.setHex(0xff3300); // Hot red-orange
-      mat.emissiveIntensity = 0.8;
-    } else if (anomaly) {
-      mat.emissive.setHex(0x9333ea); // Purple anomaly marker
-      mat.emissiveIntensity = 0.65;
-    } else if (tempK > 313.0) {
-      mat.emissive.setHex(0xf59e0b); // Elevated amber
-      mat.emissiveIntensity = 0.35;
-    } else {
-      mat.emissive.setHex(0x000000);
-      mat.emissiveIntensity = 0.0;
-    }
-  }
-
-  // 4. VMC Coolant System Glow & Alarm Indication
-  if (animComponents.coolantIndicator && animComponents.coolantIndicator.material) {
-    const mat = animComponents.coolantIndicator.material;
-    const isCoolantFault = obs.active_fault === "coolant_degradation" || (twin && twin.residual && twin.residual.state === "DRIFT");
-
-    if (isCoolantFault) {
-      mat.emissive.setHex(0xef4444); // Flash coolant warning
-      mat.emissiveIntensity = 2.5;
-    } else {
-      mat.emissive.setHex(0x06b6d4); // Cool cyan flow
-      mat.emissiveIntensity = 1.0;
-    }
-  }
-
-  // 5. Compressor Pressure Gauge Needle & Tank State
-  if (typeof obs.pressure_bar === "number") {
-    const p = obs.pressure_bar;
-    if (rpmBadge && (machineId.includes("COMP") || currentTemplate === "air_compressor")) {
-      rpmBadge.textContent = `${p.toFixed(2)} BAR`;
-    }
-
-    // Drive live analog gauge needle
-    if (animComponents.gaugeNeedle) {
-      // Map 0 to 10 bar across -135° to +135°
-      const angle = (p / 10.0) * (Math.PI * 1.5) - (Math.PI * 0.75);
-      animComponents.gaugeNeedle.rotation.y = -angle; // in GLB exported orientation
-    }
-
-    // Tank highlight on low pressure
-    if (animComponents.tankMesh && animComponents.tankMesh.material) {
-      if (p < 6.0) {
-        animComponents.tankMesh.material.emissive.setHex(0xef4444);
-        animComponents.tankMesh.material.emissiveIntensity = 0.6;
-      } else {
-        animComponents.tankMesh.material.emissive.setHex(0x000000);
-        animComponents.tankMesh.material.emissiveIntensity = 0.0;
+        // Cache original material for reset
+        if (child.material) {
+          originalMaterials.set(child, child.material);
+        }
       }
     }
-  }
+  });
+}
 
-  // 6. Compressor Dependency Propagation to Downstream CNCs
-  // If compressor drops below 6.0 bar, pneumatic clamping on VMC/Lathe is flagged
-  if (animComponents.airInlet && animComponents.airInlet.material) {
-    const compObs = typeof state !== "undefined" && state.obs && state.obs["COMP-01"];
-    const compPressure = compObs ? compObs.pressure_bar : 7.2;
+// -----------------------------------------------------------------------------
+// Interactive Raycasting & Machine Highlighting
+// -----------------------------------------------------------------------------
+function setupInteractionEvents(canvas) {
+  let isDragging = false;
+  let downPos = { x: 0, y: 0 };
 
-    if (compPressure < 6.0) {
-      animComponents.airInlet.material.emissive.setHex(0xef4444); // Red pneumatic pressure drop warning
-      animComponents.airInlet.material.emissiveIntensity = 1.8;
-    } else {
-      animComponents.airInlet.material.emissive.setHex(0x000000);
-      animComponents.airInlet.material.emissiveIntensity = 0.0;
+  canvas.addEventListener("pointerdown", (e) => {
+    isDragging = false;
+    downPos = { x: e.clientX, y: e.clientY };
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+    if (dist > 5) isDragging = true;
+
+    if (!threeCamera || interactiveMeshes.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    mouseCoords.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseCoords.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouseCoords, threeCamera);
+    const intersects = raycaster.intersectObjects(interactiveMeshes, false);
+
+    if (intersects.length > 0) {
+      const targetMesh = intersects[0].object;
+      const machineId = targetMesh.userData.machineId;
+      if (machineId) {
+        canvas.style.cursor = "pointer";
+        showCanvasTooltip(e.clientX, e.clientY, machineId);
+        return;
+      }
     }
-  }
+    canvas.style.cursor = "grab";
+    hideCanvasTooltip();
+  });
 
-  // 7. Band Saw Blade Wear Tinting
-  if (animComponents.bladeMesh && typeof obs.blade_wear_pct === "number" && animComponents.bladeMesh.material) {
-    const wear = obs.blade_wear_pct;
-    const mat = animComponents.bladeMesh.material;
-    if (wear > 75.0) {
-      mat.emissive.setHex(0xef4444);
-      mat.emissiveIntensity = 0.7;
-    } else if (wear > 40.0) {
-      mat.emissive.setHex(0xd97706);
-      mat.emissiveIntensity = 0.35;
-    } else {
-      mat.emissive.setHex(0x000000);
-      mat.emissiveIntensity = 0.0;
+  canvas.addEventListener("pointerup", (e) => {
+    if (isDragging) return; // ignore orbit drags
+
+    if (!threeCamera || interactiveMeshes.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    mouseCoords.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseCoords.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouseCoords, threeCamera);
+    const intersects = raycaster.intersectObjects(interactiveMeshes, false);
+
+    if (intersects.length > 0) {
+      const machineId = intersects[0].object.userData.machineId;
+      if (machineId) {
+        if (typeof window.selectMachineIn3D === "function") {
+          window.selectMachineIn3D(machineId);
+        } else {
+          window.focusCameraOnMachine(machineId);
+        }
+      }
     }
+  });
+
+  canvas.addEventListener("pointerleave", () => {
+    canvas.style.cursor = "default";
+    hideCanvasTooltip();
+  });
+}
+
+function showCanvasTooltip(x, y, machineId) {
+  let tip = document.getElementById("canvasHoverTooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "canvasHoverTooltip";
+    tip.style.position = "fixed";
+    tip.style.pointerEvents = "none";
+    tip.style.padding = "6px 12px";
+    tip.style.background = "rgba(20, 20, 24, 0.94)";
+    tip.style.color = "#FFFFFF";
+    tip.style.fontSize = "12px";
+    tip.style.fontWeight = "600";
+    tip.style.borderRadius = "8px";
+    tip.style.border = "1px solid rgba(255, 255, 255, 0.18)";
+    tip.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
+    tip.style.zIndex = "9999";
+    tip.style.transition = "opacity 0.12s ease";
+    document.body.appendChild(tip);
+  }
+  const nameMap = {
+    "SAW-01": "Station 1 · Bar-Cutting Saw",
+    "LATHE-01": "Station 2 · CNC Slant Lathe",
+    "VMC-01": "Station 3 · CNC Milling Machine",
+    "COMP-01": "Utility · Rotary Air Compressor"
+  };
+  tip.textContent = `${nameMap[machineId] || machineId} (Click to inspect)`;
+  tip.style.left = `${x + 14}px`;
+  tip.style.top = `${y + 14}px`;
+  tip.style.opacity = "1";
+}
+
+function hideCanvasTooltip() {
+  const tip = document.getElementById("canvasHoverTooltip");
+  if (tip) tip.style.opacity = "0";
+}
+
+// Machine Highlighting (Subtle Apple-grade luminance glow on active station)
+function highlightMachineInScene(selectedId) {
+  Object.keys(machineMeshMap).forEach((id) => {
+    const meshes = machineMeshMap[id];
+    const isSelected = id === selectedId;
+
+    meshes.forEach((mesh) => {
+      const origMat = originalMaterials.get(mesh);
+      if (!origMat) return;
+
+      if (isSelected) {
+        if (origMat.emissive) {
+          mesh.material = origMat.clone();
+          mesh.material.emissive = new THREE.Color(0x1a3848);
+          mesh.material.emissiveIntensity = 0.55;
+        }
+      } else {
+        mesh.material = origMat;
+      }
+    });
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Camera Navigation Controls
+// -----------------------------------------------------------------------------
+window.focusCameraOnMachine = function (targetKey) {
+  if (!threeCamera || !orbitControls) return;
+
+  currentMachineId = targetKey;
+  const preset = getCameraPreset(targetKey);
+
+  smoothMoveCamera(preset.pos, preset.target, 850);
+  highlightMachineInScene(targetKey === "FACTORY" ? null : targetKey);
+
+  // Update Viewport HUD Info
+  const titleEl = document.getElementById("viewportMachineTitle");
+  if (titleEl) {
+    titleEl.textContent = preset.name;
   }
 };
 
-// -----------------------------------------------------------------------------
-// Procedural Fallback Builders (Preserved for offline/low-spec resilience)
-// -----------------------------------------------------------------------------
-
-function buildProceduralFallback(template) {
-  if (template === "cnc_mill") buildMillFallback();
-  else if (template === "cnc_lathe") buildLatheFallback();
-  else if (template === "bar_saw") buildSawFallback();
-  else if (template === "air_compressor") buildCompressorFallback();
-  else buildMillFallback();
-}
-
-function buildMillFallback() {
-  const baseGeom = new THREE.BoxGeometry(2.0, 0.5, 1.6);
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x222733, metalness: 0.7, roughness: 0.3 });
-  const base = new THREE.Mesh(baseGeom, baseMat);
-  base.position.y = -0.25;
-  threeScene.add(base);
-
-  const colGeom = new THREE.BoxGeometry(0.65, 1.8, 0.7);
-  const colMat = new THREE.MeshStandardMaterial({ color: 0x181d28, metalness: 0.6, roughness: 0.4 });
-  const col = new THREE.Mesh(colGeom, colMat);
-  col.position.set(0, 0.6, -0.45);
-  threeScene.add(col);
-
-  const headGeom = new THREE.BoxGeometry(0.55, 0.4, 0.7);
-  const headMat = new THREE.MeshStandardMaterial({ color: 0x2c3545, metalness: 0.6, roughness: 0.35 });
-  const head = new THREE.Mesh(headGeom, headMat);
-  head.position.set(0, 1.05, -0.15);
-  threeScene.add(head);
-
-  const spindleGroup = new THREE.Group();
-  spindleGroup.position.set(0, 0.85, 0.05);
-
-  const chuckGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.35, 32);
-  const chuckMat = new THREE.MeshStandardMaterial({ color: 0xd0d5dd, metalness: 0.9, roughness: 0.1 });
-  const chuck = new THREE.Mesh(chuckGeom, chuckMat);
-  spindleGroup.add(chuck);
-
-  const toolGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.32, 16);
-  const toolMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.2 });
-  const tool = new THREE.Mesh(toolGeom, toolMat);
-  tool.position.y = -0.28;
-  spindleGroup.add(tool);
-  threeScene.add(spindleGroup);
-
-  const pieceGeom = new THREE.BoxGeometry(0.5, 0.22, 0.5);
-  const pieceMat = new THREE.MeshStandardMaterial({ color: 0x475467, metalness: 0.5, roughness: 0.5 });
-  const piece = new THREE.Mesh(pieceGeom, pieceMat);
-  piece.position.set(0, 0.11, 0.05);
-  threeScene.add(piece);
-
-  animComponents.rotatingGroup = spindleGroup;
-  animComponents.rotationAxis = "y";
-  animComponents.hotMesh = tool;
-  animComponents.speed = 0.03;
-}
-
-function buildLatheFallback() {
-  const bedGeom = new THREE.BoxGeometry(2.4, 0.5, 1.2);
-  const bedMat = new THREE.MeshStandardMaterial({ color: 0x1f242e, metalness: 0.7, roughness: 0.3 });
-  const bed = new THREE.Mesh(bedGeom, bedMat);
-  bed.position.y = -0.25;
-  threeScene.add(bed);
-
-  const hsGeom = new THREE.BoxGeometry(0.7, 0.9, 0.9);
-  const hsMat = new THREE.MeshStandardMaterial({ color: 0x2b3342, metalness: 0.6, roughness: 0.4 });
-  const hs = new THREE.Mesh(hsGeom, hsMat);
-  hs.position.set(-0.75, 0.35, 0);
-  threeScene.add(hs);
-
-  const chuckGroup = new THREE.Group();
-  chuckGroup.position.set(-0.35, 0.35, 0);
-  chuckGroup.rotation.y = Math.PI / 2;
-
-  const chuckGeom = new THREE.CylinderGeometry(0.28, 0.28, 0.16, 32);
-  const chuckMat = new THREE.MeshStandardMaterial({ color: 0xd0d5dd, metalness: 0.9, roughness: 0.1 });
-  const chuck = new THREE.Mesh(chuckGeom, chuckMat);
-  chuck.rotation.x = Math.PI / 2;
-  chuckGroup.add(chuck);
-
-  const stockGeom = new THREE.CylinderGeometry(0.12, 0.12, 0.9, 32);
-  const stockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.7, roughness: 0.3 });
-  const stock = new THREE.Mesh(stockGeom, stockMat);
-  stock.position.y = -0.5;
-  stock.rotation.x = Math.PI / 2;
-  chuckGroup.add(stock);
-  threeScene.add(chuckGroup);
-
-  const turretGeom = new THREE.BoxGeometry(0.4, 0.5, 0.4);
-  const turretMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-  const turret = new THREE.Mesh(turretGeom, turretMat);
-  turret.position.set(0.2, 0.35, 0.3);
-  threeScene.add(turret);
-
-  animComponents.rotatingGroup = chuckGroup;
-  animComponents.rotationAxis = "z";
-  animComponents.hotMesh = stock;
-  animComponents.speed = 0.04;
-}
-
-function buildSawFallback() {
-  const tableGeom = new THREE.BoxGeometry(2.0, 0.4, 0.8);
-  const tableMat = new THREE.MeshStandardMaterial({ color: 0x1f242e, metalness: 0.6, roughness: 0.4 });
-  const table = new THREE.Mesh(tableGeom, tableMat);
-  table.position.y = -0.2;
-  threeScene.add(table);
-
-  const bladeGroup = new THREE.Group();
-  bladeGroup.position.set(0, 0.45, 0);
-
-  const wheelGeom = new THREE.CylinderGeometry(0.25, 0.25, 0.05, 32);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.2 });
-  const wheel = new THREE.Mesh(wheelGeom, wheelMat);
-  wheel.rotation.x = Math.PI / 2;
-  bladeGroup.add(wheel);
-  threeScene.add(bladeGroup);
-
-  animComponents.rotatingGroup = bladeGroup;
-  animComponents.rotationAxis = "z";
-  animComponents.speed = 0.05;
-}
-
-function buildCompressorFallback() {
-  const tankGeom = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 32);
-  const tankMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
-  const tank = new THREE.Mesh(tankGeom, tankMat);
-  tank.rotation.z = Math.PI / 2;
-  tank.position.y = 0.05;
-  threeScene.add(tank);
-
-  const fanGroup = new THREE.Group();
-  fanGroup.position.set(-0.78, 0.55, -0.1);
-
-  const hubGeom = new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16);
-  const hubMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.2 });
-  const hub = new THREE.Mesh(hubGeom, hubMat);
-  hub.rotation.z = Math.PI / 2;
-  fanGroup.add(hub);
-  threeScene.add(fanGroup);
-
-  animComponents.rotatingGroup = fanGroup;
-  animComponents.rotationAxis = "x";
-  animComponents.tankMesh = tank;
-  animComponents.speed = 0.08;
-}
-
-// -----------------------------------------------------------------------------
-// Interactive Controls & Global Window Exports
-// -----------------------------------------------------------------------------
-
-window.updateSpindleSpeed = function (rpm) {
-  if (currentMachineId && typeof state !== "undefined" && state.obs) {
-    window.updateMachineVisualization(currentMachineId, state.obs[currentMachineId], state.twin ? state.twin[currentMachineId] : null);
-  } else if (typeof rpm === "number") {
-    animComponents.speed = (rpm / 60) * (2 * Math.PI) / 60;
-  }
-};
+window.focusThreeMachine = window.focusCameraOnMachine;
 
 window.resetThreeView = function () {
-  if (threeCamera && orbitControls) {
-    if (currentMachineId === "FACTORY") {
-      threeCamera.position.set(0.5, 7.5, 11.0);
-      orbitControls.target.set(0.5, 0.8, 0);
-    } else {
-      threeCamera.position.set(2.4, 2.0, 3.2);
-      orbitControls.target.set(0, 0.65, 0);
-    }
-    orbitControls.update();
-  }
-};
-
-window.toggleThreeAnimation = function () {
-  animating = !animating;
-  const btn = document.getElementById("btnToggleAnim");
-  if (btn) btn.textContent = animating ? "Pause" : "Resume";
-  return animating;
+  window.focusCameraOnMachine("FACTORY");
 };
 
 window.showFactoryOverview = function () {
-  initThreeView("FACTORY");
-  const title = document.getElementById("threeTitle");
-  if (title) title.textContent = "3D Kinematic Twin — Complete Factory Floor";
+  window.focusCameraOnMachine("FACTORY");
+};
+
+// -----------------------------------------------------------------------------
+// Animation Playback Controls (Play / Pause / Reset)
+// -----------------------------------------------------------------------------
+window.toggleSimPlayback = function () {
+  isSimPlaying = !isSimPlaying;
+  const btn = document.getElementById("btnPlayPause");
+  if (btn) {
+    btn.innerHTML = isSimPlaying ? "⏸ Pause" : "▶ Resume";
+    btn.setAttribute("title", isSimPlaying ? "Pause 3D Kinematics" : "Resume 3D Kinematics");
+  }
+  return isSimPlaying;
+};
+
+window.resetSimPlayback = function () {
+  if (animMixer) {
+    animMixer.setTime(0);
+  }
+  if (!isSimPlaying) {
+    window.toggleSimPlayback();
+  }
+};
+
+window.toggleThreeAnimation = window.toggleSimPlayback;
+
+// -----------------------------------------------------------------------------
+// High-Fidelity Procedural Fallback Builder
+// -----------------------------------------------------------------------------
+function buildProceduralFallback() {
+  updateModelSourceBadge("Procedural Digital Twin (Active)", false);
+  currentModelSource = "procedural";
+  fallbackAnimElements = [];
+  interactiveMeshes = [];
+  machineMeshMap = { "SAW-01": [], "LATHE-01": [], "VMC-01": [], "COMP-01": [] };
+
+  // Floor
+  const floorGeom = new THREE.PlaneGeometry(28, 16);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x16181d, roughness: 0.85, metalness: 0.2 });
+  const floor = new THREE.Mesh(floorGeom, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.01;
+  threeScene.add(floor);
+
+  // Green thoroughfare walkway
+  const walkGeom = new THREE.PlaneGeometry(22, 2.2);
+  const walkMat = new THREE.MeshStandardMaterial({ color: 0x059499, roughness: 0.6 });
+  const walkway = new THREE.Mesh(walkGeom, walkMat);
+  walkway.rotation.x = -Math.PI / 2;
+  walkway.position.set(-1.0, 0.002, 1.8);
+  threeScene.add(walkway);
+
+  // Station 1: SAW-01
+  const sawGroup = new THREE.Group();
+  sawGroup.position.set(-6.7, 0, -0.8);
+  const sawBase = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.2), new THREE.MeshStandardMaterial({ color: 0x242a38, metalness: 0.7 }));
+  sawBase.position.y = 0.3;
+  sawGroup.add(sawBase);
+  const sawBow = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 0.35), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 }));
+  sawBow.position.set(0, 0.85, 0);
+  sawGroup.add(sawBow);
+  sawGroup.userData.machineId = "SAW-01";
+  sawBase.userData.machineId = "SAW-01";
+  sawBow.userData.machineId = "SAW-01";
+  threeScene.add(sawGroup);
+  interactiveMeshes.push(sawBase, sawBow);
+  machineMeshMap["SAW-01"].push(sawBase, sawBow);
+  fallbackAnimElements.push({ mesh: sawBow, axis: "z", speed: 0.02 });
+
+  // Station 2: LATHE-01
+  const latheGroup = new THREE.Group();
+  latheGroup.position.set(-2.05, 0, -1.3);
+  const latheBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.7, 1.4), new THREE.MeshStandardMaterial({ color: 0x1f242e, metalness: 0.7 }));
+  latheBase.position.y = 0.35;
+  latheGroup.add(latheBase);
+  const latheChuck = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.15, 32), new THREE.MeshStandardMaterial({ color: 0xd0d5dd, metalness: 0.9 }));
+  latheChuck.rotation.z = Math.PI / 2;
+  latheChuck.position.set(-0.5, 0.85, 0);
+  latheGroup.add(latheChuck);
+  latheBase.userData.machineId = "LATHE-01";
+  latheChuck.userData.machineId = "LATHE-01";
+  threeScene.add(latheGroup);
+  interactiveMeshes.push(latheBase, latheChuck);
+  machineMeshMap["LATHE-01"].push(latheBase, latheChuck);
+  fallbackAnimElements.push({ mesh: latheChuck, axis: "x", speed: 0.06 });
+
+  // Station 3: VMC-01
+  const vmcGroup = new THREE.Group();
+  vmcGroup.position.set(3.6, 0, -1.1);
+  const vmcBase = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.65, 2.0), new THREE.MeshStandardMaterial({ color: 0x222733, metalness: 0.7 }));
+  vmcBase.position.y = 0.32;
+  vmcGroup.add(vmcBase);
+  const vmcCol = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x181d28, metalness: 0.6 }));
+  vmcCol.position.set(0, 1.35, -0.5);
+  vmcGroup.add(vmcCol);
+  const vmcSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.45, 24), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9 }));
+  vmcSpindle.position.set(0, 1.4, 0.1);
+  vmcGroup.add(vmcSpindle);
+  vmcBase.userData.machineId = "VMC-01";
+  vmcCol.userData.machineId = "VMC-01";
+  vmcSpindle.userData.machineId = "VMC-01";
+  threeScene.add(vmcGroup);
+  interactiveMeshes.push(vmcBase, vmcCol, vmcSpindle);
+  machineMeshMap["VMC-01"].push(vmcBase, vmcCol, vmcSpindle);
+  fallbackAnimElements.push({ mesh: vmcSpindle, axis: "y", speed: 0.08 });
+
+  // Station 4: COMP-01
+  const compGroup = new THREE.Group();
+  compGroup.position.set(-8.9, 0, -6.0);
+  const compTank = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.2, 32), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 }));
+  compTank.rotation.z = Math.PI / 2;
+  compTank.position.y = 0.6;
+  compGroup.add(compTank);
+  const compFan = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 16), new THREE.MeshStandardMaterial({ color: 0x059499, metalness: 0.8 }));
+  compFan.rotation.z = Math.PI / 2;
+  compFan.position.set(-1.1, 0.8, 0);
+  compGroup.add(compFan);
+  compTank.userData.machineId = "COMP-01";
+  compFan.userData.machineId = "COMP-01";
+  threeScene.add(compGroup);
+  interactiveMeshes.push(compTank, compFan);
+  machineMeshMap["COMP-01"].push(compTank, compFan);
+  fallbackAnimElements.push({ mesh: compFan, axis: "x", speed: 0.09 });
+}
+
+// -----------------------------------------------------------------------------
+// Live Telemetry / RPM Visualization Hook
+// -----------------------------------------------------------------------------
+window.updateMachineVisualization = function (machineId, obs, twin) {
+  if (!obs) return;
+  const rpmBadge = document.getElementById("hudRpm");
+  if (rpmBadge && typeof obs.rpm === "number") {
+    rpmBadge.textContent = `${obs.rpm.toFixed(0)} RPM`;
+  }
 };
 
 window.addEventListener("resize", () => {
   if (!threeCamera || !threeRenderer) return;
-  const wrapper = document.getElementById("threeCanvasWrapper") || document.getElementById("detailView");
+  const wrapper = document.getElementById("threeCanvasWrapper");
   if (!wrapper) return;
-  const width = wrapper.clientWidth || 500;
-  threeCamera.aspect = width / 360;
+  const width = wrapper.clientWidth || 960;
+  const height = wrapper.clientHeight || 560;
+  threeCamera.aspect = width / height;
   threeCamera.updateProjectionMatrix();
-  threeRenderer.setSize(width, 360);
+  threeRenderer.setSize(width, height);
 });
 
 window.initThreeView = initThreeView;

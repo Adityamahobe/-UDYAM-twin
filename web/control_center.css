@@ -1,0 +1,1284 @@
+/* Control Center: the existing feature panels (sim controls, factory runs/datasets/learning, models, adaptive, RL,
+   Wokwi, reports), restyled for the new design. Generated from web/legacy/app.css, every rule scoped to :is(#controlCenter, #realDataHost, #simControlHost). */
+:is(#controlCenter, #realDataHost, #simControlHost) {
+  /* The old panels' design tokens, mapped to the new light design (web/app.css) */
+  --bg-primary: #F5F5F7; --bg-surface: #FFFFFF; --bg-card: #F5F5F7; --bg-card-hover: #EDEDF0; --bg-glass: rgba(255,255,255,.92);
+  --text-primary: #1D1D1F; --text-secondary: #6E6E73; --text-muted: #86868B;
+  --border-subtle: #E5E5EA; --border-focus: #0071E3;
+  --accent-blue: #0071E3; --accent-cyan: #0071E3; --accent-purple: #7D4CDB;
+  --status-ok: #1B813E; --status-warn: #B25E00; --status-crit: #D70015; --status-info: #0071E3;
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 18px;
+  color: var(--text-primary); font-size: 14px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) header {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .brand h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .badge-sim {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-crit);
+  transition: background 0.3s ease;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .status-dot.connected {
+  background: var(--status-ok);
+  box-shadow: 0 0 8px var(--status-ok);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-focus);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn-primary {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn-primary:hover {
+  background: #1d4ed8;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn-danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) main {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .line-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-card);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .line-flow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .station-node {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .station-node.active-station {
+  border-color: var(--accent-cyan);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .buffer-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .flow-arrow {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .line-kpis {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-item {
+  display: flex;
+  flex-direction: column;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-val {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-card:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-card.selected {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px #60a5fa, var(--shadow-card);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .card-title h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .hero-star {
+  color: #fbbf24;
+  font-size: 14px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-badges {
+  display: flex;
+  gap: 6px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.RUNNING,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.LOW,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.OK,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.IN_BAND,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.RUN {
+  color: var(--status-ok);
+  background: rgba(16, 185, 129, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.DERATED,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.MEDIUM,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.WARN,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.DRIFT,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.DERATE,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.STARVED,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.BLOCKED {
+  color: var(--status-warn);
+  background: rgba(245, 158, 11, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.DOWN,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.HIGH,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.CRITICAL,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.ANOMALY,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.TRIP {
+  color: var(--status-crit);
+  background: rgba(239, 68, 68, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-SIM,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-REPLAY,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE {
+  white-space: nowrap;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-SIM {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-REPLAY {
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE {
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.12);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE.src-degraded {
+  color: var(--status-warn);
+  background: rgba(245, 158, 11, 0.1);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE.src-degraded::before {
+  animation: none;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .badge-sim.live {
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.45);
+  white-space: nowrap;
+}
+@keyframes live-pulse {
+  50% { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.src-LIVE::before { animation: none; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .telemetry-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .telemetry-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .telemetry-table td {
+  padding: 5px 0;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .telemetry-table td:last-child {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .twin-section {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .twin-header {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .lower-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 20px;
+}
+@media (max-width: 1024px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .lower-layout {
+    grid-template-columns: 1fr;
+  }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--panel-pad, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap, 12px);
+  box-shadow: var(--shadow-card);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .panel-header h2 {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) select {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-card {
+  background: var(--bg-card);
+  border-left: 4px solid var(--border-subtle);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-card.INFO {
+  border-left-color: var(--status-info);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-card.WARN {
+  border-left-color: var(--status-warn);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-card.CRITICAL {
+  border-left-color: var(--status-crit);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-breakdown {
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .event-breakdown b {
+  color: var(--text-secondary);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .modal-overlay.open {
+  display: flex;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .form-group label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .form-control {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .form-control:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .calc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .calc-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .calc-card .calc-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .calc-card .calc-val {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .formula-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  min-width: 0;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-box-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-value small {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-table td {
+  padding: 4px 0;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-trend {
+  width: 100%;
+  height: 70px;
+  display: block;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-trend-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-dq ul {
+  margin: 4px 0 0 16px;
+  font-size: 12px;
+  color: var(--status-warn);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.vib-prov-measured { color: var(--accent-cyan); background: rgba(6, 182, 212, 0.12); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.vib-prov-simulated { color: #60a5fa; background: rgba(59, 130, 246, 0.1); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.vib-prov-replayed,
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.vib-prov-recorded { color: var(--accent-purple); background: rgba(139, 92, 246, 0.1); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.vib-prov-none { color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-status-ASSESSED { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-status-PROVISIONAL { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-status-UNAVAILABLE,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-status-NOT_APPLICABLE,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-status-NO_DATA,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-ml-TRAINING_NOT_CONFIGURED,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-ml-SYNTHETIC_MODEL,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-ml-INSUFFICIENT_FEATURES,
+:is(#controlCenter, #realDataHost, #simControlHost) .vib-ml-OUT_OF_DOMAIN {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 900;
+  background: var(--accent-blue); color: #fff; border: 0; border-radius: 999px;
+  padding: 12px 18px; font: 600 14px var(--font-sans); cursor: pointer; box-shadow: var(--shadow-card);
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-fab:hover { filter: brightness(1.1); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-panel {
+  position: fixed; right: 20px; bottom: 76px; z-index: 901; width: min(420px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); overflow: hidden;
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-panel.open { display: flex; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-head > div:first-child { flex: 1; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-title { font-weight: 700; color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-sub { font-size: 11px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-mode { font: 600 11px var(--font-mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-mode.on { color: var(--status-ok); border-color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-mode.off { color: var(--status-warn); border-color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-x { background: none; border: 0; color: var(--text-secondary); font-size: 16px; cursor: pointer; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg { max-width: 92%; padding: 9px 12px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.45; color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg p { margin: 0 0 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg p:last-child { margin-bottom: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg ul { margin: 4px 0 6px 18px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg code { font-family: var(--font-mono); font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg.user { align-self: flex-end; background: var(--accent-blue); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg.assistant { align-self: flex-start; background: var(--bg-card); border: 1px solid var(--border-subtle); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg.system { align-self: center; background: transparent; color: var(--text-muted); font-size: 11px; text-align: center; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-msg.thinking { color: var(--text-secondary); font-style: italic; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-h { font-weight: 700; margin: 4px 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-meta { margin-top: 6px; font: 10px var(--font-mono); color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-proposal { align-self: flex-start; max-width: 92%; padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; color: var(--text-primary);
+  background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-proposal.done { opacity: 0.7; border-style: dashed; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-actions { display: flex; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-chip { flex: none; background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); border-radius: 999px;
+  padding: 5px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-chip:hover { color: var(--text-primary); border-color: var(--border-focus); }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-form { display: flex; gap: 8px; padding: 10px 12px 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-form input { flex: 1; min-width: 0; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .chat-form input:focus { outline: none; border-color: var(--border-focus); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-body { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi { background: var(--bg-card); border-radius: var(--radius-sm); padding: 7px 9px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-label { font-size: 10.5px; color: var(--text-muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-val { font-size: 16px; font-weight: 700; margin-top: 1px; font-variant-numeric: tabular-nums; }
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-sub { font-size: 10.5px; color: var(--text-secondary); line-height: 1.35; }
+:is(#controlCenter, #realDataHost, #simControlHost) .src-tag { font-size: 9px; font-weight: 700; padding: 0 5px; border-radius: 3px; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .src-tag.sim { color: var(--accent-purple); border: 1px solid rgba(139, 92, 246, 0.45); }
+:is(#controlCenter, #realDataHost, #simControlHost) .src-tag.live { color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.45); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-rec { background: var(--bg-card); border-radius: var(--radius-sm); padding: 8px 10px; border-left: 3px solid var(--accent-purple);
+  display: flex; flex-direction: column; gap: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-rec-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-action { font-size: 13.5px; font-weight: 700; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-meta { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-q { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; font-family: var(--font-mono); font-size: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-q div { background: var(--bg-primary); border-radius: 4px; padding: 3px 4px; text-align: center; color: var(--text-muted);
+  display: flex; flex-direction: column; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-q div b { color: var(--text-secondary); font-weight: 600; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-q div.best { outline: 1px solid var(--accent-purple); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-q div.best b { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-act { margin-top: 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts figure { margin: 0; background: var(--bg-card); border-radius: var(--radius-sm); padding: 6px 8px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts figcaption { font-size: 10.5px; color: var(--text-muted); display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts svg { width: 100%; height: 54px; display: block; margin-top: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-line { fill: none; stroke: var(--accent-purple); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-zero { stroke: var(--border-subtle); stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts rect.pos { fill: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts rect.neg { fill: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-axis { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-chart-empty { height: 54px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details { background: var(--bg-card); border-radius: var(--radius-sm); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details summary { cursor: pointer; padding: 6px 9px; font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px; list-style: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details summary::-webkit-details-marker { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details summary::before { content: "▸"; color: var(--text-muted); transition: transform 0.15s; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details[open] summary::before { transform: rotate(90deg); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-details > :not(summary) { margin: 0 9px 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-method { display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-method b { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table { width: 100%; border-collapse: collapse; font-size: 10.5px; font-family: var(--font-mono); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table th,
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table td { padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); text-align: left; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table th { color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-ok { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-bad { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table-wrap { max-height: 200px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--border-subtle) transparent; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-eval td.win { color: var(--status-ok); font-weight: 700; }
+@media (max-width: 640px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-charts { grid-template-columns: 1fr; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .export-body { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .export-quick,
+:is(#controlCenter, #realDataHost, #simControlHost) .export-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+:is(#controlCenter, #realDataHost, #simControlHost) .export-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .export-body label { display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary); font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .export-body input,
+:is(#controlCenter, #realDataHost, #simControlHost) .export-body select { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 6px 8px; font-size: 12px; color-scheme: dark; }
+:is(#controlCenter, #realDataHost, #simControlHost) .export-quick .btn.active { border-color: var(--border-focus); color: var(--text-primary); }
+@media (max-width: 640px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .export-range { grid-template-columns: 1fr; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .panel-compact { --panel-pad: 12px; --panel-gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .scroll-list { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-subtle) transparent; }
+:is(#controlCenter, #realDataHost, #simControlHost) .scroll-list::-webkit-scrollbar { width: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .scroll-list::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .scroll-list::-webkit-scrollbar-track { background: transparent; }
+:is(#controlCenter, #realDataHost, #simControlHost) .list-empty { font-size: 12px; color: var(--text-muted); padding: 6px 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .list-empty.ok { color: var(--sev-info); }
+:is(#controlCenter, #realDataHost, #simControlHost) .count-pill { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-card);
+  color: var(--text-secondary); border: 1px solid var(--border-subtle); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .count-pill.crit { color: var(--sev-crit); border-color: rgba(239, 68, 68, 0.4); }
+:is(#controlCenter, #realDataHost, #simControlHost) .count-pill.crit.zero { color: var(--sev-info); border-color: rgba(16, 185, 129, 0.4); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-list { display: flex; flex-direction: column; gap: 4px; max-height: 232px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-row { flex-shrink: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px;
+  background: var(--bg-card); border-radius: var(--radius-sm); padding: 5px 8px; font-size: 12px; min-height: 34px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-row.closed { opacity: 0.55; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-id { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-title { color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-act { display: flex; gap: 4px; justify-content: flex-end; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-act .btn { padding: 3px 8px; font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .prio-pill,
+:is(#controlCenter, #realDataHost, #simControlHost) .status-pill,
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-pill { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+  border: 1px solid var(--border-subtle); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+:is(#controlCenter, #realDataHost, #simControlHost) .prio-pill.Critical,
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-pill.CRITICAL { color: var(--sev-crit); border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.1); }
+:is(#controlCenter, #realDataHost, #simControlHost) .prio-pill.High,
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-pill.WARN { color: var(--sev-warn); border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.08); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-pill.INFO { color: var(--sev-info); border-color: rgba(16, 185, 129, 0.45); }
+:is(#controlCenter, #realDataHost, #simControlHost) .status-pill.Open { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .status-pill.In-Progress,
+:is(#controlCenter, #realDataHost, #simControlHost) .status-pill.Acknowledged { color: var(--accent-cyan); }
+:is(#controlCenter, #realDataHost, #simControlHost) .status-pill.Closed { color: var(--text-muted); }
+@media (max-width: 640px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-row .status-pill { grid-column: 2; justify-self: start; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wo-act { grid-column: 3; grid-row: 1 / span 2; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; max-height: 196px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-list.empty { display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-card { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--sev-info); padding: 6px 8px; font-size: 12px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-card.WARN { border-left-color: var(--sev-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-card.CRITICAL { border-left-color: var(--sev-crit); background: rgba(239, 68, 68, 0.1); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35); }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-card.acked { opacity: 0.7; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-main { flex: 1; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-head b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-time { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-msg { color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-card.CRITICAL .alert-msg { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-actions { display: flex; flex-direction: column; gap: 3px; align-items: stretch; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-actions .btn { padding: 2px 8px; font-size: 10.5px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .alert-state { font-size: 10px; color: var(--text-muted); text-align: center; font-family: var(--font-mono); }
+:is(#controlCenter, #realDataHost, #simControlHost) .event-filters { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip { font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-subtle); background: transparent;
+  color: var(--text-secondary); cursor: pointer; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.active { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-focus); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.INFO::before,
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.WARN::before,
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.CRITICAL::before { content: ""; display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 5px; background: var(--sev-info); vertical-align: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.WARN::before { background: var(--sev-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-chip.CRITICAL::before { background: var(--sev-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .event-filters select { margin-left: auto; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); font-size: 11px; padding: 3px 6px; text-transform: capitalize; max-width: 160px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row { border-radius: 4px; flex-shrink: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row:nth-child(odd) { background: rgba(255, 255, 255, 0.015); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row.open { background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-line { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 8px 54px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px; padding: 4px 6px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-line:disabled { cursor: default; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-line:not(:disabled):hover { background: var(--bg-card-hover); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-line:focus-visible { outline: 1px solid var(--border-focus); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sev-info); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row.WARN .sev-dot { background: var(--sev-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row.CRITICAL .sev-dot { background: var(--sev-crit); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row.CRITICAL .ev-text b { color: #fca5a5; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-text b { font-weight: 600; color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-sum { color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-row.open .ev-text { white-space: normal; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-tag { font-size: 10px; color: var(--text-muted); white-space: nowrap; text-transform: capitalize; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-detail { padding: 2px 8px 8px 76px; font-size: 11.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 3px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-detail b { color: var(--text-primary); font-weight: 600; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-detail .btn { align-self: flex-start; margin-top: 3px; padding: 3px 8px; font-size: 11px; }
+@media (max-width: 640px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-line { grid-template-columns: 8px 54px minmax(0, 1fr); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-tag { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ev-detail { padding-left: 22px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .event-filters select { margin-left: 0; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-charts figure { margin: 0; background: var(--bg-card); border-radius: var(--radius-sm); padding: 6px 8px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-charts figcaption { font-size: 10.5px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-charts svg { width: 100%; height: 64px; display: block; margin-top: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-zone { stroke: var(--status-warn); stroke-dasharray: 3 3; opacity: 0.45; vector-effect: non-scaling-stroke; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-zone.cd { stroke: var(--status-crit); opacity: 0.7; }
+@media (max-width: 640px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .ims-charts { grid-template-columns: 1fr; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .cm-fig { margin: 0; background: var(--bg-card); border-radius: var(--radius-sm); padding: 6px 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cm-fig figcaption { font-size: 10.5px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .cm-chart { width: 100%; height: 90px; display: block; margin-top: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cm-true { fill: none; stroke: var(--text-secondary); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cm-chart circle { fill: var(--accent-purple); opacity: 0.8; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rl-table tr.cm-sel td { background: var(--bg-card-hover); }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch { cursor: pointer; font-family: inherit; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch:hover { filter: brightness(1.25); }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch.real.tone-ok { color: var(--status-ok); background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.5); }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch.real.tone-warn { color: var(--status-warn); background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch.real.tone-err { color: var(--status-crit); background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.5); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; padding: 8px 12px; font-size: 12px;
+  border-radius: var(--radius-md); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-left: 4px solid var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner[hidden] { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-warn { border-left-color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-err { border-left-color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-main { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-state { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-ok .rb-state { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-warn .rb-state,
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-warn { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-err .rb-state { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-facts { display: flex; gap: 14px; flex-wrap: wrap; color: var(--text-secondary); font-size: 11.5px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-facts b { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rb-note { color: var(--text-muted); font-size: 11px; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .testing-only { opacity: 0.45; pointer-events: none; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) section.testing-only { position: relative; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) section.testing-only::after { content: attr(data-testing-note); position: absolute; left: 12px; right: 12px; bottom: 8px;
+  font-size: 11px; color: var(--status-warn); }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .no-real-data,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .sim-view { position: relative; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .no-real-data::after,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .sim-view::after { content: "No real data · no real device connected (simulated values hidden)";
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary); background: var(--bg-surface); border-radius: inherit; z-index: 5; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .sim-view::after { content: "Simulated line and shop figures · hidden in Real Data mode"; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .machine-card.no-real-data::after { background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-run { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-run.RUNNING { color: var(--status-ok); border-color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-run.PAUSED { color: var(--status-warn); border-color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-run.STOPPED { color: var(--status-crit); border-color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-label { font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-sep { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-num { width: 64px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 4px 6px; font-size: 13px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-machine-bar { margin-top: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-tag { font-size: 11px; color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 14px; margin: 10px 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param-head { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param-head b { color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param-head b.changed { color: var(--accent-cyan); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param input[type=range] { width: 100%; accent-color: var(--accent-cyan); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-param small { font-size: 10px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-hint.err { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .sc-hint.ok { color: var(--status-ok); }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) #simControlsPanel .sc-hint { visibility: hidden; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-label { font-size: 10px; font-weight: 800; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px;
+  color: #fbbf24; border: 1px dashed #fbbf24; background: rgba(251, 191, 36, .08); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-body { display: flex; flex-direction: column; gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid label,
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-range { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-secondary); min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid input,
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid select,
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-range input { background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 4px 6px; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-sub { font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-top: 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-faults { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-faults label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-ranges { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-range .pair { display: flex; gap: 6px; align-items: center; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-range small { font-size: 10px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-progress { flex: 1; min-width: 120px; height: 6px; background: var(--bg-card); border-radius: 999px; overflow: hidden; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-progress div { height: 100%; width: 0; background: var(--accent-cyan); transition: width .3s; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-item { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 12px; background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-item .row1 { display: flex; justify-content: space-between; gap: 8px; color: var(--text-primary); flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-item .row2 { color: var(--text-muted); font-size: 11px; margin: 2px 0 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-item .acts { display: flex; gap: 4px; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-item .acts .btn { padding: 2px 8px; font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) #synthPanel [hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) #modelPanel [hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-gate { font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-gate summary { cursor: pointer; color: var(--accent-cyan); font-weight: 700; font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-gate ul { margin: 4px 0 0 18px; padding: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-versions { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 8px; background: var(--bg-card); font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v.production { border-color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .tag.production { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .tag.candidate { color: var(--accent-cyan); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .tag.rejected_by_gate { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .tag.archived { color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v .on { color: var(--text-muted); font-size: 11px; margin: 2px 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 4px 0; font-variant-numeric: tabular-nums; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-table th,
+:is(#controlCenter, #realDataHost, #simControlHost) .md-table td { padding: 2px 4px; text-align: right; border-bottom: 1px solid var(--border-subtle); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-table th:first-child,
+:is(#controlCenter, #realDataHost, #simControlHost) .md-table td:first-child { text-align: left; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-checks { font-size: 11px; margin: 2px 0 4px 16px; padding: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-checks .ok { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-checks .bad { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.OK { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.WATCH,
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.NO_BASELINE,
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.INSUFFICIENT_DATA { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.DRIFT,
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-status.OUT_OF_DISTRIBUTION { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ad-src.LIVE { color: var(--status-ok); font-weight: 700; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-v.retracted { opacity: .5; }
+:is(#controlCenter, #realDataHost, #simControlHost) #whatifPanel [hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) #whatifPanel { --wi-1: #3987e5; --wi-2: #d95926; --wi-3: #199e70; --wi-4: #c98500; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-scenarios { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px; background: var(--bg-card);
+  display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-width: 0; border-top: 3px solid var(--wi-c); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc input,
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc select { background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 3px 5px; font-size: 12px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc .head { display: flex; gap: 6px; align-items: center; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc .head input { flex: 1; font-weight: 700; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc .base-tag { font-size: 10px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-sc .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-chip { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-chip button { background: none; border: 0; color: var(--text-muted); cursor: pointer; padding: 0 0 0 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-row select,
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-row input { flex: 1 1 70px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-x { background: none; border: 0; color: var(--text-muted); cursor: pointer; font-size: 14px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table th,
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table th:first-child,
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table td:first-child { text-align: left; white-space: normal; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table th { color: var(--text-primary); font-weight: 700; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table th .sw { display: inline-block; width: 10px; height: 3px; border-radius: 2px; background: var(--wi-c); vertical-align: middle; margin-right: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table .d { font-size: 10px; display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table .better { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table .worse { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table-wrap { overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-chart { position: relative; margin-top: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-chart svg { width: 100%; height: 200px; display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-legend i { display: inline-block; width: 14px; height: 2px; background: var(--wi-c); vertical-align: middle; margin-right: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-tip { position: absolute; pointer-events: none; background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 4px 8px; font-size: 11px; color: var(--text-primary); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-alerts { font-size: 11px; color: var(--text-secondary); margin-top: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-alerts div b { color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) #whatifPanel,
+:is(#controlCenter, #realDataHost, #simControlHost) #synthPanel,
+:is(#controlCenter, #realDataHost, #simControlHost) #modelPanel,
+:is(#controlCenter, #realDataHost, #simControlHost) #adaptivePanel,
+:is(#controlCenter, #realDataHost, #simControlHost) #simControlsPanel { min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table-wrap { max-width: 100%; }
+:is(#controlCenter, #realDataHost, #simControlHost) .lower-layout > * { min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table th { white-space: normal; min-width: 90px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tabs { display: flex; gap: 4px; position: sticky; top: var(--header-h, 58px); z-index: 40; padding: 4px;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  overflow-x: auto; scrollbar-width: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tabs::-webkit-scrollbar { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0;
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tab[aria-selected="true"] { color: var(--text-primary); background: var(--bg-card-hover); box-shadow: inset 0 -2px 0 var(--accent-cyan); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--status-crit); color: #fff;
+  font-size: 11px; line-height: 18px; text-align: center; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .ws-tab.ws-testing { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-pane[hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 12px; align-items: start; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > * { min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > #whatifPanel { grid-column: 1 / -1; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-id { font-size: 11px; color: var(--text-muted); margin-top: -4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-metric { background: var(--bg-card); border-radius: var(--radius-sm); padding: 6px 8px; display: flex; flex-direction: column; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-metric span { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-metric b { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-metric small { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-foot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-foot .pill { font-size: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-frozen { color: var(--status-crit); font-size: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mc-warn { background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 4px 6px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) main { padding: 12px 16px; gap: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) header { padding: 8px 16px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .line-banner { padding: 10px 14px; gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-card { padding: 10px 12px; gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-card:hover { transform: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .lower-layout { gap: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .panel { --panel-pad: 12px; --panel-gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .panel-header { padding-bottom: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-body { gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .md-versions { max-height: 360px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .card-header { flex-wrap: wrap; gap: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .card-title { min-width: 0; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .machine-badges .pill { white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table-wrap { max-height: 420px; overflow: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
+:is(#controlCenter, #realDataHost, #simControlHost) #recentPanel { flex: 1; min-height: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-wrap { max-height: 560px; overflow: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table th { position: sticky; top: 0; background: var(--bg-surface); text-align: left; color: var(--text-muted);
+  font-weight: 600; font-size: 11px; padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); z-index: 1; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table td:first-child { font-family: var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table td:nth-child(2),
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table td:nth-child(3) { white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table tr.rc-new td { animation: rc-flash 1.6s ease-out; }
+@keyframes rc-flash { from { background: rgba(6, 182, 212, 0.16); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-table tr.rc-new td { animation: none; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-kind { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-kind.alert { color: var(--status-warn); border-color: currentColor; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-kind.work_order { color: var(--accent-cyan); border-color: currentColor; }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-src { font-size: 10px; font-weight: 700; margin-left: 4px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-src.LIVE { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-sev-CRITICAL { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .rc-sev-WARN { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) #rcPause[aria-pressed="true"] { color: var(--status-warn); border-color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > .ws-col { align-self: stretch; }
+:is(#controlCenter, #realDataHost, #simControlHost) #recentPanel { flex: 1 1 0; min-height: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) #recentPanel .rc-wrap { flex: 1 1 0; min-height: 240px; max-height: none; }
+@media (max-width: 1040px) {
+:is(#controlCenter, #realDataHost, #simControlHost) #recentPanel { flex: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) #recentPanel .rc-wrap { flex: none; max-height: 480px; }
+}
+body:not(.real-mode) :is(#controlCenter, #realDataHost, #simControlHost) .real-only { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .mode-switch.real.tone-virtual { color: #c4b5fd; background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.55); }
+:is(#controlCenter, #realDataHost, #simControlHost) #wokwiPanel { border-color: rgba(139, 92, 246, 0.45); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-ok { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-warn { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-err { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-facts code { font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-card { background: var(--bg-card); border: 1px dashed rgba(139, 92, 246, 0.55); border-radius: var(--radius-md);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-card.wk-dim .wk-metrics { opacity: .55; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-card .mc-metric { background: var(--bg-surface); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.wk-src { color: #c4b5fd; border-color: rgba(139, 92, 246, 0.6); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.wk-virtual { color: #fbbf24; border-color: rgba(251, 191, 36, 0.55); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.wk-ok { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.wk-warn { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .pill.wk-err { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-fault { color: var(--status-warn); margin-left: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-more { font-size: 11px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-more summary { cursor: pointer; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-more div { margin-top: 3px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-circuit-wrap { margin-top: 10px; border: 1px dashed rgba(139, 92, 246, 0.45); border-radius: var(--radius-md); padding: 8px 10px; background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-circuit-title { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-circuit-title span { font-weight: 500; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-circuit-scroll { overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wk-circuit { display: block; width: 100%; min-width: 620px; height: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) #wkCircuit[hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-fit { position: relative; width: 100%; overflow: hidden; background: #2b2b2b; border-radius: var(--radius-sm); margin-top: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-wires { position: absolute; left: 0; top: 0; overflow: visible; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-stage > :not(svg):not(.wkc-label) { z-index: 1; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label { position: absolute; z-index: 2; white-space: nowrap; font-size: 11px; line-height: 1.3; color: #e5e7eb;
+  background: rgba(17, 24, 39, 0.82); border: 1px solid rgba(255, 255, 255, 0.12); border-left: 3px solid #94a3b8;
+  border-radius: 4px; padding: 2px 6px; display: flex; flex-direction: column; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label.vs { border-left-color: #a78bfa; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label.sw { border-left-color: #fbbf24; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label span { color: #cbd5e1; font-size: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label em { font-style: normal; font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: #fff; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label em:empty { display: none; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label em.stale { color: #9ca3af; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label.alert { border-color: #ef4444; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-label.alert em { color: #fca5a5; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-stale .wkc-stage > :not(.wkc-label):not(svg) { filter: saturate(.55) brightness(.85); }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-legend i.vs { background: #a78bfa; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wkc-legend i.sw { background: #fbbf24; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(3, 7, 18, 0.62); display: flex;
+  align-items: center; justify-content: center; padding: 16px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog { width: min(440px, 100%); background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog-input { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 8px 10px; font-size: 14px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ud-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) header .testing-only,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .sim-view,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .machine-card.no-real-data,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) #machineGrid.rd-empty,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) #detailView.no-real-data,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) #vibrationPanel.no-real-data,
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .lower-layout.rd-solo > .ws-col:first-child { display: none !important; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .lower-layout.rd-solo { grid-template-columns: 1fr; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner .rb-virtual { color: #c4b5fd; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner .rb-ro { color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-virtual { border-left-color: #a78bfa; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner.tone-virtual .rb-state { color: #c4b5fd; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner .rb-future { font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed var(--border-subtle); padding-top: 5px; margin-top: 2px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .real-banner .rb-future b { color: var(--text-secondary); }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) #workOrdersPanel { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) #factoryRunPanel [hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > #factoryRunPanel { grid-column: 1 / -1; }
+:is(#controlCenter, #realDataHost, #simControlHost) #factoryRunPanel { --wi-1: #3987e5; --wi-2: #d95926; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid label.fr-check { flex-direction: row; align-items: center; gap: 6px; align-self: end; padding-bottom: 6px; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .synth-grid label.fr-check input { width: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-events { overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11px; padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table td { padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table input,
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table select { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 3px 5px; font-size: 12px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table input[type=number] { width: 64px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-table .fr-at { width: 56px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-args { display: flex; gap: 4px; align-items: center; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-run { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-subtle); padding-top: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-batch { background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px 8px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-batch .sc-num { width: 52px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-kpis { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-kpis b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-lanes svg { width: 100%; min-width: 560px; height: auto; display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-lanes { overflow-x: auto; background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table.fr-left td,
+:is(#controlCenter, #realDataHost, #simControlHost) .wi-table.fr-left th { text-align: left; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-ok { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-miss { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fr-alert { white-space: normal !important; max-width: 320px; color: var(--text-secondary); font-size: 11px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > #factoryDatasetPanel { grid-column: 1 / -1; }
+:is(#controlCenter, #realDataHost, #simControlHost) #factoryDatasetPanel { --wi-1: #3987e5; --wi-2: #d95926; }
+:is(#controlCenter, #realDataHost, #simControlHost) #factoryDatasetPanel [hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) #factoryDatasetPanel .fr-batch input[type=text] { width: 180px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-sel td { background: var(--bg-card); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-actions { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-warn { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-detail { border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 6px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 900px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-cols { grid-template-columns: 1fr; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--text-secondary); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks li { padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks b { color: var(--text-primary); font-weight: 600; margin-right: 4px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks .fd-pass b { color: var(--status-ok); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks .fd-warn b { color: var(--status-warn); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-checks .fd-fail b { color: var(--status-crit); }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-chart,
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-trace { background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px; margin: 4px 0; overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-chart svg,
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-trace svg { width: 100%; min-width: 420px; height: auto; display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fd-read { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+:is(#controlCenter, #realDataHost, #simControlHost) #fdRecipe { overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) #fdRecipe td.sc-label { white-space: normal; min-width: 160px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid > #factoryLearningPanel { grid-column: 1 / -1; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+@media (max-width: 1100px) {
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kinds { grid-template-columns: 1fr; }
+}
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kind { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kind h3 { margin: 0; font-size: 13px; display: flex; justify-content: space-between; gap: 6px; align-items: center; flex-wrap: wrap; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kind .md-versions { max-height: 520px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-kind .md-table { overflow-x: auto; display: block; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-what { font-size: 11px; color: var(--text-muted); }
+:is(#controlCenter, #realDataHost, #simControlHost) #flLive { overflow-x: auto; }
+:is(#controlCenter, #realDataHost, #simControlHost) .fl-p { color: var(--text-muted); font-size: 11px; }
+
+/* Control Center frame in the new design */
+:is(#controlCenter, #realDataHost, #simControlHost) { margin-top: 28px; text-align: left; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cc-tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 18px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cc-tab { border: 1px solid var(--border-subtle); background: #FFFFFF; color: var(--text-primary); border-radius: 999px;
+  padding: 8px 16px; font: 600 13px var(--font-sans); cursor: pointer; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cc-tab[aria-selected="true"] { background: #1D1D1F; color: #FFFFFF; border-color: #1D1D1F; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cc-pane[hidden] { display: none !important; }
+:is(#controlCenter, #realDataHost, #simControlHost) .ws-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; }
+:is(#controlCenter, #realDataHost, #simControlHost) .panel { background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+:is(#controlCenter, #realDataHost, #simControlHost) input, :is(#controlCenter, #realDataHost, #simControlHost) select, :is(#controlCenter, #realDataHost, #simControlHost) textarea { background: #FFFFFF; color: var(--text-primary); border-color: var(--border-subtle); }
+
+/* On-page confirm / prompt (web/dialog.js) — appended to <body>, so styled here outside :is(#controlCenter, #realDataHost, #simControlHost) */
+.ud-dialog-backdrop { position: fixed; inset: 0; z-index: 3000; background: rgba(0, 0, 0, 0.35); display: flex;
+  align-items: center; justify-content: center; padding: 16px; font-family: var(--font-sans); }
+.ud-dialog { width: min(440px, 100%); background: #FFFFFF; border: 1px solid #E5E5EA; border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.ud-dialog-title { font-size: 15px; font-weight: 700; color: #1D1D1F; }
+.ud-dialog-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: #6E6E73; }
+.ud-dialog-input { background: #FFFFFF; color: #1D1D1F; border: 1px solid #D2D2D7; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+.ud-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.ud-dialog .btn { border: 1px solid #D2D2D7; background: #FFFFFF; color: #1D1D1F; border-radius: 999px; padding: 7px 14px; font: 600 13px var(--font-sans); cursor: pointer; }
+.ud-dialog .btn-primary { background: #0071E3; border-color: #0071E3; color: #FFFFFF; }
+.ud-dialog .btn-danger { background: #D70015; border-color: #D70015; color: #FFFFFF; }
+:is(#controlCenter, #realDataHost, #simControlHost) .cc-testing-note { text-align: center; color: var(--text-secondary); font-size: 14px; margin: 8px 0 16px; }
+body.real-mode :is(#controlCenter, #realDataHost, #simControlHost) .cc-testing-note { display: none; }
+
+/* Real Data section (#real-data): only in Real Data mode */
+body:not(.real-mode) #real-data, body:not(.real-mode) .real-only-link { display: none !important; }
+#realDataHost { margin-top: 24px; text-align: left; }
+#realDataHost .real-banner { background: #FFFFFF; border: 1px solid #E5E5EA; border-left: 4px solid #7D4CDB; border-radius: 14px; padding: 12px 16px; font-size: 13px; }
+#realDataHost .real-banner .rb-virtual, #realDataHost .real-banner.tone-virtual .rb-state { color: #7D4CDB; }
+#realDataHost #wokwiPanel { grid-column: 1 / -1; }
+
+
+/* Advisor chat (web/chat.js: floating "Ask the Twin" button + panel, appended to <body>). Rules from
+   web/legacy/app.css; the old design tokens are mapped to the new light design for these two elements. */
+#chatFab, #chatPanel {
+  --bg-primary: #F5F5F7; --bg-surface: #FFFFFF; --bg-card: #F5F5F7; --text-primary: #1D1D1F; --text-secondary: #6E6E73;
+  --text-muted: #86868B; --border-subtle: #E5E5EA; --border-focus: #0071E3; --accent-blue: #0071E3; --status-ok: #1B813E;
+  --status-warn: #B25E00; --radius-sm: 10px; --radius-md: 14px; --radius-lg: 20px; --shadow-card: 0 12px 40px rgba(0,0,0,.14);
+  font-family: var(--font-sans);
+}
+.chat-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 900;
+  background: var(--accent-blue); color: #fff; border: 0; border-radius: 999px;
+  padding: 12px 18px; font: 600 14px var(--font-sans); cursor: pointer; box-shadow: var(--shadow-card);
+}
+.chat-fab:hover { filter: brightness(1.1); }
+.chat-panel {
+  position: fixed; right: 20px; bottom: 76px; z-index: 901; width: min(420px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); overflow: hidden;
+}
+.chat-panel.open { display: flex; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-card); }
+.chat-head > div:first-child { flex: 1; min-width: 0; }
+.chat-title { font-weight: 700; color: var(--text-primary); }
+.chat-sub { font-size: 11px; color: var(--text-secondary); }
+.chat-mode { font: 600 11px var(--font-mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.chat-mode.on { color: var(--status-ok); border-color: var(--status-ok); }
+.chat-mode.off { color: var(--status-warn); border-color: var(--status-warn); }
+.chat-x { background: none; border: 0; color: var(--text-secondary); font-size: 16px; cursor: pointer; }
+.chat-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.chat-msg { max-width: 92%; padding: 9px 12px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.45; color: var(--text-primary); }
+.chat-msg p { margin: 0 0 6px; } .chat-msg p:last-child { margin-bottom: 0; }
+.chat-msg ul { margin: 4px 0 6px 18px; } .chat-msg code { font-family: var(--font-mono); font-size: 12px; }
+.chat-msg.user { align-self: flex-end; background: var(--accent-blue); }
+.chat-msg.assistant { align-self: flex-start; background: var(--bg-card); border: 1px solid var(--border-subtle); }
+.chat-msg.system { align-self: center; background: transparent; color: var(--text-muted); font-size: 11px; text-align: center; }
+.chat-msg.thinking { color: var(--text-secondary); font-style: italic; }
+.chat-h { font-weight: 700; margin: 4px 0; }
+.chat-meta { margin-top: 6px; font: 10px var(--font-mono); color: var(--text-muted); }
+.chat-proposal { align-self: flex-start; max-width: 92%; padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; color: var(--text-primary);
+  background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warn); }
+.chat-proposal.done { opacity: 0.7; border-style: dashed; }
+.chat-actions { display: flex; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.chat-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; }
+.chat-chip { flex: none; background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); border-radius: 999px;
+  padding: 5px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.chat-chip:hover { color: var(--text-primary); border-color: var(--border-focus); }
+.chat-form { display: flex; gap: 8px; padding: 10px 12px 12px; }
+.chat-form input { flex: 1; min-width: 0; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; }
+.chat-form input:focus { outline: none; border-color: var(--border-focus); }
+.chat-msg.user { color: #FFFFFF; }
+.chat-panel .btn { border: 1px solid #0071E3; background: #0071E3; color: #FFFFFF; border-radius: 999px; padding: 7px 16px; font: 600 13px var(--font-sans); cursor: pointer; }
+.chat-panel .chat-actions .btn { padding: 5px 12px; font-size: 12px; }
+.chat-panel .chat-actions .btn:not(.btn-primary) { background: #FFFFFF; color: #1D1D1F; border-color: #D2D2D7; }
+.chat-fab { box-shadow: 0 8px 24px rgba(0,113,227,.35); }
+@media (max-width: 600px) { .chat-fab { right: 14px; bottom: 14px; } .chat-panel { right: 8px; bottom: 70px; } }

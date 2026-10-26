@@ -6,23 +6,27 @@
   <title>UDYAM-TWIN Sign In</title>
   <link rel="stylesheet" href="/static/app.css">
   <style>
-    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg-primary); }
-    .login-card { flex: 0 0 auto; height: auto; margin: auto; width: 100%; max-width: 380px; background: var(--bg-surface); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg); padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: #F5F5F7; }
+    .login-card { flex: 0 0 auto; height: auto; margin: auto; width: 100%; max-width: 380px; background: #FFFFFF; border: 1px solid #E5E5EA;
+      border-radius: 18px; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; }
     .login-card h1 { margin: 0; font-size: 22px; letter-spacing: .02em; color: var(--text-primary); }
     .login-card .sub { margin: -8px 0 4px; color: var(--text-secondary); font-size: 13px; }
     .login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
-    .login-card input { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm); padding: 9px 10px; font-size: 14px; }
-    .login-card input:focus { outline: none; border-color: var(--border-focus); }
-    .login-card .btn { width: 100%; justify-content: center; padding: 9px; font-size: 14px; }
+    .login-card input { background: #FFFFFF; color: var(--text-primary); border: 1px solid #E5E5EA;
+      border-radius: 10px; padding: 9px 10px; font-size: 14px; }
+    .login-card input:focus { outline: none; border-color: #0071E3; }
+    .login-card .btn { width: 100%; display: flex; justify-content: center; padding: 10px; font: 600 14px var(--font-sans);
+      border-radius: 999px; border: 1px solid #D2D2D7; background: #FFFFFF; color: #1D1D1F; cursor: pointer; }
+    .login-card .btn-primary { background: #0071E3; border-color: #0071E3; color: #FFFFFF; }
+    .login-card .btn:disabled { opacity: .6; cursor: default; }
+    .login-card { box-shadow: 0 8px 30px rgba(0,0,0,.06); }
     .login-or { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
-    .login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--border-subtle); }
+    .login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid #E5E5EA; }
     .login-links { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; flex-wrap: wrap; }
-    .login-links button { background: none; border: none; color: var(--accent-cyan); cursor: pointer; padding: 0; font-size: 12px; }
+    .login-links button { background: none; border: none; color: #0071E3; cursor: pointer; padding: 0; font-size: 12px; }
     .login-msg { font-size: 13px; min-height: 18px; color: var(--text-secondary); }
-    .login-msg.err { color: var(--status-crit); }
-    .login-msg.ok { color: var(--status-ok); }
+    .login-msg.err { color: #D70015; }
+    .login-msg.ok { color: #1B813E; }
     .login-card [hidden] { display: none !important; }
   </style>
 </head>

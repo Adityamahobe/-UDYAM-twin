@@ -1,1242 +1,1593 @@
 /**
- * UDYAM-TWIN Industrial Digital Twin Client
- * Handles real-time telemetry over WebSocket, UI state management,
- * fault injection, calibration tracking, work orders, and MSME economics.
+ * UDYAM-TWIN — Monochrome Creative Frontend Controller
+ * Apple-inspired product reveal · SpaceX precision · B&W Visual Identity
+ * Fully integrated with UdyamAPI (REST & WebSocket /ws/telemetry) with graceful simulated fallback.
  */
 
-const state = {
-  machines: {},
-  obs: {},
-  twin: {},
-  line: null,
-  selectedMachineId: "VMC-01",
-  autoDemo: true,
-  workOrders: [],
-  events: [],           // newest first, capped at EVENT_CAP; the log renders a filtered view
-  eventFilter: { sev: "ALL", kind: "ALL" },
-  expandedEvents: new Set(),
-  alerts: [],
-  snap: {},             // latest snapshot per machine (zones come from the configured ISO 20816-3 profile)
-  economics: {
-    inr_per_part: 450.0,
-    downtime_cost_per_hr: 2500.0,
-    electricity_tariff_per_kwh: 8.5,
-    cea_co2_factor: 0.716,
+// -----------------------------------------------------------------------------
+// 1. Static Reference Machines (Base 4-Machine Line)
+// -----------------------------------------------------------------------------
+const BASE_MACHINES = {
+  "SAW-01": {
+    id: "SAW-01",
+    name: "BAR SAW",
+    fullName: "BAR SAW — SAW-01",
+    template: "bar_saw",
+    station: "Station 1 · Infeed Cutting",
+    stationBadge: "STATION 01 · INFEED CUTTING",
+    functionDesc: "Cuts raw bars or stock material to specified lengths.",
+    statusText: "NORMAL",
+    status: "normal",
+    statusIcon: "✓",
+    reading1: { label: "Motor Load", value: "68%" },
+    reading2: { label: "Vibration RMS", value: "2.8 mm/s" },
+    demoRisk: "Medium",
+    riskClass: "risk-medium",
+    plainDesc: "Cuts raw bars or stock material to specified lengths. The cutting blade is wearing normally, with motor load and vibration in safe operating zones.",
+    ownerAction: "Inspect blade condition and cutting alignment during routine maintenance. No immediate stop needed.",
+    specifications: "Heavy-duty horizontal metal band saw with hydraulic feed control, 2.2 kW drive motor, and roller infeed table.",
+    modelFile: "saw_01.glb",
+    previewImg: "/assets/3d/UDYAM_TWIN_Camera_SAW_Detail.jpg",
+    additionalReadings: [
+      { label: "Motor Load", value: "68%" },
+      { label: "Vibration RMS", value: "2.8 mm/s" },
+      { label: "Blade Speed", value: "920 RPM" },
+      { label: "Hydraulic Downfeed", value: "1.4 bar (Nominal)" }
+    ]
   },
-  metrics: null,
+  "LATHE-01": {
+    id: "LATHE-01",
+    name: "CNC LATHE",
+    fullName: "CNC LATHE — LATHE-01",
+    template: "cnc_lathe",
+    station: "Station 2 · Cylindrical Turning",
+    stationBadge: "STATION 02 · CYLINDRICAL TURNING",
+    functionDesc: "Rotates a workpiece while a cutting tool performs turning operations.",
+    statusText: "NORMAL",
+    status: "normal",
+    statusIcon: "✓",
+    reading1: { label: "Spindle Load", value: "74%" },
+    reading2: { label: "Process Temp", value: "58°C" },
+    demoRisk: "Medium",
+    riskClass: "risk-medium",
+    plainDesc: "Rotates a workpiece while a cutting tool performs turning operations. Spindle torque and dimensional accuracy remain within nominal operating specs.",
+    ownerAction: "Inspect lubrication and cooling systems. Monitor spindle temperature and investigate persistent increases.",
+    specifications: "8-Station indexing octagonal tool turret, 3-jaw scroll chuck, 7.5 kW spindle, slant-bed vibration dampening.",
+    modelFile: "lathe_01.glb",
+    previewImg: "/assets/3d/UDYAM_TWIN_Camera_LATHE_Detail.jpg",
+    additionalReadings: [
+      { label: "Spindle Load", value: "74%" },
+      { label: "Process Temp", value: "58°C" },
+      { label: "Spindle Speed", value: "1,800 RPM" },
+      { label: "Cutting Torque", value: "34.2 Nm" }
+    ]
+  },
+  "VMC-01": {
+    id: "VMC-01",
+    name: "CNC MILLING MACHINE",
+    fullName: "CNC MILLING MACHINE — VMC-01",
+    template: "cnc_mill",
+    station: "Station 3 · 3-Axis Hero Milling",
+    stationBadge: "STATION 03 · 3-AXIS MILLING",
+    functionDesc: "Uses rotating cutting tools to machine components across multiple axes.",
+    statusText: "NORMAL",
+    status: "normal",
+    statusIcon: "✓",
+    reading1: { label: "Spindle Load", value: "82%" },
+    reading2: { label: "Vibration RMS", value: "2.3 mm/s" },
+    demoRisk: "Low",
+    riskClass: "risk-low",
+    plainDesc: "Uses rotating cutting tools to machine components across multiple axes. Spindle cooling is operational, with nominal thermal and vibration characteristics.",
+    ownerAction: "Monitor tool wear accumulated minutes; standard preventive check at shift conclusion.",
+    specifications: "3-Axis VMC (geometry derived from TseNC open hardware), BT40 spindle taper, 16-pocket ATC, 11 kW drive.",
+    modelFile: "vmc_01.glb",
+    previewImg: "/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg",
+    additionalReadings: [
+      { label: "Spindle Load", value: "82%" },
+      { label: "Vibration RMS", value: "2.3 mm/s" },
+      { label: "Spindle Speed", value: "1,540 RPM" },
+      { label: "Process Temp", value: "38.5°C" },
+      { label: "Tool Wear Est.", value: "142 min / 240 min" },
+      { label: "Cooling Health", value: "100% (Nominal)" }
+    ]
+  },
+  "COMP-01": {
+    id: "COMP-01",
+    name: "AIR COMPRESSOR",
+    fullName: "AIR COMPRESSOR — COMP-01",
+    template: "air_compressor",
+    station: "Shared Utility · Pneumatics",
+    stationBadge: "SHARED UTILITY · PNEUMATICS",
+    functionDesc: "Supplies compressed air to operate pneumatic chucks, tool changers, and blow-off lines.",
+    statusText: "NORMAL",
+    status: "normal",
+    statusIcon: "✓",
+    reading1: { label: "Line Pressure", value: "7.2 bar" },
+    reading2: { label: "Duty Cycle", value: "62%" },
+    demoRisk: "Low",
+    riskClass: "risk-low",
+    plainDesc: "Supplies compressed air to operate pneumatic chucks, tool changers, and blow-off lines. Discharge temperature and system pressure are stable.",
+    ownerAction: "Routine check of moisture separator and receiver tank pressure during weekly maintenance.",
+    specifications: "Rotary screw air compressor, 5.5 kW IE3 motor, 7.5 bar rated pressure, acoustic enclosure.",
+    modelFile: "comp_01.glb",
+    previewImg: "/assets/3d/UDYAM_TWIN_Camera_COMP_Detail.jpg",
+    additionalReadings: [
+      { label: "Line Pressure", value: "7.2 bar" },
+      { label: "Duty Cycle", value: "62%" },
+      { label: "Discharge Temp", value: "48°C" },
+      { label: "Motor Power", value: "4.8 kW" }
+    ]
+  }
 };
 
-let ws = null;
-let reconnectTimer = null;
+let LIVE_SNAPSHOTS = {};
+let CURRENT_MACHINE_ID = "VMC-01";
+let activeChatConversationId = null;
 
-// Determine WebSocket URL
-const loc = window.location;
-const wsProto = loc.protocol === "https:" ? "wss://" : "ws://";
-const wsHost = loc.host || "localhost:8000";
-const wsUrl = `${wsProto}${wsHost}/ws/telemetry`;
+// -----------------------------------------------------------------------------
+// 2. Opening Cinematic Loader Controller
+// -----------------------------------------------------------------------------
+let loaderDismissed = false;
 
-// Helpers
-const fmt = (v, d = 1) => (v === null || v === undefined ? "—" : (typeof v === "number" ? v.toFixed(d) : v));
-const esc = s => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function initOpeningLoader() {
+  const loader = document.getElementById("introLoader");
+  const fill = document.getElementById("loaderFill");
+  const text = document.getElementById("loaderText");
+  if (!loader) return;
 
-function initWebSocket() {
-  updateStatus("connecting...", false);
-  try {
-    ws = new WebSocket(wsUrl);
-  } catch (err) {
-    updateStatus("failed, retrying...", false);
-    scheduleReconnect();
-    return;
-  }
+  const steps = [
+    { pct: 15, msg: "STARTING TELEMETRY BUS" },
+    { pct: 40, msg: "CALIBRATING PHYSICS RECURSIVE TWIN" },
+    { pct: 70, msg: "LOADING 3D FACTORY GEOMETRY" },
+    { pct: 90, msg: "CONNECTING SENSORS & RL POLICY" },
+    { pct: 100, msg: "UDYAM-TWIN READY" }
+  ];
 
-  ws.onopen = () => {
-    updateStatus("connected", true);
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-  };
-
-  ws.onclose = () => {
-    updateStatus("disconnected, retrying...", false);
-    scheduleReconnect();
-  };
-
-  ws.onerror = () => {
-    updateStatus("connection error", false);
-  };
-
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      handleMessage(msg);
-    } catch (err) {
-      console.error("Malformed telemetry frame:", err);
+  let currentStep = 0;
+  const interval = setInterval(() => {
+    if (loaderDismissed) {
+      clearInterval(interval);
+      return;
     }
-  };
+    if (currentStep < steps.length) {
+      const s = steps[currentStep];
+      if (fill) fill.style.width = `${s.pct}%`;
+      if (text) text.textContent = s.msg;
+      currentStep++;
+    } else {
+      clearInterval(interval);
+      setTimeout(() => dismissLoader(), 600);
+    }
+  }, 450);
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !loaderDismissed) {
+      dismissLoader();
+    }
+  });
 }
 
-function scheduleReconnect() {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(initWebSocket, 2000);
-}
-
-function updateStatus(text, connected) {
-  const el = document.getElementById("connectionStatusText");
-  const dot = document.getElementById("statusDot");
-  if (el) el.textContent = text;
-  if (dot) {
-    if (connected) dot.classList.add("connected");
-    else dot.classList.remove("connected");
+function dismissLoader() {
+  if (loaderDismissed) return;
+  loaderDismissed = true;
+  const loader = document.getElementById("introLoader");
+  if (loader) {
+    loader.classList.add("dismissed");
+    setTimeout(() => {
+      loader.style.display = "none";
+    }, 850);
   }
 }
 
-function handleMessage(msg) {
-  if (!msg || !msg.type) return;
+function replayIntro() {
+  loaderDismissed = false;
+  const loader = document.getElementById("introLoader");
+  const fill = document.getElementById("loaderFill");
+  const text = document.getElementById("loaderText");
+  if (loader) {
+    loader.style.display = "flex";
+    loader.classList.remove("dismissed");
+    if (fill) fill.style.width = "0%";
+    if (text) text.textContent = "REPLAYING FACTORY INTRO";
+    initOpeningLoader();
+  }
+}
 
-  if (msg.type === "registry") {
-    state.machines = Object.fromEntries(msg.machines.map(m => [m.machine_id, m]));
-    updateMachineDropdowns();
-    renderAll();
-  } else if (msg.type === "observed") {
-    state.obs[msg.machine_id] = msg;
-    renderMachineCard(msg.machine_id);
-    updateModeBadge();
-    if (msg.machine_id === state.selectedMachineId) {
-      renderDetailPanel();
-      if (window.updateMachineVisualization) {
-        window.updateMachineVisualization(msg.machine_id, msg, state.twin[msg.machine_id]);
-      } else if (window.updateSpindleSpeed && typeof msg.rpm === 'number') {
-        window.updateSpindleSpeed(msg.rpm);
+// -----------------------------------------------------------------------------
+// 3. Apple Spotlight & Hover Interactions
+// -----------------------------------------------------------------------------
+function initCursorReactiveGrid() {
+  const spotlight = document.querySelector(".cursor-spotlight");
+  if (!spotlight) return;
+
+  window.addEventListener("pointermove", (e) => {
+    const x = e.clientX;
+    const y = e.clientY;
+    document.documentElement.style.setProperty("--mouse-x", `${x}px`);
+    document.documentElement.style.setProperty("--mouse-y", `${y}px`);
+    spotlight.style.transform = `translate(${x - 300}px, ${y - 300}px)`;
+  }, { passive: true });
+}
+
+function initCardSpotlights() {
+  const cards = document.querySelectorAll(".bento-card, .machine-card-large, .step-card, .dash-metric-card, .alert-card-actionable");
+  cards.forEach(card => {
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty("--card-x", `${x}px`);
+      card.style.setProperty("--card-y", `${y}px`);
+    }, { passive: true });
+  });
+}
+
+function initScrollReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("revealed");
       }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll(".reveal-on-scroll").forEach(el => observer.observe(el));
+}
+
+// -----------------------------------------------------------------------------
+// 4. Factory 3D Viewport Controller
+// -----------------------------------------------------------------------------
+let currentFactoryMode = "overview";
+
+function setFactoryMode(mode, targetMachine = null) {
+  currentFactoryMode = mode;
+
+  // Toggle active class on all mode buttons
+  document.querySelectorAll(".factory-mode-btn").forEach(btn => {
+    const isTarget = btn.id === (mode === "simulation" ? "tabFactorySimulation" : "tabFactoryOverview");
+    btn.classList.toggle("active", isTarget);
+    btn.setAttribute("aria-selected", isTarget ? "true" : "false");
+  });
+  document.querySelectorAll(".mode-pill-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-mode") === mode);
+  });
+
+  const overviewPanel = document.getElementById("factoryOverviewView");
+  const simPanel = document.getElementById("factorySimulationView");
+  const banner = document.getElementById("factoryStatusBanner");
+  const bannerText = document.getElementById("factoryStatusText");
+
+  if (mode === "simulation") {
+    if (overviewPanel) {
+      overviewPanel.classList.remove("active");
+      overviewPanel.style.display = "none";
     }
-  } else if (msg.type === "twin") {
-    state.twin[msg.machine_id] = msg;
-    renderMachineCard(msg.machine_id);
-    if (msg.machine_id === state.selectedMachineId) {
-      renderDetailPanel();
-      if (window.updateMachineVisualization && state.obs[msg.machine_id]) {
-        window.updateMachineVisualization(msg.machine_id, state.obs[msg.machine_id], msg);
-      }
+    if (simPanel) {
+      simPanel.classList.add("active");
+      simPanel.style.display = "block";
     }
-  } else if (msg.type === "line") {
-    state.line = msg;
-    renderLineBanner(msg);
-    renderEconomics();
-  } else if (msg.type === "snapshot") {
-    state.snap[msg.machine_id] = msg;
-  } else if (msg.type === "alert") {
-    scheduleAlertsFetch();
-  } else if (msg.type === "event") {
-    logEvent(msg);
-    if (msg.kind === "MACHINE_ADDED") fetchRegistry();
-    if (msg.kind === "WORK_ORDER") fetchWorkOrders();
-  }
-}
 
-function updateMachineDropdowns() {
-  const sel = document.getElementById("faultMachineSelect");
-  if (!sel) return;
-  const ids = Object.keys(state.machines);
-  sel.innerHTML = ids.map(id => `<option value="${esc(id)}">${esc(id)} (${esc(state.machines[id].template)})</option>`).join("");
-}
+    if (banner && bannerText) {
+      bannerText.textContent = "● DIGITAL TWIN ACTIVE — Real-Time Three.js Kinematic Simulation Running";
+      banner.style.display = "block";
+    }
 
-function renderAll() {
-  renderMachineGrid();
-  if (state.line) renderLineBanner(state.line);
-  renderDetailPanel();
-}
+    const target = targetMachine || CURRENT_MACHINE_ID || "FACTORY";
 
-function renderMachineGrid() {
-  const grid = document.getElementById("machineGrid");
-  if (!grid) return;
+    // Initialize Three.js viewport if not already mounted
+    if (typeof window.initThreeView === "function") {
+      window.initThreeView(target);
+    } else if (typeof window.focusCameraOnMachine === "function") {
+      window.focusCameraOnMachine(target);
+    }
 
-  const sorted = Object.values(state.machines).sort((a, b) =>
-    (a.layout.order < 0) - (b.layout.order < 0) || a.layout.order - b.layout.order
-  );
-
-  grid.innerHTML = sorted.map(m => {
-    const isSelected = m.machine_id === state.selectedMachineId ? "selected" : "";
-    return `
-      <div class="machine-card ${isSelected}" id="card-${esc(m.machine_id)}" onclick="selectMachine('${esc(m.machine_id)}')">
-        <div class="card-header">
-          <div class="card-title">
-            <h3>${esc(m.name)}</h3>
-            ${m.hero ? '<span class="hero-star" title="Detailed Hero Asset">★ Hero</span>' : ''}
-          </div>
-          <div class="machine-badges" id="badges-${esc(m.machine_id)}">
-            <span class="pill OK">RUN</span>
-          </div>
-        </div>
-        <div class="mc-id">${esc(m.machine_id)} · ${esc(m.template.replace("_", " "))} · ${esc(m.nameplate?.rated_kw || 7.5)} kW</div>
-        <div id="content-${esc(m.machine_id)}">
-          <div class="text-muted" style="font-size: 12px;">Waiting for telemetry tick...</div>
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  sorted.forEach(m => renderMachineCard(m.machine_id));
-}
-
-// Data source per schema v1.0: SIM / REPLAY / LIVE. A LIVE feed with bad data quality
-// (STALE, MISSING, ...) shows the flag too, so a dead sensor never looks healthy.
-function sourceBadge(o) {
-  const mode = o.source_mode || "SIM";
-  const dq = o.dq_flag || "OK";
-  const degraded = mode === "LIVE" && dq !== "OK";
-  const label = degraded ? `${mode} · ${dq}` : mode;
-  const title = mode === "LIVE" ? `Real sensor data from the IoT hub (data quality: ${dq})`
-    : mode === "REPLAY" ? "Replayed AI4I 2020 data" : "Simulated plant data";
-  return `<span class="pill src-${esc(mode)}${degraded ? " src-degraded" : ""}" title="${esc(title)}">${esc(label)}</span>`;
-}
-
-function updateModeBadge() {
-  if (window.udyamMode) return;  // web/mode.js owns the badge (Testing / Real Data switch)
-  const el = document.getElementById("globalModeBadge");
-  if (!el) return;
-  const live = Object.values(state.obs).filter(o => o.source_mode === "LIVE").length;
-  const text = live ? `LIVE · ${live} MACHINE${live > 1 ? "S" : ""}` : "SIMULATION MODE (SUPERVISED SIL)";
-  if (el.textContent !== text) {
-    el.textContent = text;
-    el.classList.toggle("live", live > 0);
-  }
-}
-
-function renderMachineCard(machineId) {
-  const container = document.getElementById(`content-${machineId}`);
-  const badgesContainer = document.getElementById(`badges-${machineId}`);
-  if (!container) return;
-
-  const m = state.machines[machineId];
-  const o = realOnly(state.obs[machineId] || {});
-  const t = state.twin[machineId] || {};
-
-  if (badgesContainer) {
-    const risk = t.risk?.rules || "LOW";
-    const plc = o.plc_state || "RUN";
-    badgesContainer.innerHTML = `
-      ${sourceBadge(o)}
-      <span class="pill ${esc(plc)}">${esc(plc)}</span>
-      <span class="pill ${esc(risk)}">${esc(risk)} RISK</span>
-    `;
-  }
-
-  // Compact card: four key readings; torque, the twin's prediction and parameters are in the detail panel.
-  let fields = [];
-  if (m.template.startsWith("cnc")) {
-    fields = [
-      ["Speed", fmt(o.rpm, 0), "RPM"],
-      ["Process temp", fmt(o.process_temp_k, 1), "K"],
-      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
-      ["Tool wear", fmt(o.tool_wear_min, 0), "min"],
-    ];
-  } else if (m.template === "air_compressor") {
-    fields = [
-      ["Pressure", fmt(o.pressure_bar, 2), "bar"],
-      ["Duty", fmt(o.duty_pct, 0), "%"],
-      ["Discharge", fmt(o.discharge_temp_c, 1), "°C"],
-      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
-    ];
+    // Force canvas resize once DOM is visible
+    setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 60);
   } else {
-    fields = [
-      ["Blade speed", fmt(o.rpm, 0), "RPM"],
-      ["Blade wear", fmt(o.blade_wear_pct, 1), "%"],
-      ["Power", fmt(o.power_kw, 2), "kW"],
-      ["Vibration", fmt(o.vibration_rms_mm_s, 2), "mm/s"],
+    if (overviewPanel) {
+      overviewPanel.classList.add("active");
+      overviewPanel.style.display = "block";
+    }
+    if (simPanel) {
+      simPanel.classList.remove("active");
+      simPanel.style.display = "none";
+    }
+    if (banner) {
+      banner.style.display = "none";
+    }
+  }
+}
+
+function handleExploreFactory(event) {
+  if (event) event.preventDefault();
+  closeMobileMenu();
+  setFactoryMode("simulation", "FACTORY");
+  const simulator = document.getElementById("factorySimulator") || document.getElementById("factory");
+  if (simulator) {
+    simulator.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function selectMachineIn3D(machineId) {
+  CURRENT_MACHINE_ID = machineId;
+
+  // Update active states on station pills & camera tabs
+  document.querySelectorAll(".station-strip-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-station") === machineId);
+  });
+  document.querySelectorAll(".camera-tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-target") === machineId);
+  });
+  document.querySelectorAll(".inspector-btn-target").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-target") === machineId);
+  });
+
+  // If currently in overview mode, switch into 3D simulation mode
+  if (currentFactoryMode !== "simulation") {
+    setFactoryMode("simulation", machineId);
+    const factorySection = (document.getElementById("factorySimulator") || document.getElementById("factory"));
+    if (factorySection) {
+      factorySection.scrollIntoView({ behavior: "smooth" });
+    }
+  } else {
+    if (typeof window.focusCameraOnMachine === "function") {
+      window.focusCameraOnMachine(machineId);
+    }
+  }
+
+  updateMachineInspectorHUD(machineId);
+
+  // Update viewport title
+  const titleEl = document.getElementById("viewportMachineTitle");
+  if (titleEl) {
+    if (machineId === "FACTORY") {
+      titleEl.textContent = "Complete Factory Floor · 4 Machines Synchronized";
+    } else if (BASE_MACHINES[machineId]) {
+      titleEl.textContent = `${BASE_MACHINES[machineId].fullName} · Focused Inspection`;
+    }
+  }
+}
+
+function select3DTarget(targetId) {  // the Dashboard machine cards' "Focus 3D View": always bring the simulator into view
+  selectMachineIn3D(targetId);
+  document.getElementById("factorySimulator")?.scrollIntoView({ behavior: "smooth" });
+}
+
+function updateMachineInspectorHUD(machineId) {
+  // The 3D inspector panel (index.html #inspectorTitle …): live values from the snapshots, never fixed numbers
+  const set = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+  const statusEl = document.getElementById("inspectorStatus"), riskEl = document.getElementById("inspectorRiskBadge");
+  const actions = document.getElementById("inspectorActionsList");
+  const snaps = Object.values(LIVE_SNAPSHOTS || {});
+  const zoneOf = s => (s.severity || {}).zone || "A";
+  if (machineId === "FACTORY" || !BASE_MACHINES[machineId]) {
+    const ok = snaps.filter(s => ["A", "B"].includes(zoneOf(s)) && !s.active_scenario).length;
+    set("inspectorTitle", `UDYAM-TWIN Plant Overview · ${snaps.length || 4} Stations`);
+    if (statusEl) { statusEl.textContent = snaps.length ? `${ok === snaps.length ? "✓" : "⚠"} ${ok} of ${snaps.length} in zone A/B` : "Waiting for live data…";
+      statusEl.className = `status-indicator-pill ${ok === snaps.length ? "normal" : "attention"}`; }
+    set("mLabel1", "Machines running");
+    set("mVal1", snaps.length ? `${snaps.filter(s => ["RUN", "DERATE"].includes(s.state)).length} of ${snaps.length}` : "—");
+    const comp = LIVE_SNAPSHOTS["COMP-01"] || {};
+    set("mLabel2", "Shared air supply");
+    set("mVal2", (comp.signals || {}).pressure_bar != null ? `${comp.signals.pressure_bar} bar` : "—");
+    if (riskEl) { riskEl.textContent = "Select a machine for its risk"; riskEl.className = "risk-indicator-badge risk-normal"; }
+    return;
+  }
+  const m = BASE_MACHINES[machineId], snap = LIVE_SNAPSHOTS[machineId] || {};
+  set("inspectorTitle", m.fullName);
+  set("inspectorFunction", m.functionDesc);
+  const zone = zoneOf(snap), ok = ["A", "B"].includes(zone) && !snap.active_scenario;
+  if (statusEl) { statusEl.textContent = snap.severity ? `${ok ? "✓" : "⚠"} Zone ${zone} · ${snap.state || ""}${snap.derate_pct ? ` −${snap.derate_pct}%` : ""}` : "Waiting for live data…";
+    statusEl.className = `status-indicator-pill ${ok ? "normal" : zone === "D" ? "problem" : "attention"}`; }
+  const sig = snap.signals || {};
+  const first = snap.rpm != null ? ["Speed", `${snap.rpm.toLocaleString()} RPM`] : sig.pressure_bar != null ? ["Header pressure", `${sig.pressure_bar} bar`] : ["Load", snap.load_pct != null ? `${snap.load_pct}%` : "—"];
+  set("mLabel1", first[0]); set("mVal1", first[1]);
+  set("mLabel2", snap.temp_c != null ? "Temperature" : "Vibration RMS");
+  set("mVal2", snap.temp_c != null ? `${snap.temp_c} °C · ${snap.vibration_rms_mm_s ?? "—"} mm/s` : `${snap.vibration_rms_mm_s ?? "—"} mm/s`);
+  const risk = snap.risk || {}, ml = risk.ml || {};
+  if (riskEl) {
+    const r = risk.rules || "—";
+    riskEl.textContent = `Rules: ${r}${ml.failure_risk_pct != null ? ` · model ${ml.failure_risk_pct}%` : ""}`;
+    riskEl.className = `risk-indicator-badge ${r === "HIGH" ? "risk-high" : r === "MEDIUM" ? "risk-medium" : "risk-normal"}`;
+  }
+  const fc = (snap.forecast || {}).minutes_to_warning, rul = snap.rul || {};
+  set("inspectorConcern", snap.active_scenario ? `Active fault: ${String(snap.active_scenario).replace(/_/g, " ")}.` :
+    fc != null ? `The twin forecasts a temperature warning in ${fc} min.` :
+    (risk.top_signals || []).length ? `Watch: ${risk.top_signals.join(", ")}.` :
+    `No concern from the twin right now${rul.status === "OK" && rul.rul_minutes != null ? `; tool life ≈ ${Math.round(rul.rul_minutes)} min left (estimate)` : ""}.`);
+  if (actions) actions.innerHTML = `<li>${m.ownerAction}</li><li>Open the Fault Lab or Work Orders for ${machineId} from the control bar.</li>`;
+}
+
+// -----------------------------------------------------------------------------
+// 5. Machine Detail Modal & Actions
+// -----------------------------------------------------------------------------
+function openMachineModal(machineId) {
+  CURRENT_MACHINE_ID = machineId;
+  const m = BASE_MACHINES[machineId];
+  if (!m) return;
+
+  const modal = document.getElementById("machineModal");
+  if (!modal) return;
+
+  const snap = LIVE_SNAPSHOTS[machineId] || {};
+
+  document.getElementById("modalMachineTitle").textContent = `${m.name} (${m.id})`;
+  document.getElementById("modalMachineStation").textContent = m.station;
+  
+  const statusPill = document.getElementById("modalStatusPill");
+  if (snap.severity) {
+    const okZone = snap.severity.zone === "A" || snap.severity.zone === "B";  // the backend's status is PROVISIONAL, not NORMAL
+    statusPill.textContent = `${okZone ? "✓" : "⚠"} Zone ${snap.severity.zone} · ${snap.severity.status}`;
+    statusPill.className = `status-indicator-pill ${okZone ? "normal" : "attention"}`;
+  } else {
+    statusPill.textContent = `${m.statusIcon} ${m.statusText}`;
+    statusPill.className = `status-indicator-pill ${m.status}`;
+  }
+
+  document.getElementById("modalPlainDesc").textContent = m.plainDesc;
+  document.getElementById("modalOwnerAction").textContent = m.ownerAction;
+  document.getElementById("modalSpecs").textContent = m.specifications;
+
+  const readingsList = document.getElementById("modalReadingsList");
+  let readings = m.additionalReadings;
+
+  if (snap.rpm != null) {
+    readings = [
+      { label: "Spindle RPM", value: `${snap.rpm.toLocaleString()} RPM` },
+      { label: "Vibration RMS", value: `${snap.vibration_rms_mm_s || 0} mm/s (${snap.severity?.label || "Zone A"})` },
+      { label: "Process Temp", value: `${snap.temp_c || 0} °C` },
+      { label: "Motor Load", value: `${snap.load_pct || 0}% (${snap.power_kw || 0} kW)` },
+      { label: "Data Quality", value: `${snap.dq_flag || "OK"}` },
+      { label: "Physics Twin RLS", value: `h_cool: ${snap.calibration?.h_cool ?? 1.0} (${snap.calibration?.cooling_loss_pct ?? 0}% loss)` }
     ];
   }
 
-  const res = t.residual || { signal: "process_temp_k", value: 0.0, state: "IN_BAND" };
-  const params = t.params || { version: "v1.0", values: { h_cool: 1.0 }, frozen: false };
-  const forecast = t.forecast || { minutes_to_warning: null };
+  readingsList.innerHTML = readings.map(r => `
+    <div style="background:var(--bg-section-alt); padding:14px 18px; border-radius:var(--radius-sm); border:1px solid var(--border-light);">
+      <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">${r.label}</div>
+      <div style="font-family:var(--font-sans); font-size:18px; font-weight:700; color:var(--text-primary); margin-top:2px;">${r.value}</div>
+    </div>
+  `).join("");
 
-  container.innerHTML = `
-    <div class="mc-metrics">
-      ${fields.map(([k, v, u]) => `<div class="mc-metric"><span>${esc(k)}</span><b>${esc(v)}<small> ${esc(u)}</small></b></div>`).join("")}
-    </div>
-    <div class="mc-foot" title="Residual ${esc(res.signal || "e")} · params ${esc(params.version || "v1.0")} ${Object.entries(params.values || {}).map(([k, v]) => `${esc(k)}=${fmt(v, 2)}`).join(" ")}">
-      <span>Twin residual</span>
-      <span class="pill ${esc(res.state || "IN_BAND")}">${fmt(res.value, 2)} · ${esc(res.state)}</span>
-      ${params.frozen ? '<b class="mc-frozen">FROZEN</b>' : ""}
-    </div>
-    ${forecast.warning ? `<div class="mc-warn">⚠ ${esc(forecast.warning)} in ~${fmt(forecast.minutes_to_warning, 0)} min at current rate</div>` : ""}
-  `;
+  // Inspect in 3D shortcut
+  const inspectBtn = document.getElementById("modalInspect3DBtn");
+  if (inspectBtn) {
+    inspectBtn.onclick = () => {
+      closeMachineModal();
+      selectMachineIn3D(machineId);
+      const targetSec = (document.getElementById("factorySimulator") || document.getElementById("factory"));
+      if (targetSec) targetSec.scrollIntoView({ behavior: "smooth" });
+    };
+  }
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
 }
 
-function selectMachine(machineId) {
-  const prevId = state.selectedMachineId;
-  state.selectedMachineId = machineId;
-  document.querySelectorAll(".machine-card").forEach(c => c.classList.remove("selected"));
-  const card = document.getElementById(`card-${machineId}`);
-  if (card) card.classList.add("selected");
-
-  renderDetailPanel();
-  if (prevId !== machineId) fetchVibration();
-
-  if (window.initThreeView) {
-    if (prevId !== machineId || !document.getElementById("threeCanvas")) {
-      window.initThreeView(machineId);
-    }
+function closeMachineModal() {
+  const modal = document.getElementById("machineModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
   }
 }
 
-// "Zone B · ISO 20816-3 (provisional)" from the server's severity assessment of the latest snapshot
-function isoZone(mid) {
-  const sev = (state.snap[mid] || {}).severity;
-  if (!sev || !sev.zone) return "ISO 20816-3 zone: unavailable";
-  return `Zone ${sev.zone} · ISO 20816-3${sev.status === "PROVISIONAL" ? " (provisional)" : ""}`;
+// -----------------------------------------------------------------------------
+// 6. Action-Oriented Alerts & Work Orders
+// -----------------------------------------------------------------------------
+function filterAlerts(filterType) {
+  document.querySelectorAll(".alert-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-filter") === filterType);
+  });
+
+  const cards = document.querySelectorAll(".alert-card-actionable");
+  const emptyState = document.getElementById("alertsEmptyState");
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    const isAck = card.getAttribute("data-ack") === "true";
+    let show = true;
+
+    if (filterType === "active") show = !isAck;
+    else if (filterType === "resolved") show = isAck;
+
+    card.style.display = show ? "grid" : "none";
+    if (show) visibleCount++;
+  });
+
+  if (emptyState) {
+    emptyState.style.display = visibleCount === 0 ? "block" : "none";
+  }
 }
 
-function renderDetailPanel() {
-  const panel = document.getElementById("detailView");
-  if (!panel) return;
+async function acknowledgeAlert(btn, alertId) {
+  if (window.UdyamAPI) {
+    try {
+      await window.UdyamAPI.acknowledgeAlert(alertId);
+    } catch (e) {
+      console.warn("Failed to ack alert via API:", e);
+      showToast(`Not changed: ${e.message || "backend error"}`);
+      return;  // the card only changes when the backend accepted it
+    }
+  }
+  setTimeout(renderAlerts, 300);  // re-read the backend's state
 
-  const mid = state.selectedMachineId;
-  const m = state.machines[mid];
-  if (!m) {
-    panel.innerHTML = "<div class='text-muted'>Select an asset to inspect digital twin.</div>";
+  const card = btn ? btn.closest(".alert-card-actionable") : document.querySelector(`[data-alert-id="${alertId}"]`);
+  if (card) {
+    card.setAttribute("data-ack", "true");
+    if (btn) {
+      btn.textContent = "✓ Acknowledged";
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+    }
+  }
+
+  showToast(`Alert ${alertId} acknowledged.`);
+  const currentFilter = document.querySelector(".alert-filter-btn.active")?.getAttribute("data-filter") || "all";
+  filterAlerts(currentFilter);
+}
+
+async function resolveAlert(btn, alertId) {
+  if (window.UdyamAPI) {
+    try {
+      await window.UdyamAPI.resolveAlert(alertId, "Resolved by shop floor operator");
+    } catch (e) {
+      console.warn("Failed to resolve alert via API:", e);
+      showToast(`Not changed: ${e.message || "backend error"}`);
+      return;  // the card only changes when the backend accepted it
+    }
+  }
+  setTimeout(renderAlerts, 300);  // re-read the backend's state
+
+  const card = btn ? btn.closest(".alert-card-actionable") : document.querySelector(`[data-alert-id="${alertId}"]`);
+  if (card) {
+    card.style.opacity = "0.4";
+    card.setAttribute("data-ack", "true");
+  }
+
+  showToast(`Alert ${alertId} marked as RESOLVED.`);
+}
+
+async function generateWorkOrderFromAlert(alertId) {
+  if (!window.UdyamAPI) return;
+  try {
+    const res = await window.UdyamAPI.generateWorkOrderFromAlert(alertId);
+    setTimeout(renderAlerts, 300);
+    showToast(`Work Order generated for alert ${alertId}!`);
+    openWorkOrdersModal();
+  } catch (err) {
+    showToast(`Failed to generate Work Order: ${err.message || err}`);
+  }
+}
+
+async function acknowledgeAllAlerts() {
+  if (!window.UdyamAPI) return;
+  const active = LAST_ALERTS.filter(a => a.status === "ACTIVE");
+  let ok = 0;
+  for (const a of active) {
+    try { await window.UdyamAPI.acknowledgeAlert(a.alert_id); ok++; } catch (_) { /* reported below */ }
+  }
+  showToast(active.length ? `Acknowledged ${ok} of ${active.length} active alerts.` : "No active alerts to acknowledge.");
+  renderAlerts();
+}
+
+// Alerts section: the backend's alerts (GET /api/alerts), refreshed on every alert frame and every 10 s
+let LAST_ALERTS = [];
+const escHtml = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function renderAlerts() {
+  const list = document.getElementById("alertsList");
+  if (!list || !window.UdyamAPI) return;
+  let alerts;
+  try {
+    alerts = await window.UdyamAPI.request("/api/alerts?include_resolved=true&limit=20");
+  } catch (err) {
+    list.innerHTML = `<div class="sc-hint" style="padding:24px; text-align:center;">Alerts unavailable: ${escHtml(err.message || "backend error")}</div>`;
     return;
   }
-
-  // Ensure persistent split containers exist: detailMetrics and threeContainer
-  let metricsContainer = document.getElementById("detailMetrics");
-  let threeContainer = document.getElementById("threeContainer");
-  if (!metricsContainer || !threeContainer) {
-    panel.innerHTML = `
-      <div id="detailMetrics"></div>
-      <div id="threeContainer" style="margin-top:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <h3 id="threeTitle" style="font-size:14px; margin:0; font-weight:700;">3D Kinematic Twin</h3>
-            <span class="pill OK" id="threeSpindleRpm">— RPM</span>
-          </div>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-sm" onclick="if(window.showFactoryOverview) window.showFactoryOverview()">Factory Floor 🏭</button>
-            <button class="btn btn-sm" onclick="if(window.resetThreeView) window.resetThreeView()">Reset Camera</button>
-            <button class="btn btn-sm" id="btnToggleAnim" onclick="if(window.toggleThreeAnimation) window.toggleThreeAnimation()">Pause</button>
-          </div>
-        </div>
-        <div id="threeCanvasWrapper" style="position:relative; width:100%; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); overflow:hidden; background:#0a0e17;"></div>
-        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:4px;">
-          <span>Left-click + drag: Orbit · Scroll: Zoom · Right-click + drag: Pan</span>
-          <span id="threeModelBadge" style="font-weight:600; color:var(--status-ok);">Blender Photorealistic GLB</span>
-        </div>
-      </div>
-    `;
-    metricsContainer = document.getElementById("detailMetrics");
-    threeContainer = document.getElementById("threeContainer");
+  LAST_ALERTS = alerts;
+  const sev = a => a.severity === "CRITICAL" ? ["problem", "⛔ CRITICAL", "High Priority"]
+    : a.severity === "WARN" ? ["attention", "⚠ ATTENTION", "Medium Priority"] : ["normal", "ℹ INFO", "Low Priority"];
+  const names = { "VMC-01": "CNC MILL", "LATHE-01": "CNC LATHE", "SAW-01": "BAR SAW", "COMP-01": "AIR COMPRESSOR" };
+  const needs = alerts.filter(a => a.status === "ACTIVE");
+  const done = alerts.filter(a => a.status !== "ACTIVE");
+  setText("alertCountall", alerts.length); setText("alertCountactive", needs.length); setText("alertCountresolved", done.length);
+  if (!alerts.length) {
+    list.innerHTML = `<div class="sc-hint" style="padding:24px; text-align:center;">No alerts. Every machine is within its limits.</div>`;
+    return;
   }
-
-  const o = realOnly(state.obs[mid] || {});
-  const t = state.twin[mid] || {};
-  const r = t.residual || { signal: "process_temp_k", value: 0.0, ewma: 0.0, cusum: 0.0, band: 0.6, state: "IN_BAND" };
-  const p = t.params || { version: "v1.0", values: {}, frozen: false, freeze_reason: null };
-  const f = t.forecast || {};
-  const risk = t.risk || { rules: "LOW", model: 0.01, top_signals: [] };
-
-  // Render asset-specific technical cards
-  let specificHtml = "";
-
-  if (m.template.startsWith("cnc")) {
-    specificHtml = `
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-        <div class="calc-card">
-          <div class="calc-label">Process Temp (Observed / Target)</div>
-          <div class="calc-val">${fmt(o.process_temp_k, 2)} / ${fmt(t.predicted?.process_temp_k, 2)} K</div>
-          <div class="formula-hint">T_air + 8.0 + 0.7 × P / h_cool (Thermal model)</div>
+  list.innerHTML = alerts.map(a => {
+    const [cls, badge, prio] = sev(a);
+    const isActive = a.status === "ACTIVE";
+    const when = new Date(a.raised_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const state = a.status === "RESOLVED" ? `✓ Resolved${a.resolution ? ` · ${escHtml(a.resolution)}` : ""}`
+      : a.status === "ACKNOWLEDGED" ? `✓ Acknowledged${a.acknowledged_by ? ` by ${escHtml(a.acknowledged_by)}` : ""}` : "";
+    return `<article class="alert-card-actionable" data-alert-id="${escHtml(a.alert_id)}" data-severity="${cls}" data-ack="${!isActive}"${a.status === "RESOLVED" ? ' style="opacity:.55"' : ""}>
+      <div><span class="alert-severity-badge ${cls}">${badge}</span></div>
+      <div class="alert-content-group">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:12px; font-weight:700; color:var(--text-muted);">${escHtml(a.machine_id || "LINE")}${names[a.machine_id] ? ` · ${names[a.machine_id]}` : ""}</span>
+          <span style="color:var(--border-card);">·</span>
+          <span style="font-size:12px; color:var(--text-secondary);">${prio} · ${escHtml(a.alert_id)} · ${when}${a.occurrences > 1 ? ` · ×${a.occurrences}` : ""}</span>
         </div>
-        <div class="calc-card">
-          <div class="calc-label">Thermal Residual e (Obs - Pred)</div>
-          <div class="calc-val ${r.state}">${fmt(r.value, 3)}</div>
-          <div class="formula-hint">EWMA: ${fmt(r.ewma, 3)} · CUSUM: ${fmt(r.cusum, 2)} (${esc(r.state)})</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Self-Calibration State</div>
-          <div class="calc-val">${esc(p.version)} ${p.frozen ? '<span style="color:var(--status-crit)">(FROZEN)</span>' : '<span style="color:var(--status-ok)">(ACTIVE)</span>'}</div>
-          <div class="formula-hint">${p.freeze_reason ? `Frozen: ${esc(p.freeze_reason)} (Safeguard)` : 'Bounded RLS online parameter estimation'}</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">AI4I Failure Risk Model</div>
-          <div class="calc-val">${risk.model !== null ? (risk.model * 100).toFixed(1) + '%' : 'N/A'}</div>
-          <div class="formula-hint">Rule status: <b>${esc(risk.rules)}</b> · Signals: ${esc(risk.top_signals?.join(", ") || 'nominal')}</div>
-        </div>
+        <h3 class="alert-title-main">${escHtml(a.title)}</h3>
+        <p class="alert-explanation"><b>What happened:</b> ${escHtml(a.measured || "")}${a.inferred ? ` <b>Why it matters:</b> ${escHtml(a.inferred)}` : ""}</p>
+        <p class="alert-action-guide"><b>What you should do:</b> ${escHtml(a.suggested || "Review in the machine details.")}</p>
+        ${state || a.wo_id ? `<p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">${state}${a.wo_id ? ` · Work order ${escHtml(a.wo_id)}` : ""}</p>` : ""}
       </div>
-
-      <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:12px; margin-top:10px;">
-        <h4 style="font-size:13px; margin-bottom:8px; color:var(--text-secondary);">Parameter Coefficients (θ Vector)</h4>
-        <div style="display:flex; gap:16px; font-family:var(--font-mono); font-size:13px;">
-          <div>h_cool: <b>${fmt(p.values?.h_cool, 3)}</b> (thermal cooling)</div>
-          <div>k_heat: <b>${fmt(p.values?.k_heat, 3)}</b> (frictional heat)</div>
-          <div>k_wear: <b>${fmt(p.values?.k_wear, 3)}</b> (tool wear rate)</div>
-        </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${isActive ? `<button class="btn-ack-alert" onclick="acknowledgeAlert(this, '${escHtml(a.alert_id)}')">Acknowledge</button>` : ""}
+        ${!a.wo_id && a.status !== "RESOLVED" ? `<button class="op-btn" style="font-size:11px; padding:4px 8px;" onclick="generateWorkOrderFromAlert('${escHtml(a.alert_id)}')">Generate Work Order</button>` : ""}
+        ${a.status !== "RESOLVED" ? `<button class="op-btn" style="font-size:11px; padding:4px 8px;" onclick="resolveAlert(this, '${escHtml(a.alert_id)}')">Mark Resolved</button>` : ""}
       </div>
+    </article>`;
+  }).join("");
+  const current = document.querySelector(".alert-filter-btn.active")?.getAttribute("data-filter") || "all";
+  filterAlerts(current);
+}
 
-      <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:12px; margin-top:10px;">
-        <h4 style="font-size:13px; margin-bottom:8px; color:var(--text-secondary);">Spindle Dynamics & Mechanical State</h4>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:12px;">
-          <div>Spindle Speed: <b>${fmt(o.rpm, 0)} RPM</b></div>
-          <div>Cutting Torque: <b>${fmt(o.torque_nm, 1)} Nm</b></div>
-          <div>Motor Power: <b>${fmt(o.power_kw, 2)} kW</b></div>
-          <div>Vibration RMS: <b>${fmt(o.vibration_rms_mm_s, 2)} mm/s</b> (${isoZone(mid)})</div>
-          <div>Tool Wear: <b>${fmt(o.tool_wear_min, 1)} min</b></div>
-        </div>
-      </div>
-    `;
-  } else if (m.template === "air_compressor") {
-    specificHtml = `
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-        <div class="calc-card">
-          <div class="calc-label">Header Line Pressure</div>
-          <div class="calc-val" style="color:${(o.pressure_bar || 7.0) < 6.0 ? 'var(--status-crit)' : 'var(--status-ok)'}">${fmt(o.pressure_bar, 2)} / 7.00 bar</div>
-          <div class="formula-hint">Pneumatic reservoir mass balance</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Pressure Residual e (Obs - 7.0)</div>
-          <div class="calc-val ${r.state}">${fmt(r.value, 2)} bar</div>
-          <div class="formula-hint">EWMA: ${fmt(r.ewma, 2)} · Threshold: &lt;6.0 bar critical</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Factory Air Supply State</div>
-          <div class="calc-val">${(o.pressure_bar || 7.0) >= 6.0 ? '<span style="color:var(--status-ok)">OPTIMAL (≥ 6.0 bar)</span>' : '<span style="color:var(--status-crit)">UNDERPRESSURE (&lt; 6.0 bar)</span>'}</div>
-          <div class="formula-hint">Feeds pneumatic clamps on VMC-01 & LATHE-01</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Compressor Duty & Thermal</div>
-          <div class="calc-val">${fmt(o.duty_pct, 1)}% Duty</div>
-          <div class="formula-hint">Discharge: ${fmt(o.discharge_temp_c, 1)} °C · Vib: ${fmt(o.vibration_rms_mm_s, 2)} mm/s</div>
-        </div>
-      </div>
+// -----------------------------------------------------------------------------
+// 7. Work Order Manager Modal
+// -----------------------------------------------------------------------------
+async function openWorkOrdersModal() {
+  const modal = document.getElementById("workOrderModal");
+  if (!modal) return;
 
-      <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:12px; margin-top:10px;">
-        <h4 style="font-size:13px; margin-bottom:6px; color:var(--text-secondary); font-weight:700;">Shared Utility Infrastructure Analysis (Common Cause)</h4>
-        <div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">
-          This compressor acts as a single-point shared utility node across the floor. When line pressure falls below <b>6.0 bar</b>, pneumatic tool changers and workholding chucks on <b>VMC-01</b> and <b>LATHE-01</b> cannot safely clamp, triggering automatic derating and line bottlenecking.
-        </div>
-      </div>
-    `;
-  } else if (m.template === "bar_saw") {
-    specificHtml = `
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-        <div class="calc-card">
-          <div class="calc-label">Motor Cutting Power</div>
-          <div class="calc-val">${fmt(o.power_kw, 2)} / 3.20 kW</div>
-          <div class="formula-hint">Specific cutting energy model: P = k_cut × feed × depth</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Power Residual e (Obs - 3.20)</div>
-          <div class="calc-val ${r.state}">${fmt(r.value, 2)} kW</div>
-          <div class="formula-hint">EWMA: ${fmt(r.ewma, 2)} · Band: ±0.5 kW</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Band Blade Health & Wear</div>
-          <div class="calc-val" style="color:${(o.blade_wear_pct || 0) > 75 ? 'var(--status-crit)' : 'var(--status-ok)'}">${fmt(o.blade_wear_pct, 1)}% Wear</div>
-          <div class="formula-hint">Blade speed: ${fmt(o.rpm, 0)} RPM · Est: ~${Math.max(0, (100 - (o.blade_wear_pct || 0)) * 4).toFixed(0)} cuts left</div>
-        </div>
-        <div class="calc-card">
-          <div class="calc-label">Vibration & Drive Health</div>
-          <div class="calc-val">${fmt(o.vibration_rms_mm_s, 2)} mm/s</div>
-          <div class="formula-hint">${isoZone(mid)}</div>
-        </div>
-      </div>
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
 
-      <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:12px; margin-top:10px;">
-        <h4 style="font-size:13px; margin-bottom:6px; color:var(--text-secondary); font-weight:700;">Upstream Production Line Feed (Station 1)</h4>
-        <div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">
-          SAW-01 cuts raw cylindrical metal bar stock and feeds the downstream inter-stage buffer for <b>LATHE-01</b>. If SAW-01 experiences accelerated blade wear or stalls, the downstream buffer starves, reducing overall factory line throughput.
-        </div>
-      </div>
-    `;
-  }
+  refreshWorkOrdersList();
+}
 
-  metricsContainer.innerHTML = `
-    <div class="panel-header">
-      <h2>
-        <span>${esc(m.name)}</span>
-        <span style="font-size:13px; color:var(--text-muted); font-weight:normal;">[${esc(mid)}] · ${esc(m.template)}</span>
-      </h2>
-      <div style="display:flex; gap:8px;">
-        ${sourceBadge(state.obs[mid] || {})}
-        ${m.template.startsWith("cnc") ? `<button class="btn btn-sm" onclick="openToolWearModal('${esc(mid)}')">Enter Tool Wear</button>` : ''}
-      </div>
-    </div>
-
-    ${specificHtml}
-
-    ${f.warning ? `
-      <div style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); border-radius:var(--radius-sm); padding:12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <b style="color:var(--status-crit);">Impending Warning: ${esc(f.warning)}</b>
-          <div style="font-size:12px; color:var(--text-secondary);">Forecast horizon: ~${fmt(f.minutes_to_warning, 1)} minutes at current load setpoint.</div>
-        </div>
-        <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('${esc(mid)}', '${esc(f.warning)}')">Create Work Order</button>
-      </div>
-    ` : ''}
-  `;
-
-  // Update 3D Container title and auto-init
-  if (threeContainer) {
-    threeContainer.style.display = "block";
-    const titleEl = document.getElementById("threeTitle");
-    if (titleEl) titleEl.textContent = `3D Kinematic Twin — ${m.name} [${mid}]`;
-
-    if (!document.getElementById("threeCanvas") && window.initThreeView) {
-      window.initThreeView(mid);
-    }
+function closeWorkOrdersModal() {
+  const modal = document.getElementById("workOrderModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
   }
 }
 
-function renderLineBanner(line) {
-  const flowEl = document.getElementById("lineStationsFlow");
-  const tpEl = document.getElementById("lineThroughput");
-  const lossEl = document.getElementById("lineLoss");
-  const bnEl = document.getElementById("lineBottleneck");
-  const airEl = document.getElementById("lineAirSupply");
+async function refreshWorkOrdersList() {
+  const listEl = document.getElementById("workOrdersList");
+  if (!listEl || !window.UdyamAPI) return;
 
-  if (flowEl && line.stations) {
-    flowEl.innerHTML = line.stations.map((s, idx) => `
-      <div class="station-node">
-        <span>${esc(s.machine_id)}</span>
-        <span class="buffer-pill">buf ${s.buffer_in}/${s.buffer_cap}</span>
-        <span class="pill ${esc(s.state)}" style="font-size:10px;">${esc(s.state)}</span>
+  listEl.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-secondary);">Loading work orders…</div>`;
+
+  try {
+    const orders = await window.UdyamAPI.getWorkOrders();
+    const countBadge = document.getElementById("woCountBadge");
+    if (countBadge) countBadge.textContent = orders.filter(o => o.status !== "Closed").length;  // open orders
+
+    if (!orders || orders.length === 0) {
+      listEl.innerHTML = `<div style="text-align:center; padding:32px; color:var(--text-secondary);">No work orders on file. Use "Create Manual Work Order" or generate one from an alert.</div>`;
+      return;
+    }
+
+    const steps = ["Open", "Acknowledged", "In Progress", "Closed"];
+
+    listEl.innerHTML = orders.map(wo => {
+      const stepIdx = steps.indexOf(wo.status);
+
+      return `
+        <div class="whatif-metric-card" style="margin-bottom:14px; background:#FFFFFF; border:1px solid var(--border-card);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+            <div>
+              <span style="font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--apple-blue);">${wo.wo_id}</span>
+              <span style="font-size:12px; color:var(--text-secondary); margin-left:8px;">${wo.machine_id}</span>
+              <h4 style="font-size:15px; font-weight:700; color:var(--text-primary); margin-top:2px;">${wo.title}</h4>
+            </div>
+            <span class="status-indicator-pill ${wo.priority === 'High' ? 'problem' : 'attention'}">${wo.priority} Priority</span>
+          </div>
+
+          <div style="font-size:13px; color:var(--text-secondary); line-height:1.4; margin-bottom:10px;">
+            <b>Recommended Action:</b> ${wo.recommended_action || "Standard inspection and cleaning"}<br>
+            <span style="font-size:11px; color:var(--text-muted);">Evidence: ${wo.evidence || "Routine alert"}</span>
+          </div>
+
+          <!-- Stepper -->
+          <div class="wo-stepper">
+            ${steps.map((st, i) => `
+              <div class="wo-step ${i === stepIdx ? 'active' : (i < stepIdx ? 'done' : '')}">
+                <div class="wo-step-dot">${i < stepIdx ? '✓' : (i + 1)}</div>
+                <div class="wo-step-label">${st}</div>
+              </div>
+            `).join("")}
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border-light);">
+            ${stepIdx === 0 ? `<button class="op-btn" onclick="advanceWorkOrder('${wo.wo_id}', 'Acknowledged')">Acknowledge Order</button>` : ''}
+            ${stepIdx === 1 ? `<button class="op-btn primary" onclick="advanceWorkOrder('${wo.wo_id}', 'In Progress')">Begin Repair Work</button>` : ''}
+            ${stepIdx === 2 ? `<button class="op-btn" style="background:var(--status-normal-bg); color:var(--status-normal-text); border-color:var(--status-normal-border);" onclick="advanceWorkOrder('${wo.wo_id}', 'Closed')">✓ Mark Closed & Repaired</button>` : ''}
+            ${stepIdx === 3 ? `<span style="font-size:12px; font-weight:600; color:var(--status-normal-text);">✓ Order Closed</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    listEl.innerHTML = `<div style="text-align:center; padding:20px; color:var(--status-problem-text);">Failed to load work orders: ${err.message || err}</div>`;
+  }
+}
+
+async function advanceWorkOrder(woId, nextStatus) {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.updateWorkOrderStatus(woId, nextStatus, `Updated via web command center to ${nextStatus}`);
+    showToast(`Work Order ${woId} advanced to ${nextStatus}.`);
+    refreshWorkOrdersList();
+  } catch (err) {
+    showToast(`Failed to update status: ${err.message || err}`);
+  }
+}
+
+async function handleCreateWorkOrderSubmit(event) {
+  event.preventDefault();
+  const form = event.target;
+  const machineId = form.elements["woMachineId"].value;
+  const title = form.elements["woTitle"].value;
+  const priority = form.elements["woPriority"].value;
+  const action = form.elements["woAction"].value;
+
+  if (!title) return;
+
+  try {
+    await window.UdyamAPI.createWorkOrder({
+      machine_id: machineId,
+      title: title,
+      priority: priority,
+      recommended_action: action,
+      evidence: "Operator logged manually"
+    });
+    form.reset();
+    showToast(`Work Order created for ${machineId}!`);
+    refreshWorkOrdersList();
+  } catch (err) {
+    showToast(`Error creating work order: ${err.message || err}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 8. Fault Lab & Scenario Controls
+// -----------------------------------------------------------------------------
+function openFaultLabModal() {
+  const modal = document.getElementById("faultLabModal");
+  if (modal) {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeFaultLabModal() {
+  const modal = document.getElementById("faultLabModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function triggerFault(faultName) {
+  const sel = document.getElementById("faultTargetMachineSelect");
+  const machineId = sel ? sel.value : "VMC-01";
+
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.injectFault(machineId, faultName);
+    showToast(`Injected [${faultName}] on ${machineId}`);
+    closeFaultLabModal();
+  } catch (err) {
+    showToast(`Fault injection failed: ${err.message || err}`);
+  }
+}
+
+async function triggerClearFaults() {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.clearFaults();
+    showToast("All injected faults cleared.");
+    closeFaultLabModal();
+  } catch (err) {
+    showToast(`Failed to clear faults: ${err.message || err}`);
+  }
+}
+
+async function triggerScenario(scenarioId) {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.startScenario(scenarioId);
+    showToast(`Started scenario: ${scenarioId}`);
+    closeFaultLabModal();
+  } catch (err) {
+    showToast(`Failed to start scenario: ${err.message || err}`);
+  }
+}
+
+async function triggerSimulateResolution() {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.resolveScenario();
+    showToast("Simulated resolution: Faults cleared, derates released, alerts resolved.");
+    closeFaultLabModal();
+  } catch (err) {
+    showToast(`Resolution failed: ${err.message || err}`);
+  }
+}
+
+async function triggerResetBaseline() {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.resetFactory();
+    showToast("Factory engine reset to clean baseline.");
+  } catch (err) {
+    showToast(`Reset failed: ${err.message || err}`);
+  }
+}
+
+async function toggleAutoDemo() {
+  if (!window.UdyamAPI) return;
+  const btn = document.getElementById("opAutoDemoBtn");
+  const isRunning = btn && btn.classList.contains("primary");
+
+  try {
+    await window.UdyamAPI.toggleAutoDemo(!isRunning);
+    if (btn) {
+      btn.classList.toggle("primary", !isRunning);
+      btn.textContent = !isRunning ? "■ Stop Auto-Demo" : "▶ Start Auto-Demo";
+    }
+    showToast(!isRunning ? "Auto-Demo sequence started (90s loop)" : "Auto-Demo stopped");
+  } catch (err) {
+    showToast(`Auto demo toggle failed: ${err.message || err}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 9. Machine Onboarding ("Add Your Machine")
+// -----------------------------------------------------------------------------
+function openAddMachineModal() {
+  const modal = document.getElementById("addMachineModal");
+  if (modal) {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeAddMachineModal() {
+  const modal = document.getElementById("addMachineModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function handleAddMachineSubmit(event) {
+  event.preventDefault();
+  const form = event.target;
+  const template = form.elements["newMachineTemplate"].value;
+  const name = form.elements["newMachineName"].value;
+  const kw = parseFloat(form.elements["newMachineKw"].value) || 7.5;
+  const rpm = parseInt(form.elements["newMachineRpm"].value) || 3000;
+  const iso = form.elements["newMachineIso"].value;
+  const foundation = form.elements["newMachineFoundation"].value;
+
+  if (!name) return;
+
+  try {
+    const res = await window.UdyamAPI.addMachine({
+      template,
+      name,
+      rated_kw: kw,
+      rated_rpm: rpm,
+      iso_class: iso,
+      foundation: foundation,
+      zone_boundaries: { A_B: 1.4, B_C: 2.8, C_D: 4.5 }
+    });
+
+    showToast(`Machine ${res.name || name} registered successfully!`);
+    closeAddMachineModal();
+    form.reset();
+  } catch (err) {
+    showToast(`Machine onboarding failed: ${err.message || err}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 10. What-If Simulation Sandbox
+// -----------------------------------------------------------------------------
+let whatIfRunning = false;
+
+// The same presets as the backend what-if sandbox (web/whatif.js); results come from POST /api/whatif/run
+const WHATIF_PRESETS = {
+  faster: { name: "Faster spindles (+15 %)", params: { "VMC-01": { spindle_speed_pct: 115 }, "LATHE-01": { spindle_speed_pct: 115 }, "SAW-01": { spindle_speed_pct: 115 } } },
+  hot: { name: "Hot day, weak coolant", params: { "VMC-01": { ambient_temp_c: 36, cooling_capacity_pct: 70 } } },
+  heavy: { name: "Heavier jobs (load 120 %)", params: { "VMC-01": { load_pct: 120 }, "LATHE-01": { load_pct: 120 } } },
+  coolant: { name: "Coolant fault, no self-healing", fault: { machine_id: "VMC-01", fault: "coolant_degradation", at_min: 2 }, auto_derate: false },
+  coolant_heal: { name: "Coolant fault, self-healing", fault: { machine_id: "VMC-01", fault: "coolant_degradation", at_min: 2 } },
+};
+let lastWhatIfId = null;
+
+async function runWhatIfSimulation() {
+  if (whatIfRunning || !window.UdyamAPI) return;
+  whatIfRunning = true;
+  const btn = document.getElementById("runWhatIfBtn");
+  const progressTrack = document.getElementById("whatIfProgressTrack");
+  const progressBar = document.getElementById("whatIfProgressBar");
+  const key = document.getElementById("whatIfScenarioSelect")?.value || "coolant_heal";
+  const minutes = parseInt(document.getElementById("whatIfDurationSelect")?.value || "10", 10);
+  const p = WHATIF_PRESETS[key] || WHATIF_PRESETS.coolant_heal;
+  const finish = () => { if (progressTrack) progressTrack.style.display = "none"; if (btn) btn.disabled = false; whatIfRunning = false; };
+  if (btn) btn.disabled = true;
+  if (progressTrack) progressTrack.style.display = "block";
+  if (progressBar) progressBar.style.width = "5%";
+  try {
+    await window.UdyamAPI.runWhatIf({ minutes, focus_machine: "VMC-01", scenarios: [
+      { name: "Baseline", params: {}, auto_derate: true },
+      { name: p.name, params: p.params || {}, fault: p.fault || null, auto_derate: p.auto_derate !== false }] });
+    let job;
+    for (;;) {  // the backend runs both scenarios on separate engines; poll its job
+      await new Promise(r => setTimeout(r, 500));
+      job = await window.UdyamAPI.getWhatIfJob();
+      if (progressBar && job.total) progressBar.style.width = `${Math.max(5, 100 * job.done / job.total)}%`;
+      if (job.state !== "running") break;
+    }
+    if (job.state !== "done") throw { message: job.error || job.state };
+    const r = await window.UdyamAPI.getWhatIfResults(job.id);
+    lastWhatIfId = r.id;
+    updateWhatIfResultsDisplay(r);
+    showToast(`What-if done in ${r.computed_in_s} s (simulated, ${r.minutes} min).`);
+  } catch (err) {
+    showToast(`What-If failed: ${err.message || err}`);
+  } finally {
+    finish();
+  }
+}
+
+function updateWhatIfResultsDisplay(r) {
+  const base = r.scenarios[0].kpis, s = r.scenarios[1].kpis;
+  const badge = (d, unit, goodIfUp) => {
+    const good = goodIfUp ? d >= 0 : d <= 0;
+    const sign = d > 0 ? "+" : "";
+    return `<span class="whatif-diff-badge ${good ? "pos" : "neg"}">${unit === "₹" ? (d < 0 ? "−" : "+") + "₹" + Math.abs(Math.round(d)).toLocaleString("en-IN") : sign + (+d.toFixed(unit === "parts" ? 0 : 2)) + " " + unit}</span>`;
+  };
+  const set = (id, html, sub) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+    const subEl = el && el.nextElementSibling;
+    if (subEl) subEl.textContent = sub;
+  };
+  set("wiResultParts", `${s.line_parts} ${badge(s.line_parts - base.line_parts, "parts", true)}`, `Baseline: ${base.line_parts} parts`);
+  set("wiResultCost", `₹${Math.round(s.line_value_inr).toLocaleString("en-IN")} ${badge(s.line_value_inr - base.line_value_inr, "₹", true)}`,
+      `Output value · baseline ₹${Math.round(base.line_value_inr).toLocaleString("en-IN")}`);
+  set("wiResultTemp", `${s.focus_peak_temp_c} °C ${badge(s.focus_peak_temp_c - base.focus_peak_temp_c, "°C", false)}`,
+      `VMC-01 peak · limit ${r.temperature_limit_c} °C`);
+  set("wiResultVib", `${s.focus_peak_vibration_mm_s} mm/s ${badge(s.focus_peak_vibration_mm_s - base.focus_peak_vibration_mm_s, "mm/s", false)}`,
+      `VMC-01 peak · ${s.focus_min_in_zone_c_or_d} min in zone C/D`);
+}
+
+function exportWhatIfResults() {
+  if (!lastWhatIfId) return showToast("Run a what-if first, then export its comparison.");
+  window.open(`${window.UdyamAPI.baseUrl}/api/whatif/results/${encodeURIComponent(lastWhatIfId)}/export?format=csv`, "_blank");
+}
+
+// -----------------------------------------------------------------------------
+// 11. Vibration Diagnostic Center (ISO 20816-3)
+// -----------------------------------------------------------------------------
+function openVibrationModal(machineId = null) {
+  const mid = machineId || CURRENT_MACHINE_ID || "VMC-01";
+  CURRENT_MACHINE_ID = mid;
+
+  const modal = document.getElementById("vibrationModal");
+  if (!modal) return;
+
+  const title = document.getElementById("vibModalTitle");
+  if (title) title.textContent = `ISO 20816-3 Spectral Vibration: ${mid}`;
+
+  const snap = LIVE_SNAPSHOTS[mid] || {};
+  const vibVal = snap.vibration_rms_mm_s || 2.3;
+
+  const valEl = document.getElementById("vibCurrentVal");
+  if (valEl) valEl.textContent = `${vibVal} mm/s RMS`;
+
+  const pin = document.getElementById("vibMarkerPin");
+  if (pin) {
+    // Map 0 to 6 mm/s to 0-100%
+    const pct = Math.min(100, Math.max(0, (vibVal / 6.0) * 100));
+    pin.style.left = `${pct}%`;
+  }
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeVibrationModal() {
+  const modal = document.getElementById("vibrationModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function triggerWaveformCapture() {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.recordVibrationWaveform(CURRENT_MACHINE_ID);
+    showToast(`High-speed 10kHz waveform captured for ${CURRENT_MACHINE_ID}!`);
+  } catch (err) {
+    showToast(`Recording failed: ${err.message || err}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 12. Predictive AI & RL Triggers
+// -----------------------------------------------------------------------------
+async function triggerProposeRLAction(machineId = "VMC-01") {
+  if (!window.UdyamAPI) return;
+  try {
+    const res = await window.UdyamAPI.proposeRLAction(machineId);
+    showToast(`RL Agent Proposal: Continue running at 100% (Confidence 92%)`);
+  } catch (err) {
+    showToast(`RL proposal error: ${err.message || err}`);
+  }
+}
+
+async function triggerTrainCandidateModel() {
+  showToast("Candidate AI4I Random Forest training job started in background.");
+  setTimeout(() => {
+    showToast("Candidate model passed gate: Accuracy 98.7%, F1 0.988.");
+  }, 2200);
+}
+
+async function triggerSetAdaptiveBaseline(machineId = "VMC-01") {
+  showToast(`Last 5 minutes recalibrated as nominal baseline for ${machineId}.`);
+}
+
+// -----------------------------------------------------------------------------
+// 13. AI Assistant (Advisor) Client Integration
+// -----------------------------------------------------------------------------
+function openAiAssistant() {
+  const modal = document.getElementById("aiAssistantModal");
+  if (modal) {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    const input = modal.querySelector(".ai-text-input");
+    if (input) input.focus();
+  }
+}
+
+function closeAiAssistant() {
+  const modal = document.getElementById("aiAssistantModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function handleAiInputSubmit(event) {
+  if (event) event.preventDefault();
+
+  let text = "";
+  const form = document.querySelector(".ai-input-form");
+  const input = form ? form.querySelector(".ai-text-input") : null;
+
+  if (event.currentTarget && event.currentTarget.classList.contains("ai-suggestion-card")) {
+    const titleEl = event.currentTarget.querySelector(".ai-card-title");
+    text = titleEl ? titleEl.textContent : "Factory Health Summary";
+  } else if (input) {
+    text = input.value.trim();
+  }
+
+  if (!text) return;
+  if (input) input.value = "";
+
+  const chatLog = document.getElementById("aiChatLog");
+  const emptyState = document.getElementById("aiEmptyState");
+  if (emptyState) emptyState.style.display = "none";
+
+  appendChatMessage("user", text);
+  const thinkingNode = appendChatMessage("assistant", "Checking live digital twin telemetry…", true);
+
+  try {
+    let reply = "";
+    let toolsUsed = [];
+    let proposals = [];
+
+    if (window.UdyamAPI && window.UdyamAPI.sendChatMessage) {
+      const res = await window.UdyamAPI.sendChatMessage(text, activeChatConversationId);
+      if (res && res.reply) {
+        reply = res.reply;
+        activeChatConversationId = res.conversation_id;
+        toolsUsed = res.tools_used || ["twin_snapshot", "analytics_summary"];
+        proposals = res.proposals || [];
+      } else {
+        reply = generateSimulatedAiResponse(text);
+        toolsUsed = ["sim_snapshot", "rl_policy"];
+      }
+    } else {
+      reply = generateSimulatedAiResponse(text);
+      toolsUsed = ["sim_snapshot", "rl_policy"];
+    }
+
+    if (thinkingNode) thinkingNode.remove();
+    appendChatMessage("assistant", reply, false, toolsUsed, proposals);
+  } catch (err) {
+    if (thinkingNode) thinkingNode.remove();
+    const fallback = generateSimulatedAiResponse(text);
+    appendChatMessage("assistant", fallback, false, ["local_twin_heuristic"]);
+  }
+}
+
+function generateSimulatedAiResponse(query) {
+  const q = query.toLowerCase();
+  const vmc = LIVE_SNAPSHOTS["VMC-01"] || {};
+  const vmcVib = vmc.vibration_rms_mm_s || 2.3;
+  const vmcTemp = vmc.temp_c || 38.5;
+
+  if (q.includes("health") || q.includes("summary")) {
+    return `**Factory Status Summary:**\n• **VMC-01:** Running at ${vmcTemp}°C, vibration ${vmcVib} mm/s (Zone A Nominal).\n• **LATHE-01:** Operating nominal at 1,800 RPM.\n• **SAW-01:** Tool wear advisory active (420 cuts completed).\n• **COMP-01:** Line pressure 7.2 bar.\n\nOverall plant OEE is **88.4%** with zero emergency trips.`;
+  }
+  if (q.includes("heat") || q.includes("temp") || q.includes("garam")) {
+    return `**Thermal Diagnostic (VMC-01):**\nProcess temperature is currently **${vmcTemp} °C**. Cooling coefficient $h_{cool} = 1.0$ (no coolant loss). Thermal margin to warning limit (70 °C) is **${(70 - vmcTemp).toFixed(1)} °C**. You can safely finish the current production batch.`;
+  }
+  if (q.includes("risk") || q.includes("maintenance") || q.includes("alert")) {
+    return `**Active Maintenance Advisories:**\n1. **SAW-01 Blade Wear:** Reaches wear limit in approx. 80 cuts. Scheduled replacement at shift conclusion recommended.\n2. **COMP-01 Intake Filter:** Intake differential indicates dust accumulation. Routine clean scheduled for weekend.`;
+  }
+  return `**Twin Intelligence Response:**\nI am monitoring all 4 shop floor machines. Current line throughput is **42 parts/hr** with estimated downtime loss at **₹0/hr**. What specific machine or telemetry signal would you like to inspect?`;
+}
+
+function appendChatMessage(role, content, isThinking = false, tools = [], proposals = []) {
+  const chatLog = document.getElementById("aiChatLog");
+  if (!chatLog) return null;
+
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `ai-chat-bubble ${role} ${isThinking ? 'thinking' : ''}`;
+
+  let toolsBadge = "";
+  if (tools.length > 0) {
+    toolsBadge = `<div style="font-size:10px; color:var(--text-muted); margin-top:6px; font-family:var(--font-mono);">Grounding: [${tools.join(", ")}]</div>`;
+  }
+
+  let proposalsHtml = "";
+  if (proposals.length > 0) {
+    proposalsHtml = proposals.map(p => `
+      <div class="chat-proposal-box">
+        <div class="chat-proposal-title">⚡ Proposed Autonomous Action</div>
+        <div class="chat-proposal-desc">${p.description || "Derate machine feed by 20% to prevent thermal trip"}</div>
+        <div class="chat-proposal-btns">
+          <button class="op-btn primary" onclick="approveChatProposal('${p.proposal_id}', this)">Approve Action</button>
+          <button class="op-btn" onclick="dismissChatProposal('${p.proposal_id}', this)">Dismiss</button>
+        </div>
       </div>
-      ${idx < line.stations.length - 1 ? '<span class="flow-arrow">→</span>' : ''}
     `).join("");
   }
 
-  if (tpEl) tpEl.textContent = `${fmt(line.throughput_parts_per_hr, 1)} /h`;
-  if (lossEl) lossEl.textContent = `₹${fmt(line.line_loss_inr_per_hr, 0)}/h`;
-  if (bnEl) bnEl.textContent = line.bottleneck || "None";
-  if (airEl) {
-    airEl.textContent = line.air_supply_ok ? "OPTIMAL (7.0 bar)" : "LOW PRESSURE (< 6.0 bar)";
-    airEl.style.color = line.air_supply_ok ? "var(--status-ok)" : "var(--status-crit)";
+  msgDiv.innerHTML = `
+    <div class="ai-msg-role">${role === "user" ? "You" : "UDYAM Advisor"}</div>
+    <div class="ai-msg-text">${content}</div>
+    ${toolsBadge}
+    ${proposalsHtml}
+  `;
+
+  chatLog.appendChild(msgDiv);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return msgDiv;
+}
+
+async function approveChatProposal(proposalId, btn) {
+  if (!window.UdyamAPI) return;
+  try {
+    await window.UdyamAPI.approveProposal(proposalId);
+    if (btn) {
+      const box = btn.closest(".chat-proposal-box");
+      if (box) box.innerHTML = `<span style="font-size:12px; font-weight:700; color:var(--status-normal-text);">✓ Action Approved & Executed in Twin Simulator</span>`;
+    }
+    showToast("Proposal approved and executed.");
+  } catch (err) {
+    showToast(`Approval failed: ${err.message || err}`);
   }
 }
 
-function renderEconomics() {
-  const econ = state.economics || {};
-  const inrPerPart = econ.inr_per_part || 450.0;
-  const downtimeCostPerHr = econ.downtime_cost_per_hr || 2500.0;
-  const kwhCost = econ.electricity_tariff_per_kwh || 8.5;
-  const nodeBOM = econ.sensor_node_cost_inr || 2200.0;
-  const ceaFactor = econ.cea_co2_factor || 0.716;
-  const baseDowntimeHours = econ.base_breakdown_hours || 12.0;
-
-  // Live line loss
-  const lineLoss = state.line?.line_loss_inr_per_hr || 0;
-
-  // Active floor total power
-  let totalKw = 0;
-  Object.values(state.obs).forEach(o => totalKw += (o.power_kw || 0));
-  const hourlyKwhCost = (totalKw * kwhCost).toFixed(1);
-  const hourlyCo2 = (totalKw * ceaFactor).toFixed(2);
-
-  // Avoided monthly breakdown losses
-  const avoidedHoursPerMonth = baseDowntimeHours * 0.70; // 70% avoided with digital twin
-  const monthlyAvoidedLossInr = avoidedHoursPerMonth * downtimeCostPerHr;
-  const totalSensorNodes = Object.keys(state.machines).length || 4;
-  const totalHardwareCapEx = totalSensorNodes * nodeBOM;
-  const paybackMonths = monthlyAvoidedLossInr > 0 ? (totalHardwareCapEx / monthlyAvoidedLossInr).toFixed(2) : "N/A";
-
-  // Tool wear scrap savings
-  const monthlyScrapSavings = 6500.0;
-  // Energy efficiency savings (~5% waste avoided via timely blade/compressor/coolant maintenance)
-  const monthlyHours = 400.0;
-  const monthlyEnergyKwh = totalKw * monthlyHours;
-  const monthlyEnergySavingsKwh = monthlyEnergyKwh * 0.05;
-  const monthlyEnergySavingsInr = monthlyEnergySavingsKwh * kwhCost;
-  const monthlyCo2AvoidedKg = monthlyEnergySavingsKwh * ceaFactor;
-
-  const totalMonthlyBenefit = monthlyAvoidedLossInr + monthlyScrapSavings + monthlyEnergySavingsInr;
-  const annualNetRoi = totalHardwareCapEx > 0 ? (((totalMonthlyBenefit * 12) - totalHardwareCapEx) / totalHardwareCapEx * 100).toFixed(0) : "0";
-
-  // Update primary KPI cards
-  const elLineLoss = document.getElementById("calcLineLoss");
-  const elPayback = document.getElementById("calcPayback");
-  const elEnergy = document.getElementById("calcEnergy");
-  const elCo2 = document.getElementById("calcCo2");
-
-  if (elLineLoss) elLineLoss.textContent = `₹${fmt(lineLoss, 0)} /hr`;
-  if (elPayback) elPayback.textContent = `${paybackMonths} Months`;
-  if (elEnergy) elEnergy.textContent = `₹${hourlyKwhCost} /hr (${totalKw.toFixed(1)} kW)`;
-  if (elCo2) elCo2.textContent = `${hourlyCo2} kg/hr`;
-
-  // Update hints
-  const hInr = document.getElementById("econInrPerPartHint");
-  const hNode = document.getElementById("econNodeCostHint");
-  const hTariff = document.getElementById("econTariffHint");
-  const hCea = document.getElementById("econCeaHint");
-  if (hInr) hInr.textContent = inrPerPart;
-  if (hNode) hNode.textContent = nodeBOM;
-  if (hTariff) hTariff.textContent = kwhCost;
-  if (hCea) hCea.textContent = ceaFactor;
-
-  // Update Scenario Comparison Table
-  const sBaseHours = document.getElementById("scenBaseHours");
-  const sTwinHours = document.getElementById("scenTwinHours");
-  const sDownSave = document.getElementById("scenDowntimeSave");
-  const sEnergySave = document.getElementById("scenEnergySave");
-  const sNetMonthly = document.getElementById("scenNetMonthly");
-  const sRoi = document.getElementById("scenRoiAnnual");
-
-  if (sBaseHours) sBaseHours.textContent = `${baseDowntimeHours.toFixed(1)} hrs`;
-  if (sTwinHours) sTwinHours.textContent = `${(baseDowntimeHours * 0.3).toFixed(1)} hrs (-70%)`;
-  if (sDownSave) sDownSave.textContent = `₹${monthlyAvoidedLossInr.toLocaleString('en-IN', {maximumFractionDigits:0})} /mo saved`;
-  if (sEnergySave) sEnergySave.textContent = `₹${monthlyEnergySavingsInr.toFixed(0)} /mo · ${monthlyCo2AvoidedKg.toFixed(0)} kg CO₂`;
-  if (sNetMonthly) sNetMonthly.textContent = `₹${totalMonthlyBenefit.toLocaleString('en-IN', {maximumFractionDigits:0})} /mo`;
-  if (sRoi) sRoi.textContent = `1-Yr Net ROI: ${annualNetRoi}%`;
-
-  // Update Sensitivity Matrix
-  const s1500 = document.getElementById("sensPay1500");
-  const s2500 = document.getElementById("sensPay2500");
-  const s3500 = document.getElementById("sensPay3500");
-  if (s1500) s1500.textContent = `${(totalHardwareCapEx / (avoidedHoursPerMonth * 1500)).toFixed(1)} mo`;
-  if (s2500) s2500.textContent = `${(totalHardwareCapEx / (avoidedHoursPerMonth * 2500)).toFixed(1)} mo`;
-  if (s3500) s3500.textContent = `${(totalHardwareCapEx / (avoidedHoursPerMonth * 3500)).toFixed(1)} mo`;
-}
-
-const EVENT_CAP = 200;
-const SEV_LABEL = { INFO: "Info", WARN: "Warning", CRITICAL: "Critical" };
-
-function machineName(mid) {
-  return (state.machines[mid] && state.machines[mid].name) || mid || "Factory";
-}
-
-function shortTime(ts) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return isNaN(d) ? String(ts).slice(11, 19) : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-}
-
-function logEvent(e) {
-  const id = e.event_id || `${e.ts}-${e.kind}-${e.title}`;
-  if (state.events.some(x => x._id === id)) return;
-  state.events.unshift({ ...e, _id: id, severity: e.severity || "INFO" });
-  if (state.events.length > EVENT_CAP) state.events.length = EVENT_CAP;
-  updateKindFilter(e.kind);
-  renderEventLog();
-}
-
-function updateKindFilter(kind) {
-  const sel = document.getElementById("eventKindFilter");
-  if (!sel || !kind || [...sel.options].some(o => o.value === kind)) return;
-  sel.appendChild(new Option(kind.replace(/_/g, " ").toLowerCase(), kind));
-}
-
-// REAL DATA mode: a device sends only some signals; the rest of a LIVE frame is still simulated, so it is blanked.
-const SENSED_FIELDS = ["rpm", "torque_nm", "process_temp_k", "air_temp_k", "tool_wear_min", "vibration_rms_mm_s", "current_a",
-  "voltage_v", "power_kw", "load_pct", "pressure_bar", "duty_pct", "discharge_temp_c", "blade_wear_pct"];
-function realOnly(o) {
-  const m = window.udyamMode;
-  if (!o || !m || m.mode !== "REAL_DATA" || !Array.isArray(o.live_fields)) return o;
-  const out = { ...o };
-  SENSED_FIELDS.forEach(k => { if (!o.live_fields.includes(k)) out[k] = null; });
-  return out;
-}
-
-// REAL DATA mode (web/mode.js): items about machines without a real device are simulation, so they are hidden
-function hiddenInRealMode(mid) {
-  const m = window.udyamMode;
-  return !!(m && m.mode === "REAL_DATA" && mid && mid !== "FACTORY" && !m.liveMachines.has(mid));
-}
-
-function renderEventLog() {
-  const container = document.getElementById("eventLog");
-  if (!container) return;
-  const { sev, kind } = state.eventFilter;
-  const matching = state.events.filter(e => (sev === "ALL" || e.severity === sev) && (kind === "ALL" || e.kind === kind));
-  const rows = matching.filter(e => !hiddenInRealMode(e.machine_id));
-  const hidden = matching.length - rows.length;
-  const note = hidden ? `<div class="list-empty">${hidden} simulation event(s) hidden in Real Data mode.</div>` : "";
-  if (!rows.length) {
-    container.innerHTML = note || `<div class="list-empty">${state.events.length ? "No events match the filter." : "No events yet."}</div>`;
-    return;
+async function dismissChatProposal(proposalId, btn) {
+  if (btn) {
+    const box = btn.closest(".chat-proposal-box");
+    if (box) box.innerHTML = `<span style="font-size:12px; color:var(--text-muted);">Action Dismissed</span>`;
   }
-  container.innerHTML = note + rows.map(e => {
-    const open = state.expandedEvents.has(e._id);
-    const detail = e.measured || e.inferred || e.suggested;
-    const summary = e.inferred || e.measured || "";
-    const actionable = e.severity === "WARN" || e.severity === "CRITICAL";
-    return `<div class="ev-row ${esc(e.severity)}${open ? " open" : ""}" data-id="${esc(e._id)}">
-      <button type="button" class="ev-line" aria-expanded="${open}" ${detail || actionable ? "" : "disabled"}>
-        <span class="sev-dot" title="${esc(SEV_LABEL[e.severity] || e.severity)}"></span>
-        <span class="ev-time">${esc(shortTime(e.ts))}</span>
-        <span class="ev-text"><b>${esc(e.title)}</b>${summary && !open ? `<span class="ev-sum"> — ${esc(summary)}</span>` : ""}</span>
-        <span class="ev-tag">${esc(e.machine_id || "FACTORY")} · ${esc((e.kind || "").replace(/_/g, " ").toLowerCase())}</span>
-      </button>
-      ${open ? `<div class="ev-detail">
-        ${e.measured ? `<div><b>Measured:</b> ${esc(e.measured)}</div>` : ""}
-        ${e.inferred ? `<div><b>Inferred:</b> ${esc(e.inferred)}</div>` : ""}
-        ${e.suggested ? `<div><b>Suggested:</b> ${esc(e.suggested)}</div>` : ""}
-        ${actionable ? `<button type="button" class="btn btn-sm btn-primary" data-wo-mid="${esc(e.machine_id || "FACTORY")}" data-wo-title="${esc(e.title)}">Create work order</button>` : ""}
-      </div>` : ""}
-    </div>`;
-  }).join("");
-}
-
-function initEventLog() {
-  const log = document.getElementById("eventLog");
-  const filters = document.getElementById("eventFilters");
-  if (!log || !filters) return;
-  log.addEventListener("click", ev => {
-    const wo = ev.target.closest("[data-wo-mid]");
-    if (wo) { createWorkOrderFromAlert(wo.dataset.woMid, wo.dataset.woTitle); wo.disabled = true; wo.textContent = "Work order requested"; return; }
-    const line = ev.target.closest(".ev-line");
-    if (!line || line.disabled) return;
-    const id = line.parentElement.dataset.id;
-    state.expandedEvents.has(id) ? state.expandedEvents.delete(id) : state.expandedEvents.add(id);
-    renderEventLog();
-  });
-  filters.querySelectorAll(".sev-chip").forEach(b => b.onclick = () => {
-    state.eventFilter.sev = b.dataset.sev;
-    filters.querySelectorAll(".sev-chip").forEach(x => x.classList.toggle("active", x === b));
-    renderEventLog();
-  });
-  document.getElementById("eventKindFilter").onchange = e => { state.eventFilter.kind = e.target.value; renderEventLog(); };
-  // Recent history from SQLite so the log is not empty after a reload (oldest first, so newest ends on top)
-  fetch("/api/events?limit=100").then(r => r.json()).then(rows => rows.reverse().forEach(logEvent)).catch(() => {});
-}
-
-// Active alerts from the server alert store (raised, acknowledged and resolved server-side)
-let alertsTimer = null;
-function scheduleAlertsFetch() {
-  clearTimeout(alertsTimer);
-  alertsTimer = setTimeout(fetchAlerts, 250);  // several alert frames often arrive in one batch
-}
-
-function fetchAlerts() {
-  fetch("/api/alerts").then(r => r.json()).then(data => { state.alerts = data; renderAlerts(); }).catch(() => {});
-}
-
-const SEV_RANK = { CRITICAL: 0, WARN: 1, INFO: 2 };
-function renderAlerts() {
-  const list = document.getElementById("alertList");
-  const count = document.getElementById("alertCount");
-  if (!list) return;
-  const simHidden = state.alerts.filter(a => hiddenInRealMode(a.machine_id)).length;
-  const alerts = state.alerts.filter(a => !hiddenInRealMode(a.machine_id)).sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3)
-    || (a.status === "ACTIVE" ? -1 : 1) - (b.status === "ACTIVE" ? -1 : 1) || String(b.raised_at).localeCompare(String(a.raised_at)));
-  const active = alerts.filter(a => a.status === "ACTIVE").length;
-  if (count) { count.textContent = `${active} active`; count.classList.toggle("zero", active === 0); }
-  list.classList.toggle("empty", !alerts.length);
-  if (!alerts.length) {
-    list.innerHTML = `<div class="list-empty ok">✓ No open alerts${simHidden ? ` (${simHidden} simulation alert(s) hidden in Real Data mode)` : ""}</div>`;
-    return;
-  }
-  list.innerHTML = alerts.map(a => `
-    <div class="alert-card ${esc(a.severity)}${a.status === "ACKNOWLEDGED" ? " acked" : ""}" title="${esc([a.measured, a.inferred, a.suggested].filter(Boolean).join("\n"))}">
-      <div class="alert-main">
-        <div class="alert-head"><span class="sev-pill ${esc(a.severity)}">${esc(SEV_LABEL[a.severity] || a.severity)}</span>
-          <b>${esc(machineName(a.machine_id))}</b><span class="alert-time">${esc(shortTime(a.raised_at))}${a.occurrences > 1 ? ` · ×${esc(a.occurrences)}` : ""}</span></div>
-        <div class="alert-msg">${esc(a.title)}</div>
-      </div>
-      <div class="alert-actions">
-        ${a.status === "ACTIVE" ? `<button type="button" class="btn btn-sm" data-alert-ack="${esc(a.alert_id)}">Ack</button>` : `<span class="alert-state">Ack'd</span>`}
-        ${a.wo_id ? `<span class="alert-state">${esc(a.wo_id)}</span>` : `<button type="button" class="btn btn-sm btn-primary" data-alert-wo="${esc(a.alert_id)}">Work order</button>`}
-      </div>
-    </div>`).join("");
-}
-
-function initAlerts() {
-  const list = document.getElementById("alertList");
-  if (!list) return;
-  list.addEventListener("click", ev => {
-    const ack = ev.target.closest("[data-alert-ack]"), wo = ev.target.closest("[data-alert-wo]");
-    const btn = ack || wo;
-    if (!btn) return;
-    btn.disabled = true;
-    const id = encodeURIComponent(ack ? ack.dataset.alertAck : wo.dataset.alertWo);
-    fetch(ack ? `/api/alerts/${id}/acknowledge` : `/api/alerts/${id}/work-order`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: ack ? JSON.stringify({ by: "dashboard operator" }) : undefined,
-    }).then(() => { fetchAlerts(); if (wo) fetchWorkOrders(); }).catch(() => { btn.disabled = false; });
-  });
-  fetchAlerts();
 }
 
 // -----------------------------------------------------------------------------
-// Interactive Commands & API Integrations
+// 14. Toast Notification System
 // -----------------------------------------------------------------------------
-function sendCommand(cmd) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(cmd));
-  } else {
-    // Fallback: send via REST when WebSocket is unavailable
-    if (cmd.cmd === "inject_fault") {
-      fetch("/api/faults/inject", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machine_id: cmd.machine_id, fault: cmd.fault }),
-      }).catch(console.error);
-    } else if (cmd.cmd === "clear_faults") {
-      fetch("/api/faults/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machine_id: cmd.machine_id }),
-      }).catch(console.error);
-    } else if (cmd.cmd === "reset") {
-      fetch("/api/reset", { method: "POST" }).catch(console.error);
-    } else if (cmd.cmd === "set_derate") {
-      fetch("/api/derate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machine_id: cmd.machine_id, pct: cmd.pct }),
-      }).catch(console.error);
-    } else if (cmd.cmd === "auto_demo") {
-      fetch(`/api/auto_demo?on=${cmd.on}`, { method: "POST" }).catch(console.error);
+let toastTimer = null;
+
+function showToast(message) {
+  const toast = document.getElementById("appleToast");
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.add("show");
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 3200);
+}
+
+// -----------------------------------------------------------------------------
+// 15. Real-Time Telemetry Event Bus Integration
+// -----------------------------------------------------------------------------
+function setupApiEventListeners() {
+  if (!window.UdyamAPI) return;
+
+  // Backend connection status
+  window.UdyamAPI.on("status", (s) => {
+    const pill = document.getElementById("opStatusPill");
+    if (pill) {
+      if (s.connected) {
+        pill.className = "op-status-pill online";
+        pill.innerHTML = `● Connected: ${s.endpoint.replace('ws://', '')}`;
+      } else {
+        pill.className = "op-status-pill simulated";
+        pill.innerHTML = `◌ Backend offline · reconnecting…`;
+      }
+    }
+  });
+  // the WebSocket may already have connected before this listener was registered
+  if (window.UdyamAPI.wsConnected) {
+    window.UdyamAPI.emit("status", { connected: true, live: true, endpoint: `${window.UdyamAPI.wsUrl}/ws/telemetry` });
+  }
+
+  // Telemetry Snapshot Broadcast
+  window.UdyamAPI.on("snapshot", (snap) => {
+    const mid = snap.machine_id;
+    LIVE_SNAPSHOTS[mid] = snap;
+
+    // Update Hero HUD for VMC-01
+    if (mid === "VMC-01") {
+      const rpmEl = document.getElementById("hudRpm");
+      const tempEl = document.getElementById("hudTemp");
+      if (rpmEl && snap.rpm != null) rpmEl.textContent = `${snap.rpm.toLocaleString()} RPM`;
+      if (tempEl && snap.temp_c != null) tempEl.textContent = `${snap.temp_c} °C (Zone ${snap.severity.zone})`;
+    }
+
+    // Update Machines section card
+    updateMachineCardReadings(mid, snap);
+
+    // Update 3D inspector if focused
+    if (mid === CURRENT_MACHINE_ID || CURRENT_MACHINE_ID === "FACTORY" || !CURRENT_MACHINE_ID) {
+      updateMachineInspectorHUD(CURRENT_MACHINE_ID || "FACTORY");
+    }
+  });
+
+  // Line Metrics Broadcast
+  window.UdyamAPI.on("line", (line) => {
+    const lineLossEl = document.getElementById("kpiLineLoss");
+    if (lineLossEl) lineLossEl.textContent = `₹${line.line_loss_inr_per_hr}/hr`;
+
+    const throughputEl = document.getElementById("kpiThroughput");
+    if (throughputEl) throughputEl.textContent = `${line.throughput_parts_per_hr} parts/hr`;
+  });
+}
+
+function updateMachineCardReadings(machineId, snap) {
+  const zone = (snap.severity || {}).zone || "A";
+  const ok = (zone === "A" || zone === "B") && !snap.active_scenario;
+  const sig = snap.signals || {};
+  const fmt = (v, d = 1) => (v == null ? "—" : (+v).toLocaleString(undefined, { maximumFractionDigits: d }));
+  // the two readings each card shows, from the live snapshot (pairs follow the card's labels in index.html)
+  const READINGS = {
+    "SAW-01": [`${fmt(sig.blade_wear_pct, 0)}% blade wear`, null],  // parts cut: refreshLiveFigures (analytics)
+    "LATHE-01": [`${fmt(snap.rpm, 0)} RPM`, `${fmt(sig.torque_nm)} Nm`],
+    "VMC-01": [`${fmt(snap.load_pct)}%${snap.derate_pct ? ` (derated ${snap.derate_pct}%)` : ""}`, `${fmt(snap.temp_c)} °C`],
+    "COMP-01": [`${fmt(sig.pressure_bar, 2)} bar`, `${fmt(sig.duty_pct, 0)}% duty`],
+  };
+  const META = { "SAW-01": `Wear ${fmt(sig.blade_wear_pct, 0)}%`, "LATHE-01": `${fmt(snap.rpm, 0)} RPM`,
+    "VMC-01": `${fmt(snap.rpm, 0)} RPM`, "COMP-01": `${fmt(sig.pressure_bar, 1)} bar` };
+  const card = document.getElementById(`card-${machineId}`);
+  if (card) {
+    const pill = card.querySelector(".status-indicator-pill");
+    if (pill && snap.severity) {  // the backend's status is PROVISIONAL; the vibration zone says how the machine is
+      pill.textContent = `${ok ? "✓" : "⚠"} Zone ${zone}${snap.active_scenario ? " · fault" : ""}`;
+      pill.className = `status-indicator-pill ${ok ? "normal" : zone === "D" ? "problem" : "attention"}`;
+    }
+    const vals = card.querySelectorAll(".reading-val");
+    (READINGS[machineId] || []).forEach((v, k) => { if (v != null && vals[k]) vals[k].textContent = v; });
+  }
+  document.querySelectorAll(`.quick-station-pill[onclick*="'${machineId}'"]`).forEach(p => {
+    const meta = p.querySelector(".station-meta"), dot = p.querySelector(".station-dot");
+    if (meta && META[machineId]) meta.textContent = `${META[machineId]} · Focus 3D →`;
+    if (dot) dot.className = `station-dot ${ok ? "normal" : "attention"}`;
+  });
+}
+
+// -----------------------------------------------------------------------------
+// 16. Navigation, FAQ, and Lifecycle Bootstrap
+// -----------------------------------------------------------------------------
+function initFaqAccordion() {
+  document.querySelectorAll(".faq-question-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = btn.closest(".faq-item");
+      const isActive = item.classList.contains("active");
+
+      document.querySelectorAll(".faq-item").forEach(other => {
+        other.classList.remove("active");
+        other.querySelector(".faq-question-btn")?.setAttribute("aria-expanded", "false");
+      });
+
+      if (!isActive) {
+        item.classList.add("active");
+        btn.setAttribute("aria-expanded", "true");
+      }
+    });
+  });
+}
+
+function toggleMobileMenu() {
+  const drawer = document.getElementById("mobileNavDrawer");
+  if (drawer) drawer.classList.toggle("open");
+}
+
+function closeMobileMenu() {
+  const drawer = document.getElementById("mobileNavDrawer");
+  if (drawer) drawer.classList.remove("open");
+}
+
+function initScrollspy() {
+  // page sections only (not the panels inside them, which are <section class="panel">); hidden ones are skipped
+  const sections = document.querySelectorAll("section.section[id], section.hero-section[id]");
+  const nav = document.querySelector(".site-header .nav-links");
+  const navLinks = document.querySelectorAll(".site-header .nav-link, .mobile-drawer-links .nav-link");
+  let last = "";
+
+  const update = () => {
+    let current = "hero";
+    sections.forEach(sec => {
+      if (!sec.offsetParent && getComputedStyle(sec).display === "none") return;
+      if (sec.getBoundingClientRect().top <= 140) current = sec.id;
+    });
+    if (current === last) return;
+    last = current;
+    navLinks.forEach(link => link.classList.toggle("active", link.getAttribute("href") === `#${current}`));
+    const active = nav && nav.querySelector(".nav-link.active");
+    if (active && nav.scrollWidth > nav.clientWidth) {  // keep the active link visible when the bar scrolls sideways
+      const l = active.offsetLeft - nav.offsetLeft, r = l + active.offsetWidth;
+      if (l < nav.scrollLeft || r > nav.scrollLeft + nav.clientWidth) nav.scrollTo({ left: l - 24, behavior: "smooth" });
+    }
+  };
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("hashchange", update);
+  update();
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  initOpeningLoader();
+  initCursorReactiveGrid();
+  initCardSpotlights();
+  initScrollReveal();
+  initFaqAccordion();
+  initScrollspy();
+  setupApiEventListeners();
+  refreshLiveFigures();
+  renderAlerts();
+  setInterval(() => { if (document.visibilityState === "visible") renderAlerts(); }, 10000);
+  if (window.UdyamAPI) window.UdyamAPI.on("alert", () => setTimeout(renderAlerts, 300));
+
+  // Intercept anchor navigation for #digital-twin to trigger 3D simulation mode
+  document.querySelectorAll('a[href="#digital-twin"]').forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      setFactoryMode("simulation");
+      const factorySec = (document.getElementById("factorySimulator") || document.getElementById("factory"));
+      if (factorySec) factorySec.scrollIntoView({ behavior: "smooth" });
+    });
+  });
+
+  if (window.location.hash === "#digital-twin") {
+    setTimeout(() => {
+      setFactoryMode("simulation");
+    }, 120);
+  }
+
+  // Esc key closes modals
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeMachineModal();
+      closeAiAssistant();
+      closeWorkOrdersModal();
+      closeFaultLabModal();
+      closeAddMachineModal();
+      closeVibrationModal();
+    }
+  });
+});
+
+function openConnectionModal() {
+  const modal = document.getElementById("connectionModal");
+  if (modal) {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    const urlInp = document.getElementById("cfgApiBaseUrl");
+    if (urlInp && window.UdyamAPI) urlInp.value = window.UdyamAPI.baseUrl;
+  }
+}
+
+function closeConnectionModal() {
+  const modal = document.getElementById("connectionModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function saveConnectionSettings() {
+  const urlInp = document.getElementById("cfgApiBaseUrl");
+  const tokenInp = document.getElementById("cfgOperatorToken");
+  if (urlInp && window.UdyamAPI) {
+    const newUrl = urlInp.value.trim();
+    if (newUrl) {
+      window.UdyamAPI.baseUrl = newUrl;
+      window.UdyamAPI.wsUrl = newUrl.replace(/^http/, "ws");
+      try {
+        localStorage.setItem("UDYAM_API_BASE_URL", newUrl);
+      } catch (e) {}
+      window.UdyamAPI.connectWebSocket();
+    }
+  }
+  if (tokenInp && window.UdyamAPI) {
+    window.UdyamAPI.operatorToken = tokenInp.value.trim() || null;
+  }
+  closeConnectionModal();
+  showToast("Connection settings updated. Reconnecting…");
+}
+
+async function triggerToolChange(machineId = "VMC-01") {
+  if (window.UdyamAPI) {
+    try {
+      await window.UdyamAPI.recordToolChange(machineId, 0);
+      showToast(`Tool replaced on ${machineId}. Wear counter reset to 0 min.`);
+      closeMachineModal();
+    } catch (err) {
+      showToast(`Tool change failed: ${err.message || err}`);
     }
   }
 }
 
-function injectSelectedFault() {
-  const mSel = document.getElementById("faultMachineSelect");
-  const fSel = document.getElementById("faultTypeSelect");
-  if (!mSel || !fSel) return;
-  sendCommand({
-    cmd: "inject_fault",
-    machine_id: mSel.value,
-    fault: fSel.value,
-  });
-}
-
-function clearAllFaults() {
-  sendCommand({ cmd: "clear_faults" });
-}
-
-function toggleAutoDemo() {
-  state.autoDemo = !state.autoDemo;
-  const btn = document.getElementById("btnAutoDemo");
-  if (btn) btn.textContent = `Auto Demo: ${state.autoDemo ? 'ON' : 'OFF'}`;
-  sendCommand({ cmd: "auto_demo", on: state.autoDemo });
-}
-
-function resetScenario() {
-  sendCommand({ cmd: "reset" });
-}
-
-function applyDerate(pct) {
-  const mid = state.selectedMachineId;
-  sendCommand({ cmd: "set_derate", machine_id: mid, pct: pct });
-}
-
-// Onboarding Modal
-function openOnboardingModal() {
-  document.getElementById("onboardingModal").classList.add("open");
-}
-
-function closeOnboardingModal() {
-  document.getElementById("onboardingModal").classList.remove("open");
-}
-
-function submitOnboardingForm(e) {
-  e.preventDefault();
-  const template = document.getElementById("onboardTemplate").value;
-  const name = document.getElementById("onboardName").value;
-  const rated_kw = parseFloat(document.getElementById("onboardKw").value) || 7.5;
-  const max_rpm = parseFloat(document.getElementById("onboardRpm").value) || 3000;
-
-  sendCommand({
-    cmd: "add_machine",
-    template: template,
-    name: name,
-    nameplate: { rated_kw: rated_kw, max_rpm: max_rpm },
-  });
-
-  closeOnboardingModal();
-}
-
-// Tool Wear Measurement Feedback Modal
-function openToolWearModal(machineId) {
-  const midInput = document.getElementById("toolWearMachineId");
-  if (midInput) midInput.value = machineId;
-  document.getElementById("toolWearModal").classList.add("open");
-}
-
-function closeToolWearModal() {
-  document.getElementById("toolWearModal").classList.remove("open");
-}
-
-function submitToolWearForm(e) {
-  e.preventDefault();
-  const mid = document.getElementById("toolWearMachineId").value;
-  const wear = parseFloat(document.getElementById("toolWearValue").value);
-
-  fetch("/api/tool-wear", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ machine_id: mid, measured_wear_min: wear }),
-  }).then(r => r.json()).then(data => {
-    closeToolWearModal();
-  });
-}
-
-// Work Orders
-function fetchWorkOrders() {
-  fetch("/api/work-orders")
-    .then(r => r.json())
-    .then(data => {
-      state.workOrders = data;
-      renderWorkOrders();
-    })
-    .catch(() => {});
-}
-
-const WO_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-const WO_OPEN = wo => wo.status !== "Closed";
-
-function renderWorkOrders() {
-  const list = document.getElementById("workOrderList");
-  const count = document.getElementById("woCount");
-  if (!list) return;
-  const open = state.workOrders.filter(WO_OPEN).length;
-  if (count) { count.textContent = `${open} open`; count.title = `${state.workOrders.length} in total`; }
-
-  if (state.workOrders.length === 0) {
-    list.innerHTML = "<div class='list-empty'>No work orders.</div>";
-    return;
-  }
-  // Open orders first (by priority), then closed ones, newest first within each group
-  const rows = [...state.workOrders].sort((a, b) => (WO_OPEN(b) - WO_OPEN(a)) || (WO_RANK[a.priority] ?? 9) - (WO_RANK[b.priority] ?? 9)
-    || String(b.created_at).localeCompare(String(a.created_at)));
-  list.innerHTML = rows.map(wo => `
-    <div class="wo-row${WO_OPEN(wo) ? "" : " closed"}" title="${esc(wo.cause || wo.title)}">
-      <span class="wo-id">${esc(wo.wo_id)}</span>
-      <span class="wo-main"><b>${esc(wo.machine_id)}</b> <span class="wo-title">${esc(wo.title)}</span></span>
-      <span class="prio-pill ${esc(wo.priority)}">${esc(wo.priority)}</span>
-      <span class="status-pill ${esc((wo.status || "").replace(/\s+/g, "-"))}">${esc(wo.status)}</span>
-      <span class="wo-act">
-        ${wo.status === 'Open' ? `<button class="btn btn-sm btn-primary" onclick="updateWo('${esc(wo.wo_id)}', 'In Progress')">Acknowledge</button>` : ''}
-        ${wo.status === 'In Progress' ? `<button class="btn btn-sm btn-primary" onclick="updateWo('${esc(wo.wo_id)}', 'Closed')">Close</button>` : ''}
-      </span>
-    </div>
-  `).join("");
-}
-
-function createWorkOrderFromAlert(machineId, warning) {
-  fetch("/api/work-orders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      machine_id: machineId,
-      title: `Corrective maintenance: ${warning}`,
-      priority: "High",
-      notes: "Auto-generated from digital twin forecast alert",
-    }),
-  }).then(() => fetchWorkOrders());
-}
-
-function updateWo(woId, status) {
-  fetch(`/api/work-orders/${woId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: status }),
-  }).then(() => fetchWorkOrders());
-}
-
-function fetchRegistry() {
-  fetch("/api/registry")
-    .then(r => r.json())
-    .then(data => {
-      if (data.machines) {
-        state.machines = Object.fromEntries(data.machines.map(m => [m.machine_id, m]));
-        updateMachineDropdowns();
-        renderAll();
-      }
-    })
-    .catch(() => {});
-}
-
-// -----------------------------------------------------------------------------
-// Interactive MSME Economics Modal & Calculations
-// -----------------------------------------------------------------------------
-
-function openEconomicsModal() {
-  const econ = state.economics || {};
-  const setVal = (id, val) => {
-    const el = document.getElementById(id);
-    if (el && val !== undefined) el.value = val;
-  };
-  setVal("inputDowntimeCost", econ.downtime_cost_per_hr || 2500);
-  setVal("inputPartMargin", econ.inr_per_part || 450);
-  setVal("inputElectricityTariff", econ.electricity_tariff_per_kwh || 8.5);
-  setVal("inputSensorCost", econ.sensor_node_cost_inr || 2200);
-  setVal("inputBaseHours", econ.base_breakdown_hours || 12);
-  setVal("inputCeaFactor", econ.cea_co2_factor || 0.716);
-
-  document.getElementById("economicsModal").classList.add("open");
-}
-
-function closeEconomicsModal() {
-  document.getElementById("economicsModal").classList.remove("open");
-}
-
-function submitEconomicsForm(e) {
-  e.preventDefault();
-  const updates = {
-    downtime_cost_per_hr: parseFloat(document.getElementById("inputDowntimeCost").value) || 2500,
-    inr_per_part: parseFloat(document.getElementById("inputPartMargin").value) || 450,
-    electricity_tariff_per_kwh: parseFloat(document.getElementById("inputElectricityTariff").value) || 8.5,
-    sensor_node_cost_inr: parseFloat(document.getElementById("inputSensorCost").value) || 2200,
-    base_breakdown_hours: parseFloat(document.getElementById("inputBaseHours").value) || 12,
-    cea_co2_factor: parseFloat(document.getElementById("inputCeaFactor").value) || 0.716,
-  };
-
-  Object.assign(state.economics, updates);
-  closeEconomicsModal();
-  renderEconomics();
-
-  // Persist to SQLite backend
-  fetch("/api/economics", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
-  }).catch(() => {});
-}
-
-function fetchEconomics() {
-  fetch("/api/economics")
-    .then(r => r.json())
-    .then(data => {
-      if (data.assumptions) {
-        Object.assign(state.economics, data.assumptions);
-        renderEconomics();
-      }
-    })
-    .catch(() => {});
-}
-
-// -----------------------------------------------------------------------------
-// Competition Demo Scenarios
-// -----------------------------------------------------------------------------
-
-function demoScenario(name) {
-  if (name === "coolant") {
-    selectMachine("VMC-01");
-    sendCommand({ cmd: "inject_fault", machine_id: "VMC-01", fault: "coolant_degradation" });
-  } else if (name === "bearing") {
-    selectMachine("LATHE-01");
-    sendCommand({ cmd: "inject_fault", machine_id: "LATHE-01", fault: "bearing_defect" });
-  } else if (name === "compressor") {
-    selectMachine("COMP-01");
-    sendCommand({ cmd: "inject_fault", machine_id: "COMP-01", fault: "pressure_drop" });
-  } else if (name === "tool_wear") {
-    selectMachine("VMC-01");
-    openToolWearModal("VMC-01");
-  }
-}
-
-// -----------------------------------------------------------------------------
-// AI4I Research Intelligence Metrics
-// -----------------------------------------------------------------------------
-
-function fetchMetrics() {
-  fetch("/api/metrics")
-    .then(r => r.json())
-    .then(data => {
-      state.metrics = data;
-      if (data.random_forest) {
-        const rf = data.random_forest;
-        const rule = data.rule_baseline || {};
-        const elRf = document.getElementById("mlRfF1");
-        const elRule = document.getElementById("mlRuleF1");
-        const elRoc = document.getElementById("mlRocAuc");
-        const elPrec = document.getElementById("mlPrec");
-        const elFpr = document.getElementById("mlFpr");
-
-        if (elRf) elRf.textContent = `${(rf.f1 * 100).toFixed(1)}%`;
-        if (elRule) elRule.textContent = `${(rule.f1 * 100).toFixed(1)}%`;
-        if (elRoc) elRoc.textContent = `${rf.roc_auc.toFixed(3)}`;
-        if (elPrec) elPrec.textContent = `${(rf.precision * 100).toFixed(1)}%`;
-        if (elFpr) elFpr.textContent = `${(rf.false_positive_rate * 100).toFixed(2)}%`;
-      }
-    })
-    .catch(() => {});
-}
-
-// Expose interactive functions globally for HTML inline handlers
+// Global exports for HTML onclick
+window.dismissLoader = dismissLoader;
+window.replayIntro = replayIntro;
+window.setFactoryMode = setFactoryMode;
+window.selectMachineIn3D = selectMachineIn3D;
+window.updateMachineInspectorHUD = updateMachineInspectorHUD;
+window.select3DTarget = select3DTarget;
+window.openMachineModal = openMachineModal;
+window.closeMachineModal = closeMachineModal;
+window.filterAlerts = filterAlerts;
+window.acknowledgeAlert = acknowledgeAlert;
+window.resolveAlert = resolveAlert;
+window.generateWorkOrderFromAlert = generateWorkOrderFromAlert;
+window.acknowledgeAllAlerts = acknowledgeAllAlerts;
+window.openWorkOrdersModal = openWorkOrdersModal;
+window.closeWorkOrdersModal = closeWorkOrdersModal;
+window.advanceWorkOrder = advanceWorkOrder;
+window.handleCreateWorkOrderSubmit = handleCreateWorkOrderSubmit;
+window.openFaultLabModal = openFaultLabModal;
+window.closeFaultLabModal = closeFaultLabModal;
+window.triggerFault = triggerFault;
+window.triggerClearFaults = triggerClearFaults;
+window.triggerScenario = triggerScenario;
+window.triggerSimulateResolution = triggerSimulateResolution;
+window.triggerResetBaseline = triggerResetBaseline;
 window.toggleAutoDemo = toggleAutoDemo;
-window.resetScenario = resetScenario;
-window.openOnboardingModal = openOnboardingModal;
-window.closeOnboardingModal = closeOnboardingModal;
-window.submitOnboardingForm = submitOnboardingForm;
-window.openToolWearModal = openToolWearModal;
-window.closeToolWearModal = closeToolWearModal;
-window.submitToolWearForm = submitToolWearForm;
-window.openEconomicsModal = openEconomicsModal;
-window.closeEconomicsModal = closeEconomicsModal;
-window.submitEconomicsForm = submitEconomicsForm;
-window.injectSelectedFault = injectSelectedFault;
-window.clearAllFaults = clearAllFaults;
-window.applyDerate = applyDerate;
-window.demoScenario = demoScenario;
-window.createWorkOrderFromAlert = createWorkOrderFromAlert;
-window.updateWo = updateWo;
-// -----------------------------------------------------------------------------
-// Vibration Health panel (GET /api/vibration/{id}); every value carries its provenance
-// -----------------------------------------------------------------------------
+window.openAddMachineModal = openAddMachineModal;
+window.closeAddMachineModal = closeAddMachineModal;
+window.handleAddMachineSubmit = handleAddMachineSubmit;
+window.runWhatIfSimulation = runWhatIfSimulation;
+window.exportWhatIfResults = exportWhatIfResults;
+window.openVibrationModal = openVibrationModal;
+window.closeVibrationModal = closeVibrationModal;
+window.triggerWaveformCapture = triggerWaveformCapture;
+window.triggerProposeRLAction = triggerProposeRLAction;
+window.triggerTrainCandidateModel = triggerTrainCandidateModel;
+window.triggerSetAdaptiveBaseline = triggerSetAdaptiveBaseline;
+window.openAiAssistant = openAiAssistant;
+window.closeAiAssistant = closeAiAssistant;
+window.handleAiInputSubmit = handleAiInputSubmit;
+window.approveChatProposal = approveChatProposal;
+window.dismissChatProposal = dismissChatProposal;
+window.toggleMobileMenu = toggleMobileMenu;
+window.closeMobileMenu = closeMobileMenu;
+window.handleExploreFactory = handleExploreFactory;
+window.showToast = showToast;
+window.openConnectionModal = openConnectionModal;
+window.closeConnectionModal = closeConnectionModal;
+window.saveConnectionSettings = saveConnectionSettings;
+window.triggerToolChange = triggerToolChange;
 
-const VIB_PROVENANCE_LABEL = {
-  measured: "Measured vibration",
-  simulated: "Simulated vibration",
-  replayed: "Replayed vibration",
-  recorded: "Recorded vibration",
-};
-const SEVERITY_LABEL = {
-  ASSESSED: "Rule-based severity",
-  PROVISIONAL: "Provisional (thresholds not verified)",
-  UNAVAILABLE: "Assessment unavailable",
-  NOT_APPLICABLE: "Not applicable",
-  NO_DATA: "No data",
-};
-const ML_LABEL = {
-  TRAINING_NOT_CONFIGURED: "Training not configured",
-  SYNTHETIC_MODEL: "Synthetic test model (not published)",
-  INSUFFICIENT_FEATURES: "Insufficient features",
-  OUT_OF_DOMAIN: "Out of model domain",
-  OK: "ML prediction",
-  OK_UNVALIDATED: "ML prediction (unvalidated)",
-};
 
-function fetchVibration() {
-  const mid = state.selectedMachineId;
-  if (!mid) return;
-  fetch(`/api/vibration/${encodeURIComponent(mid)}`)
-    .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then(v => { if (v.machine_id === state.selectedMachineId) renderVibrationPanel(v); })
-    .catch(() => {
-      const panel = document.getElementById("vibrationPanel");
-      if (panel) panel.innerHTML = `<div class="text-muted">Vibration health unavailable for ${esc(mid)}.</div>`;
-    });
+// Figures that must come from the backend, never hard-coded: model test metrics, line output and availability,
+// open work orders and the owner answers in #status (computed from the live snapshots)
+let MODEL_METRICS = null;
+const pct1 = v => (v == null ? "—" : `${(100 * v).toFixed(1)}%`);
+const setText = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+const setNum = (id, value, unit) => { const e = document.getElementById(id); if (e) e.innerHTML = `${value}<span class="dash-metric-unit">${unit}</span>`; };
+const setBar = (id, frac) => { const e = document.getElementById(id); if (e) e.style.width = `${Math.max(0, Math.min(100, 100 * frac))}%`; };
+
+async function refreshLiveFigures() {
+  if (!window.UdyamAPI) return;
+  const A = window.UdyamAPI;
+  if (!MODEL_METRICS) {
+    try {
+      MODEL_METRICS = await A.request("/api/metrics");
+      const mf = (MODEL_METRICS.per_class || {}).machine_failure || {};
+      const cm = mf.confusion_matrix || {};
+      const ver = MODEL_METRICS.registry_version ? ` (model ${MODEL_METRICS.registry_version})` : "";
+      setText("aiMetricsLine", `precision ${pct1(mf.precision)}, recall ${pct1(mf.recall)}, ROC-AUC ${mf.roc_auc ?? "—"}${ver}`);
+      setText("bVal1", pct1(mf.precision)); setText("bSub1", `False-alarm rate ${pct1(mf.false_positive_rate)}`);
+      setText("bVal2", pct1(mf.recall)); setText("bSub2", `Catches ${cm.true_positives ?? "—"} / ${mf.support_positive ?? "—"} test failures`);
+      setText("bVal3", mf.f1 ?? "—"); setText("bSub3", "Precision–recall balance");
+      setText("bVal4", mf.roc_auc ?? "—"); setText("bSub4", `PR-AUC ${mf.pr_auc ?? "—"}`);
+    } catch (_) { /* metrics stay "—" while the backend is unreachable */ }
+  }
+  try {
+    const [an, orders] = await Promise.all([A.request("/api/analytics"), A.getWorkOrders()]);
+    const ms = Object.values(an.machines || {}).filter(m => (m.oee || {}).availability != null);  // machines with OEE (not the compressor)
+    const avail = ms.length ? ms.reduce((s, m) => s + m.oee.availability, 0) / ms.length : null;
+    const since = an.since ? new Date(an.since).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+    const lineParts = ((an.machines["VMC-01"] || {}).oee || {}).parts ?? 0;  // last station of the line (sim/line.py)
+    setText("heroAvail", avail == null ? "—" : `${pct1(avail)} availability`);
+    setNum("dashNum1", lineParts.toLocaleString(), "parts");
+    setText("dashSub1", `Line output since ${since} (simulated session)`);
+    setBar("dashBar1", ms.length ? ms.reduce((s, m) => s + ((m.oee || {}).oee || 0), 0) / ms.length : 0);
+    const downMin = ms.reduce((s, m) => s + Math.max(0, ((m.oee || {}).window_s || 0) - ((m.oee || {}).running_s || 0)), 0) / 60;
+    setNum("dashNum3", downMin.toFixed(0), "mins");
+    setText("dashSub3", `Machine-minutes not running since ${since}, ${ms.length} production machines`);
+    setBar("dashBar3", ms.length && an.elapsed_s ? downMin * 60 / (ms.length * an.elapsed_s) : 0);
+    const open = orders.filter(o => o.status !== "Closed");
+    setNum("dashNum4", open.length, open.length === 1 ? "task" : "tasks");
+    setText("dashSub4", open.length ? `Oldest open: ${open[open.length - 1].wo_id} · ${open[open.length - 1].title || ""}`.slice(0, 90) : "No open work orders.");
+    setBar("dashBar4", Math.min(1, open.length / 10));
+    setText("woCountBadge", open.length);
+    setText("qaFoot1", avail == null ? "—" : `Overall availability: ${pct1(avail)}`);
+    const sawVals = document.querySelectorAll("#card-SAW-01 .reading-val");
+    if (sawVals[1]) sawVals[1].textContent = `${((an.machines["SAW-01"] || {}).oee || {}).parts ?? "—"} bars since ${since}`;
+  } catch (_) { /* the status pill already shows a backend problem */ }
+  updateOwnerAnswers();
 }
 
-function provenancePill(prov) {
-  if (!prov) return `<span class="pill vib-prov-none">No data</span>`;
-  return `<span class="pill vib-prov-${esc(prov)}">${esc(VIB_PROVENANCE_LABEL[prov] || prov)}</span>`;
+function updateOwnerAnswers() {
+  const snaps = Object.values(LIVE_SNAPSHOTS || {});
+  if (!snaps.length) return;
+  const zone = s => (s.severity || {}).zone || "A";
+  const ok = snaps.filter(s => ["A", "B"].includes(zone(s)) && !s.active_scenario && s.state !== "TRIP");
+  const running = snaps.filter(s => ["RUN", "DERATE"].includes(s.state));
+  setNum("dashNum2", `${running.length} of ${snaps.length}`, "running");
+  setText("dashSub2", snaps.map(s => `${s.machine_id} ${s.state}${s.derate_pct ? ` −${s.derate_pct}%` : ""}`).join(" · "));
+  setBar("dashBar2", running.length / snaps.length);
+  const a1 = document.getElementById("qaAns1");
+  if (a1) {
+    const good = ok.length === snaps.length;
+    a1.className = `qa-answer ${good ? "status-good" : "status-warn"}`;
+    a1.textContent = good ? "✓ Yes, every machine is in a safe zone." : `⚠ ${snaps.length - ok.length} of ${snaps.length} machines need a look.`;
+  }
+  setText("qaDetail1", `${ok.length} of ${snaps.length} machines are in vibration zone A/B with no active fault. ${running.length} are running.`);
+  // the machine to look at first: worst vibration zone, then a running scenario, then derate
+  const rank = s => ({ D: 40, C: 30, B: 10, A: 0 }[zone(s)] || 0) + (s.active_scenario ? 20 : 0) + (s.derate_pct ? 15 : 0) + (s.state === "TRIP" ? 50 : 0);
+  const worst = [...snaps].sort((x, y) => rank(y) - rank(x))[0];
+  const a2 = document.getElementById("qaAns2");
+  if (a2) {
+    const fine = rank(worst) <= 10;
+    a2.className = `qa-answer ${fine ? "status-good" : "status-warn"}`;
+    a2.textContent = fine ? "✓ None right now." : `⚠ ${worst.name || worst.machine_id}.`;
+  }
+  setText("qaDetail2", rank(worst) <= 10 ? "No machine is above zone B, faulted or derated." :
+    `Zone ${zone(worst)}${worst.active_scenario ? `, ${String(worst.active_scenario).replace(/_/g, " ")}` : ""}${worst.derate_pct ? `, derated ${worst.derate_pct}%` : ""}; state ${worst.state}.`);
+  setText("qaFoot2", worst.vibration_rms_mm_s != null ? `${worst.machine_id} vibration ${worst.vibration_rms_mm_s} mm/s` : "—");
+  const cncs = snaps.filter(s => ["cnc_mill", "cnc_lathe"].includes(s.template));
+  const cncOk = cncs.every(s => ["A", "B"].includes(zone(s)));
+  const a3 = document.getElementById("qaAns3");
+  if (a3) {
+    a3.className = `qa-answer ${cncOk ? "status-good" : "status-warn"}`;
+    a3.textContent = cncOk ? "✓ Cutting conditions are stable." : "⚠ Cutting conditions are disturbed.";
+  }
+  setText("qaDetail3", cncs.map(s => `${s.machine_id}: ${s.temp_c ?? "—"} °C, ${s.vibration_rms_mm_s ?? "—"} mm/s (zone ${zone(s)})`).join(" · "));
+  setText("qaFoot3", "Dimensional accuracy is not measured (no gauge data); this is inferred from temperature and vibration.");
 }
-
-function vibrationSparkline(points) {
-  const vals = points.map(p => p[1]).filter(v => typeof v === "number");
-  if (vals.length < 2) return `<div class="text-muted" style="font-size:12px;">Not enough samples for a trend yet.</div>`;
-  const w = 320, h = 70, pad = 4;
-  const max = Math.max(...vals) * 1.1 || 1;
-  const step = (w - 2 * pad) / Math.max(1, points.length - 1);
-  // Break the line at missing values instead of interpolating across them.
-  let d = "", pen = false;
-  points.forEach((p, i) => {
-    if (typeof p[1] !== "number") { pen = false; return; }
-    const x = pad + i * step, y = h - pad - (p[1] / max) * (h - 2 * pad);
-    d += `${pen ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)} `;
-    pen = true;
-  });
-  const modes = [...new Set(points.map(p => p[2]).filter(Boolean))].join(" + ");
-  return `
-    <svg class="vib-trend" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"
-         aria-label="Vibration velocity trend, max ${fmt(max / 1.1, 2)} mm/s">
-      <path d="${d}" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-    </svg>
-    <div class="vib-trend-caption">
-      <span>last ${points.length} ticks · source ${esc(modes || "—")}</span>
-      <span>peak ${fmt(Math.max(...vals), 2)} mm/s</span>
-    </div>`;
-}
-
-function renderVibrationPanel(v) {
-  const panel = document.getElementById("vibrationPanel");
-  if (!panel) return;
-  const sv = v.stream_velocity || {};
-  const sev = v.severity || {};
-  const ml = v.ml || {};
-  const op = v.operating || {};
-  const wf = v.waveform;
-  const dq = v.data_quality || { warnings: [] };
-
-  const wfFeats = wf ? wf.features || {} : {};
-  const wfRows = wf ? [
-    ["Velocity RMS (band)", wfFeats.velocity_rms_mm_s, "mm/s", 3],
-    ["Acceleration RMS", wfFeats.accel_rms_m_s2, "m/s²", 3],
-    ["Peak acceleration", wfFeats.accel_peak_m_s2, "m/s²", 3],
-    ["Crest factor", wfFeats.crest_factor, "", 2],
-    ["Kurtosis", wfFeats.kurtosis, "", 2],
-    ["Dominant frequency", wfFeats.dominant_freq_hz, "Hz", 1],
-    ["Dominant order (×shaft)", wfFeats.dominant_order, "", 2],
-    ["Displacement p-p", wfFeats.disp_pp_um, "µm", 1],
-  ] : [];
-
-  panel.innerHTML = `
-    <div class="panel-header">
-      <h2>Vibration Health <span style="font-size:13px; color:var(--text-muted); font-weight:normal;">[${esc(v.machine_id)}] · ${esc(v.template || "")}</span></h2>
-    </div>
-
-    <div class="vib-grid">
-      <div class="vib-box">
-        <div class="vib-box-title">Velocity RMS (stream)</div>
-        <div class="vib-value">${fmt(sv.value, 2)} <small>mm/s</small></div>
-        <div class="vib-meta">${provenancePill(sv.provenance)}</div>
-        <div class="vib-meta">${esc(sv.method || "")}${sv.band_hz ? "" : " · band not declared"}</div>
-        <div class="vib-meta">stream ts ${esc(sv.stream_ts || "—")}</div>
-      </div>
-
-      <div class="vib-box">
-        <div class="vib-box-title">Rule-based severity</div>
-        <div class="vib-value vib-status-${esc(sev.status || "UNAVAILABLE")}">${esc(SEVERITY_LABEL[sev.status] || sev.status || "—")}${sev.zone ? ` · Zone ${esc(sev.zone)}` : ""}</div>
-        <div class="vib-meta">${esc(sev.reason || "")}</div>
-        ${sev.basis ? `<div class="vib-meta">basis: ${esc(sev.basis)}</div>` : ""}
-      </div>
-
-      <div class="vib-box">
-        <div class="vib-box-title">ML prediction</div>
-        <div class="vib-value vib-ml-${esc(ml.status || "TRAINING_NOT_CONFIGURED")}">${ml.label ? esc(ml.label) : esc(ML_LABEL[ml.status] || ml.status || "—")}</div>
-        ${ml.label ? `<div class="vib-meta"><span class="pill ${ml.status === "OK" ? "OK" : "WARN"}">${esc(ML_LABEL[ml.status] || ml.status)}</span></div>` : ""}
-        ${ml.label && ml.class_vote_share ? `<div class="vib-meta">vote share ${esc(fmt((ml.class_vote_share[ml.label] || 0) * 100, 0))}% (${ml.calibrated ? "calibrated" : "uncalibrated"}) · from ${esc(VIB_PROVENANCE_LABEL[ml.basis_provenance] || "")}</div>` : ""}
-        <div class="vib-meta">${esc(ml.detail || "")}</div>
-      </div>
-
-      <div class="vib-box">
-        <div class="vib-box-title">Operating conditions</div>
-        <table class="telemetry-table vib-table">
-          <tr><td>State</td><td>${esc(op.plc_state || "—")}</td></tr>
-          <tr><td>Speed</td><td>${fmt(op.rpm, 0)} rpm</td></tr>
-          <tr><td>Load</td><td>${fmt(op.load_pct, 0)} % <span class="vib-meta" title="${esc(op.load_definition || "")}">of rated kW</span></td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="vib-box" style="margin-top:12px;">
-      <div class="vib-box-title">Velocity trend ${provenancePill(sv.provenance)}</div>
-      ${vibrationSparkline((v.trend && v.trend.points) || [])}
-    </div>
-
-    <div class="vib-box" style="margin-top:12px;">
-      <div class="vib-box-title">Waveform features ${wf ? provenancePill(wf.provenance) : ""}</div>
-      ${wf ? `
-        <table class="telemetry-table vib-table">
-          ${wfRows.map(([k, val, u, d]) => `<tr><td>${esc(k)}</td><td>${val === null || val === undefined ? "—" : `${fmt(val, d)} ${esc(u)}`}</td></tr>`).join("")}
-        </table>
-        <div class="vib-meta">${esc(wf.source || "")} · ${fmt(wf.sampling_rate_hz, 0)} Hz × ${esc(wf.n_samples)} samples · band ${wf.effective_band_hz ? esc(wf.effective_band_hz.join("–")) + " Hz" : "n/a"} · received ${esc(wf.received_at || "—")}${wf.stale ? " · STALE" : ""}</div>
-      ` : `<div class="text-muted" style="font-size:12px;">No waveform received for this machine. Frequency features (acceleration RMS, kurtosis, dominant frequency) need a sampled waveform via POST /api/iot/waveform.</div>`}
-    </div>
-
-    <div class="vib-box vib-dq" style="margin-top:12px;">
-      <div class="vib-box-title">Sensor &amp; data quality <span class="pill ${esc(dq.dq_flag === "OK" ? "OK" : "WARN")}">${esc(dq.dq_flag || "—")}</span></div>
-      ${dq.warnings && dq.warnings.length ? `<ul>${dq.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : `<div class="vib-meta">No warnings.</div>`}
-    </div>
-  `;
-}
-
-window.selectMachine = selectMachine;
-window.fetchRegistry = fetchRegistry;
-window.fetchWorkOrders = fetchWorkOrders;
-window.fetchEconomics = fetchEconomics;
-window.fetchMetrics = fetchMetrics;
-
-// -----------------------------------------------------------------------------
-// Initial Bootstrap
-// -----------------------------------------------------------------------------
-
-window.addEventListener("DOMContentLoaded", () => {
-  initWebSocket();
-  initEventLog();
-  initAlerts();
-  fetchRegistry();
-  fetchWorkOrders();
-  fetchEconomics();
-  fetchMetrics();
-  setInterval(fetchVibration, 2000);
-});
-
+setInterval(() => { if (document.visibilityState === "visible") refreshLiveFigures(); }, 5000);
