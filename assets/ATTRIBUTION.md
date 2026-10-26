@@ -19,3 +19,11 @@
 - **Source:** Central Electricity Authority (CEA), Ministry of Power, Government of India
 - **Publication:** CO₂ Baseline Database for the Indian Power Sector (User Guide Version 20.0, 2024–2025)
 - **Weighted Average Emission Factor:** 0.716 kg CO₂ / kWh (National Grid)
+
+## 4. Hero Video
+- **File:** `assets/video/cnc_milling_aluminium.webm` (480p VP9 WebM transcode, 29.2 MB, downloaded once and served locally; not modified)
+- **Title:** "EGU-Metall CNC-Fräsen Aluminium" (CNC milling of aluminium)
+- **Author:** EGU-Metall (own work)
+- **Source:** Wikimedia Commons, https://commons.wikimedia.org/wiki/File:EGU-Metall_CNC-Fr%C3%A4sen_Aluminium.webm
+- **Licence:** Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0), https://creativecommons.org/licenses/by-sa/3.0/
+- **Usage:** Muted, looping video in the home page's hero frame (`web/index.html`), as in the previous design; credited on the page under the video

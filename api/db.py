@@ -188,6 +188,12 @@ def init_db(db_path: Path = DB_PATH) -> None:
             ("assumed_downtime_reduction_pct", site["assumed_downtime_reduction_pct"],
              "Assumed downtime reduction (illustration, not a measured result)"),
             ("sensor_nodes", site["sensor_nodes"], "Sensor nodes installed (assumption)"),
+            ("quality_hold_scrap_pct", site.get("quality_hold_scrap_pct", 10.0),
+             "Share of quality-hold parts that are actually scrapped (assumption)"),
+            ("assumed_scrap_reduction_pct", site.get("assumed_scrap_reduction_pct", 30.0),
+             "Assumed reduction of quality-hold (scrap-risk) parts (illustration, not a measured result)"),
+            ("assumed_energy_saving_pct", site.get("assumed_energy_saving_pct", 5.0),
+             "Assumed energy saving from timely maintenance (illustration, not a measured result)"),
         ]
         for key, val, desc in defaults:
             conn.execute(

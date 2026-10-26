@@ -500,6 +500,9 @@ function filterAlerts(filterType) {
   if (emptyState) {
     emptyState.style.display = visibleCount === 0 ? "block" : "none";
   }
+  const list = document.getElementById("alertsList");
+  if (list) list.scrollTop = 0;
+  sizeAlertsList();
 }
 
 async function acknowledgeAlert(btn, alertId) {
@@ -577,6 +580,19 @@ async function acknowledgeAllAlerts() {
 let LAST_ALERTS = [];
 const escHtml = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// The alerts list shows three cards at a time and scrolls (scrollbar on the right) for the rest
+const ALERTS_VISIBLE = 3;
+function sizeAlertsList() {
+  const list = document.getElementById("alertsList");
+  if (!list) return;
+  const shown = [...list.querySelectorAll(".alert-card-actionable")].filter(c => c.style.display !== "none");
+  if (shown.length <= ALERTS_VISIBLE) { list.style.maxHeight = ""; list.classList.remove("is-scrolling"); return; }
+  list.classList.add("is-scrolling");
+  const last = shown[ALERTS_VISIBLE - 1];
+  list.style.maxHeight = `${last.offsetTop + last.offsetHeight - shown[0].offsetTop + 18}px`;  // + room for the hover lift
+}
+window.addEventListener("resize", () => sizeAlertsList());
+
 async function renderAlerts() {
   const list = document.getElementById("alertsList");
   if (!list || !window.UdyamAPI) return;
@@ -625,7 +641,9 @@ async function renderAlerts() {
     </article>`;
   }).join("");
   const current = document.querySelector(".alert-filter-btn.active")?.getAttribute("data-filter") || "all";
+  const keep = list.scrollTop;  // the 10 s refresh keeps the reader's scroll position
   filterAlerts(current);
+  list.scrollTop = keep;
 }
 
 // -----------------------------------------------------------------------------
@@ -818,7 +836,7 @@ async function triggerResetBaseline() {
   if (!window.UdyamAPI) return;
   try {
     await window.UdyamAPI.resetFactory();
-    showToast("Factory engine reset to clean baseline.");
+    showToast("Scenario reset: the plant is back to a clean baseline.");
   } catch (err) {
     showToast(`Reset failed: ${err.message || err}`);
   }
@@ -1223,10 +1241,10 @@ function setupApiEventListeners() {
     if (pill) {
       if (s.connected) {
         pill.className = "op-status-pill online";
-        pill.innerHTML = `● Connected: ${s.endpoint.replace('ws://', '')}`;
+        pill.textContent = "● Connected";
       } else {
         pill.className = "op-status-pill simulated";
-        pill.innerHTML = `◌ Backend offline · reconnecting…`;
+        pill.textContent = "◌ Not connected";
       }
     }
   });
@@ -1399,45 +1417,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-function openConnectionModal() {
-  const modal = document.getElementById("connectionModal");
-  if (modal) {
-    modal.classList.add("open");
-    modal.setAttribute("aria-hidden", "false");
-    const urlInp = document.getElementById("cfgApiBaseUrl");
-    if (urlInp && window.UdyamAPI) urlInp.value = window.UdyamAPI.baseUrl;
-  }
-}
-
-function closeConnectionModal() {
-  const modal = document.getElementById("connectionModal");
-  if (modal) {
-    modal.classList.remove("open");
-    modal.setAttribute("aria-hidden", "true");
-  }
-}
-
-function saveConnectionSettings() {
-  const urlInp = document.getElementById("cfgApiBaseUrl");
-  const tokenInp = document.getElementById("cfgOperatorToken");
-  if (urlInp && window.UdyamAPI) {
-    const newUrl = urlInp.value.trim();
-    if (newUrl) {
-      window.UdyamAPI.baseUrl = newUrl;
-      window.UdyamAPI.wsUrl = newUrl.replace(/^http/, "ws");
-      try {
-        localStorage.setItem("UDYAM_API_BASE_URL", newUrl);
-      } catch (e) {}
-      window.UdyamAPI.connectWebSocket();
-    }
-  }
-  if (tokenInp && window.UdyamAPI) {
-    window.UdyamAPI.operatorToken = tokenInp.value.trim() || null;
-  }
-  closeConnectionModal();
-  showToast("Connection settings updated. Reconnecting…");
-}
-
 async function triggerToolChange(machineId = "VMC-01") {
   if (window.UdyamAPI) {
     try {
@@ -1496,14 +1475,11 @@ window.toggleMobileMenu = toggleMobileMenu;
 window.closeMobileMenu = closeMobileMenu;
 window.handleExploreFactory = handleExploreFactory;
 window.showToast = showToast;
-window.openConnectionModal = openConnectionModal;
-window.closeConnectionModal = closeConnectionModal;
-window.saveConnectionSettings = saveConnectionSettings;
 window.triggerToolChange = triggerToolChange;
 
 
 // Figures that must come from the backend, never hard-coded: model test metrics, line output and availability,
-// open work orders and the owner answers in #status (computed from the live snapshots)
+// open work orders and the owner answers in #dashboard (computed from the live snapshots)
 let MODEL_METRICS = null;
 const pct1 = v => (v == null ? "—" : `${(100 * v).toFixed(1)}%`);
 const setText = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };

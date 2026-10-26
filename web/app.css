@@ -3630,7 +3630,7 @@ button {
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
+  cursor: default;
   border: 1px solid transparent;
   transition: all 0.2s ease;
 }
@@ -3641,15 +3641,12 @@ button {
   border-color: var(--status-normal-border);
 }
 
-.op-status-pill.simulated {
-  background: #F0F4F8;
-  color: #1A56DB;
-  border-color: #C3D9FF;
+.op-status-pill.simulated {  /* not connected */
+  background: #FFF4E5;
+  color: #B25E00;
+  border-color: #FFD8A8;
 }
 
-.op-status-pill:hover {
-  transform: translateY(-1px);
-}
 
 .op-mode-pill {
   display: inline-flex;
@@ -3995,12 +3992,14 @@ button {
    Final UI pass: navbar, background motion, Factory simulator, Dashboard
    ========================================================================== */
 
-/* Navbar: every section link stays reachable; on narrower desktops the bar scrolls sideways */
+/* Navbar: links spread evenly across the free width (never closer than the gap); every section link stays
+   reachable, and on narrower desktops the bar scrolls sideways */
+.site-header-inner { gap: 32px; max-width: 1440px; }
 .nav-links {
   flex: 1 1 auto;
   min-width: 0;
-  justify-content: safe center;
-  gap: 2px;
+  justify-content: space-evenly;
+  gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
@@ -4008,12 +4007,22 @@ button {
   padding: 0 10px;
 }
 .nav-links::-webkit-scrollbar { display: none; }
-.nav-link { padding: 6px 9px; }
-.section[id], .hero-section[id] { scroll-margin-top: 56px; }
-#factorySimulator { scroll-margin-top: 64px; }
+.site-header { height: 60px; }
+.brand-mark { font-size: 19px; letter-spacing: -0.03em; }
+.nav-link { padding: 8px 13px; font-size: 15px; font-weight: 600; letter-spacing: -0.015em; color: #3A3A3C; }
+.nav-link:hover { color: var(--text-primary); background: rgba(0, 0, 0, 0.05); }
+.nav-link.active { color: var(--text-primary); background: rgba(0, 0, 0, 0.07); font-weight: 700; }
+.nav-actions { gap: 12px; }
+.site-header .btn-nav-cta { font-size: 14px; font-weight: 600; padding: 8px 18px; }
+.site-header .btn-nav-replay { font-size: 13px; font-weight: 600; padding: 7px 14px; }
+@media (max-width: 1440px) { .nav-link { padding: 8px 10px; font-size: 14.5px; } }
+@media (max-width: 1360px) { .nav-link { padding: 7px 8px; font-size: 14px; } .nav-links { gap: 2px; } .site-header-inner { gap: 20px; } }
+@media (max-width: 1300px) { .nav-links { display: none; } .mobile-menu-btn { display: block; } }  /* too narrow to space the links: use the ☰ menu */
+.section[id], .hero-section[id] { scroll-margin-top: 64px; }
+#factorySimulator { scroll-margin-top: 72px; }
 
-/* Background motion (local images; replaces fr_twim's streamed videos): a slow camera drift in the
-   loader, the hero CNC frame and the CNC section, under the existing scanner line */
+/* Background motion: a slow camera drift on the local images in the loader and the CNC section, under the
+   existing scanner line (the hero frame plays real CNC milling footage instead) */
 @keyframes udyamDrift {
   0%   { transform: scale(1.04) translate3d(-1.2%, 0.6%, 0); }
   50%  { transform: scale(1.10) translate3d(1.2%, -0.8%, 0); }
@@ -4024,7 +4033,6 @@ button {
   100%    { transform: translateX(120%); }
 }
 .loader-video { animation: udyamDrift 22s ease-in-out infinite; transform-origin: 50% 50%; will-change: transform; }
-.hero-showcase-frame > img,
 .cnc-showcase-media > img {
   animation: udyamDrift 26s ease-in-out infinite;
   transform-origin: 50% 50%;
@@ -4032,7 +4040,6 @@ button {
   pointer-events: none;
 }
 .cnc-showcase-media > img { animation-duration: 30s; animation-direction: reverse; }
-.hero-showcase-frame::after,
 .cnc-showcase-media::after {
   content: "";
   position: absolute;
@@ -4042,11 +4049,10 @@ button {
   background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.10) 50%, transparent 65%);
   animation: udyamGlint 9s ease-in-out infinite;
 }
-.cnc-showcase-media::after { animation-delay: 3s; }
 .scanner-line { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
-  .hero-showcase-frame > img, .cnc-showcase-media > img { animation: none; transform: none; }
-  .hero-showcase-frame::after, .cnc-showcase-media::after, .scanner-line { display: none; }
+  .cnc-showcase-media > img { animation: none; transform: none; }
+  .cnc-showcase-media::after, .scanner-line { display: none; }
 }
 
 /* Factory: Architecture on top, then the simulator with its two buttons */
@@ -4073,6 +4079,23 @@ button {
 .dash-machines-row .machine-card-actions > button { width: 100%; justify-content: center; text-align: center; }
 @media (max-width: 1080px) { .machines-grid.dash-machines-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px)  { .machines-grid.dash-machines-row { grid-template-columns: 1fr; } }
+
+.dash-status-head { margin: 56px 0 20px; }
+.dash-status-desc { font-size: 15px; color: var(--text-secondary); margin-top: 6px; }
+#dashboard .disclaimer-banner { margin-bottom: 24px; }
+
+/* Hero video credit (CC BY-SA 3.0 needs visible attribution) */
+.hero-video-credit { position: absolute; right: 12px; bottom: 10px; z-index: 11; font-size: 11px; color: rgba(255, 255, 255, .85);
+  background: rgba(0, 0, 0, .45); padding: 3px 8px; border-radius: 6px; }
+.hero-video-credit a { color: inherit; text-decoration: underline; }
+
+/* Alerts: three cards visible, the rest scroll; the scrollbar sits on the right */
+.alerts-list { position: relative; }
+.alerts-list.is-scrolling { overflow-y: auto; overscroll-behavior: contain; padding: 8px 14px 8px 4px; margin: -8px -4px 0; scrollbar-width: thin; scrollbar-color: #C7C7CC transparent; }
+.alerts-list.is-scrolling::-webkit-scrollbar { width: 8px; }
+.alerts-list.is-scrolling::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.04); border-radius: 8px; }
+.alerts-list.is-scrolling::-webkit-scrollbar-thumb { background: #C7C7CC; border-radius: 8px; }
+.alerts-list.is-scrolling::-webkit-scrollbar-thumb:hover { background: #A1A1A6; }
 
 /* What-If: its own section now */
 #what-if .whatif-sandbox-card { margin-top: 0; }

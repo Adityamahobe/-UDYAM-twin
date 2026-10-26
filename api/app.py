@@ -212,6 +212,9 @@ class EconomicsUpdateRequest(BaseModel):
     baseline_downtime_h_per_month: Optional[float] = Field(default=None, ge=0)
     assumed_downtime_reduction_pct: Optional[float] = Field(default=None, ge=0, le=100)
     sensor_nodes: Optional[float] = Field(default=None, ge=1)
+    quality_hold_scrap_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    assumed_scrap_reduction_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    assumed_energy_saving_pct: Optional[float] = Field(default=None, ge=0, le=100)
 
 
 def _testing_only(action: str) -> None:

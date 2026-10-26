@@ -28,9 +28,26 @@
     .login-msg.err { color: #D70015; }
     .login-msg.ok { color: #1B813E; }
     .login-card [hidden] { display: none !important; }
+
+    /* Background: our own 3D factory (assets/3d/factory_scene.glb, web/login_bg.js) slowly circling, over the factory
+       photo that shows until the model is ready (or if WebGL is unavailable); a light veil keeps the card readable.
+       Decorative only, never takes clicks. */
+    .login-bg { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+      background: #DDE3EA url("/assets/3d/UDYAM_TWIN_Factory_Interior_Hero.jpg") center / cover no-repeat; }
+    .login-bg .login-3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.2s ease; }
+    .login-bg.is-3d .login-3d { opacity: 1; }
+    .login-bg.is-3d { background: radial-gradient(ellipse at 50% 40%, #F4F7FA 0%, #D9E0E8 70%, #C9D2DC 100%); }
+    .login-bg::after { content: ""; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(245, 245, 247, .25) 0%, rgba(245, 245, 247, .55) 100%); }
+    .login-card { position: relative; z-index: 1; background: rgba(255, 255, 255, .86);
+      backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px);
+      box-shadow: 0 20px 55px rgba(0, 0, 0, .18); animation: loginRise .6s cubic-bezier(.16, 1, .3, 1) both; }
+    @keyframes loginRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .login-card { animation: none; } }
   </style>
 </head>
 <body>
+  <div class="login-bg" id="loginBg" aria-hidden="true"></div>
   <main class="login-card">
     <h1>UDYAM-TWIN</h1>
     <p class="sub" id="loginTitle">Sign in to the digital twin</p>
@@ -50,6 +67,9 @@
     </div>
     <div class="login-msg" id="loginMsg" role="status" aria-live="polite"></div>
   </main>
+  <script src="/static/vendor/three/three.min.js"></script>
+  <script src="/static/vendor/three/GLTFLoader.js"></script>
+  <script src="/static/login_bg.js"></script>
   <script type="module" src="/static/login.js"></script>
 </body>
 </html>

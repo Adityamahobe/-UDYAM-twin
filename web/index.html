@@ -11,9 +11,7 @@
   <link rel="stylesheet" href="/static/app.css">
   <link rel="stylesheet" href="/static/control_center.css">
   <!-- Sign-in gate (Firebase: web/login.html, api/firebase_auth.py). Off when the server has no Firebase config. -->
-  <style>html.auth-pending body { visibility: hidden; } .auth-chip { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
-    .auth-chip span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    @media (max-width: 1200px) { .auth-chip span { display: none; } }</style>
+  <style>html.auth-pending body { visibility: hidden; } .auth-slot { display: contents; }</style>
   <script>document.documentElement.classList.add("auth-pending");</script>
   <script type="module">
     const show = () => document.documentElement.classList.remove("auth-pending");
@@ -29,13 +27,17 @@
         onAuthStateChanged(auth, user => {
           if (!user) return location.replace(`/static/login.html?next=${encodeURIComponent(location.pathname + location.hash)}`);
           window.udyamAuth = { email: user.email, idToken: () => user.getIdToken() };  // for API calls: Authorization: Bearer
-          const chip = document.createElement("div");
-          chip.className = "auth-chip";
-          chip.innerHTML = '<span id="authEmail"></span><button type="button" class="op-btn" id="authSignOut">Sign out</button>';
-          chip.querySelector("#authEmail").textContent = user.email || user.displayName || "Signed in";
-          chip.querySelector("#authSignOut").title = `Signed in as ${user.email || user.displayName || "this account"}`;
-          chip.querySelector("#authSignOut").onclick = () => signOut(auth);
-          (document.querySelector(".op-control-bar .op-control-group:last-child") || document.body).appendChild(chip);
+          const btn = document.createElement("button");  // header, where Explore Factory was
+          btn.type = "button";
+          btn.className = "btn-nav-cta";
+          btn.id = "authSignOut";
+          btn.textContent = "Sign out";
+          btn.title = `Signed in as ${user.email || user.displayName || "this account"}`;
+          btn.setAttribute("aria-label", `Sign out (${user.email || user.displayName || "signed in"})`);
+          btn.onclick = () => signOut(auth);
+          const slot = () => document.getElementById("authSlot");
+          if (slot()) slot().replaceChildren(btn);
+          else document.addEventListener("DOMContentLoaded", () => slot() && slot().replaceChildren(btn), { once: true });
           show();
         });
       } catch {
@@ -109,22 +111,15 @@
         <a href="#dashboard" class="nav-link">Dashboard</a>
         <a href="#what-if" class="nav-link">What-If</a>
         <a href="#predictive-ai" class="nav-link">Predictive AI</a>
-        <a href="#status" class="nav-link">Status</a>
         <a href="#alerts" class="nav-link">Alerts</a>
         <a href="#control-center" class="nav-link">Control Center</a>
-        <a href="#about" class="nav-link">About</a>
+        <a href="#about" class="nav-link">FAQs</a>
         <a href="#references" class="nav-link">References</a>
       </nav>
 
       <div class="nav-actions">
-        <button class="nav-item-ai" onclick="window.udyamChat && udyamChat.toggle()" title="Ask the twin (Advisor chat)" aria-label="Open the Advisor chat">
-          <span class="ai-spark-icon">✨</span>
-          <span class="ai-nav-label">Ask the Twin</span>
-        </button>
         <button class="btn-nav-replay" onclick="replayIntro()" title="Replay Cinematic Intro">↺ Tour</button>
-        <button class="btn-nav-cta" onclick="handleExploreFactory(event)" aria-label="Explore 3D Factory">
-          Explore Factory
-        </button>
+        <div class="auth-slot" id="authSlot"></div>  <!-- the Firebase gate (top of this file) puts Sign out here -->
         <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle Mobile Menu">
           ☰
         </button>
@@ -159,10 +154,9 @@
       <a href="#dashboard" class="nav-link" onclick="closeMobileMenu()">Dashboard</a>
       <a href="#what-if" class="nav-link" onclick="closeMobileMenu()">What-If</a>
       <a href="#predictive-ai" class="nav-link" onclick="closeMobileMenu()">Predictive AI</a>
-      <a href="#status" class="nav-link" onclick="closeMobileMenu()">Status</a>
       <a href="#alerts" class="nav-link" onclick="closeMobileMenu()">Alerts</a>
       <a href="#control-center" class="nav-link" onclick="closeMobileMenu()">Control Center</a>
-      <a href="#about" class="nav-link" onclick="closeMobileMenu()">About</a>
+      <a href="#about" class="nav-link" onclick="closeMobileMenu()">FAQs</a>
       <a href="#references" class="nav-link" onclick="closeMobileMenu()">References</a>
     </div>
   </div>
@@ -174,8 +168,8 @@
     <!-- Global Operational Control Bar (Real-Time Backend Status & Mode Controls) -->
     <div class="op-control-bar">
       <div class="op-control-group">
-        <span class="op-status-pill simulated" id="opStatusPill" onclick="openConnectionModal()" title="Click to configure backend connection">
-          ◌ Connecting to backend…
+        <span class="op-status-pill simulated" id="opStatusPill" role="status" aria-live="polite">
+          ◌ Connecting…
         </span>
         <span class="op-mode-pill" id="opModePill">
           <span>MODE:</span> <b>SIMULATION</b>
@@ -192,8 +186,8 @@
         <button class="op-btn" onclick="openWorkOrdersModal()" title="View and advance maintenance work orders">
           📋 Work Orders (<span id="woCountBadge">1</span>)
         </button>
-        <button class="op-btn danger" onclick="triggerResetBaseline()" title="Reset factory engine to clean baseline">
-          ↺ Clean Baseline
+        <button class="op-btn danger" onclick="triggerResetBaseline()" title="Reset the scenario: the simulated plant goes back to a clean baseline">
+          ↺ Reset Scenario
         </button>
       </div>
     </div>
@@ -222,7 +216,23 @@
       <!-- High-Tech Optical Scanner Sweep Line -->
       <div class="scanner-line" aria-hidden="true"></div>
 
-      <img class="hero-showcase-video" src="/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg" alt="CNC Machining Center in Operation" style="width:100%; height:100%; object-fit:cover;">
+      <!-- Real CNC milling footage, as in the previous design (assets/video, CC BY-SA 3.0 by EGU-Metall:
+           assets/ATTRIBUTION.md); the photo is the poster -->
+      <video class="hero-showcase-video" id="heroVideo" autoplay muted loop playsinline preload="metadata"
+             poster="/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg" aria-label="CNC milling machine cutting aluminium" style="width:100%; height:100%; object-fit:cover;">
+        <source src="/assets/video/cnc_milling_aluminium.webm" type="video/webm">
+      </video>
+      <div class="hero-video-credit">Video: EGU-Metall, <a href="https://commons.wikimedia.org/wiki/File:EGU-Metall_CNC-Fr%C3%A4sen_Aluminium.webm" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA 3.0</a></div>
+      <script>  // a system set to reduce motion gets the still poster instead of the moving footage; otherwise the footage
+                // (re)starts whenever the page is shown, since browsers hold back autoplay on hidden pages
+        (() => {
+          const v = document.getElementById("heroVideo");
+          if (matchMedia("(prefers-reduced-motion: reduce)").matches) { v.removeAttribute("autoplay"); v.pause(); v.preload = "none"; return; }
+          const go = () => { if (document.visibilityState === "visible" && v.paused) v.play().catch(() => {}); };
+          document.addEventListener("visibilitychange", go);
+          v.addEventListener("canplay", go, { once: true });
+        })();
+      </script>
     </div>
 
     <!-- Apple Specs HUD Strip with Active Telemetry Binding -->
@@ -806,7 +816,7 @@
   </section>
 
   <!-- ========================================================================
-       SECTION C — DASHBOARD: the four machines (row 1), then the plant metrics (row 2)
+       SECTION C — DASHBOARD: the four machines (row 1), the plant metrics (row 2), then health & availability (row 3)
        ======================================================================== -->
   <section class="section bg-white" id="dashboard">
     <div class="section-container">
@@ -1017,6 +1027,55 @@
           <div class="dash-metric-sub" id="dashSub4">Waiting for live data…</div>
           <div class="dash-meter-track">
             <div class="dash-meter-fill" id="dashBar4" style="width:0%; background:var(--status-attention);"></div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Health & availability (formerly the Status section): app.js updateOwnerAnswers fills #qaAns*/#qaDetail*/#qaFoot* -->
+      <div class="dash-status-head reveal-on-scroll">
+        <span class="section-eyebrow">HEALTH &amp; AVAILABILITY</span>
+        <h3 class="dash-row-title">Know What Needs Attention</h3>
+        <p class="dash-status-desc">Plain answers for factory owners and managing directors, without having to read sensor graphs.</p>
+      </div>
+
+      <div class="disclaimer-banner reveal-on-scroll" role="note">
+        <span><b>LIVE</b> — ANSWERS COMPUTED FROM THE TWIN'S CURRENT READINGS</span>
+        <span>SIMULATION IN TESTING MODE · NOT A CERTIFIED ASSESSMENT</span>
+      </div>
+
+      <div class="owner-qa-grid">
+        <!-- Question 1 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 01</div>
+            <h3 class="qa-question">Is my factory working properly today?</h3>
+            <div class="qa-answer" id="qaAns1">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail1"></p>
+          </div>
+          <div id="qaFoot1" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
+        </article>
+
+        <!-- Question 2 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 02</div>
+            <h3 class="qa-question">Which machine needs attention first?</h3>
+            <div class="qa-answer" id="qaAns2">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail2"></p>
+          </div>
+          <div id="qaFoot2" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
+        </article>
+
+        <!-- Question 3 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 03</div>
+            <h3 class="qa-question">Are my parts being cut accurately?</h3>
+            <div class="qa-answer" id="qaAns3">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail3"></p>
+          </div>
+          <div id="qaFoot3" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">
+—
           </div>
         </article>
       </div>
@@ -1259,63 +1318,6 @@
         <div class="benchmark-disclaimer">
           ⓘ <b>Honest Research Disclaimer:</b> AI4I failure modes are generated from underlying synthetic rules; high benchmark scores demonstrate algorithmic correctness and reproducibility rather than real-world machine validation. Field validation occurs during Stages B and C.
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========================================================================
-       SECTION E — MACHINE STATUS ("Know What Needs Attention.")
-       ======================================================================== -->
-  <section class="section bg-white" id="status">
-    <div class="section-container">
-      <div class="section-header reveal-on-scroll">
-        <span class="section-eyebrow">HEALTH & AVAILABILITY</span>
-        <h2 class="section-title">Know What Needs Attention.</h2>
-        <p class="section-desc">
-          Designed specifically for factory owners and managing directors. You shouldn't have to decipher complex sensor graphs to know if your shop is safe and profitable.
-        </p>
-      </div>
-
-      <div class="disclaimer-banner reveal-on-scroll" role="note">
-        <span><b>LIVE</b> — ANSWERS COMPUTED FROM THE TWIN'S CURRENT READINGS</span>
-        <span>SIMULATION IN TESTING MODE · NOT A CERTIFIED ASSESSMENT</span>
-      </div>
-
-      <div class="owner-qa-grid">
-        <!-- Question 1 -->
-        <article class="owner-qa-card reveal-on-scroll">
-          <div>
-            <div class="qa-number">QUESTION 01</div>
-            <h3 class="qa-question">Is my factory working properly today?</h3>
-            <div class="qa-answer" id="qaAns1">Checking the live twin…</div>
-            <p class="qa-detail" id="qaDetail1"></p>
-          </div>
-          <div id="qaFoot1" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
-        </article>
-
-        <!-- Question 2 -->
-        <article class="owner-qa-card reveal-on-scroll">
-          <div>
-            <div class="qa-number">QUESTION 02</div>
-            <h3 class="qa-question">Which machine needs attention first?</h3>
-            <div class="qa-answer" id="qaAns2">Checking the live twin…</div>
-            <p class="qa-detail" id="qaDetail2"></p>
-          </div>
-          <div id="qaFoot2" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
-        </article>
-
-        <!-- Question 3 -->
-        <article class="owner-qa-card reveal-on-scroll">
-          <div>
-            <div class="qa-number">QUESTION 03</div>
-            <h3 class="qa-question">Are my parts being cut accurately?</h3>
-            <div class="qa-answer" id="qaAns3">Checking the live twin…</div>
-            <p class="qa-detail" id="qaDetail3"></p>
-          </div>
-          <div id="qaFoot3" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">
-—
-          </div>
-        </article>
       </div>
     </div>
   </section>
@@ -1592,6 +1594,91 @@
               <tbody id="rcBody"><tr><td colspan="4" class="sc-hint">Loading…</td></tr></tbody></table></div>
             <div class="sc-hint" id="rcHint">Newest first. Updates every 2 s while this tab is open.</div>
           </section>
+<section class="panel" id="economicsPanel">
+          <div class="panel-header">
+            <div>
+              <h2>MSME Business Impact &amp; Sustainability Calculator</h2>
+              <span class="econ-sub">Editable Shop Model · Transparent Formulas · CEA Grid Baseline v20</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" id="econEdit">⚙ Edit Assumptions</button>
+          </div>
+          <div class="calc-grid">
+            <div class="calc-card">
+              <div class="calc-label">Line Production Loss Rate</div>
+              <div class="calc-val" id="calcLineLoss" style="color:var(--status-warn);">—</div>
+              <div class="formula-hint">max(0, nominal_rate - actual_rate) × ₹<span id="econInrPerPartHint">—</span>/part</div>
+            </div>
+            <div class="calc-card">
+              <div class="calc-label">Indicative Sensor Payback</div>
+              <div class="calc-val" id="calcPayback" style="color:var(--status-ok);">—</div>
+              <div class="formula-hint">(<span id="econNodesHint">—</span> nodes × ₹<span id="econNodeCostHint">—</span>) / monthly avoided breakdown value</div>
+            </div>
+            <div class="calc-card">
+              <div class="calc-label">Line Energy Consumption</div>
+              <div class="calc-val" id="calcEnergy">—</div>
+              <div class="formula-hint">Sum(kW) × ₹<span id="econTariffHint">—</span>/kWh industrial tariff</div>
+            </div>
+            <div class="calc-card">
+              <div class="calc-label">Carbon Emission Rate</div>
+              <div class="calc-val" id="calcCo2">—</div>
+              <div class="formula-hint">kWh × <span id="econCeaHint">—</span> kg CO₂/kWh (CEA Grid Factor 2024-25)</div>
+            </div>
+          </div>
+          <div class="econ-scenario">
+            <div class="econ-scenario-head">
+              <h4>Scenario Comparison: Reactive Baseline vs UDYAM-Twin Self-Calibrating Intervention</h4>
+              <span class="badge-sim" style="font-size:10px;">MSME SHOP MODEL</span>
+            </div>
+            <div class="econ-table-wrap">
+            <table class="telemetry-table econ-table">
+              <thead>
+                <tr><th>Operating Dimension</th><th>Baseline (Reactive)</th><th>With UDYAM-Twin</th><th class="econ-good">Net MSME Benefit</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Unplanned Downtime (hrs/mo)</td><td id="scenBaseHours">—</td><td id="scenTwinHours">—</td><td id="scenDowntimeSave" class="econ-good econ-strong">—</td></tr>
+                <tr><td>Tool Breakages &amp; Scrap Risk</td><td id="scenBaseScrap" title="Parts made while risk was high or a tool-wear warning was active (quality hold), at the current rate, × the share that is actually scrapped">—</td><td id="scenTwinScrap">—</td><td id="scenScrapSave" class="econ-good econ-strong">—</td></tr>
+                <tr><td>Energy &amp; Carbon Footprint</td><td id="scenBaseEnergy">—</td><td id="scenTwinEnergy">—</td><td id="scenEnergySave" class="econ-good econ-strong">—</td></tr>
+                <tr class="econ-total"><td>Net Monthly Shop Benefit</td><td class="econ-muted">₹0</td><td id="scenNetMonthly" class="econ-good">—</td><td id="scenProfitAnnual" class="econ-good" title="12 × net monthly benefit − sensor hardware cost">—</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <div class="econ-sens">
+              <span><b>Sensitivity Analysis:</b> Payback at ₹1,500/hr = <b id="sensPay1500">—</b> · at ₹2,500/hr = <b id="sensPay2500" class="econ-good">—</b> · at ₹3,500/hr = <b id="sensPay3500">—</b></span>
+              <span class="econ-italic">Engineering estimation model</span>
+            </div>
+            <div class="formula-hint" id="econAssumptionNote"></div>
+            <div class="formula-hint econ-err" id="econStatus" role="status"></div>
+          </div>
+        </section>
+        </div>
+      </div>
+
+      <!-- Edit Assumptions dialog for the MSME calculator (web/economics.js → POST /api/economics) -->
+      <div class="modal-overlay" id="economicsModal" role="dialog" aria-modal="true" aria-labelledby="econModalTitle">
+        <div class="modal">
+          <h3 id="econModalTitle">MSME Economic &amp; Sustainability Assumptions</h3>
+          <p class="econ-modal-sub">Adjust shop operating rates and financial parameters. They are saved on the backend and used by every estimate.</p>
+          <form id="econForm" novalidate>
+            <div class="econ-form-grid">
+              <div class="form-group"><label for="econDowntimeCost">Machine Downtime Cost (₹/hr)</label><input type="number" id="econDowntimeCost" class="form-control" step="100" min="1" required></div>
+              <div class="form-group"><label for="econPartMargin">Product Gross Margin (₹/part)</label><input type="number" id="econPartMargin" class="form-control" step="10" min="1" required></div>
+              <div class="form-group"><label for="econTariff">Electricity Tariff (₹/kWh)</label><input type="number" id="econTariff" class="form-control" step="0.1" min="0.1" required></div>
+              <div class="form-group"><label for="econCea">CEA CO₂ Factor (kg/kWh)</label><input type="number" id="econCea" class="form-control" step="0.001" min="0.001" required></div>
+              <div class="form-group"><label for="econNodeCost">IoT Sensor Node BOM (₹/node)</label><input type="number" id="econNodeCost" class="form-control" step="100" min="1" required></div>
+              <div class="form-group"><label for="econNodes">Sensor Nodes</label><input type="number" id="econNodes" class="form-control" step="1" min="1" required></div>
+              <div class="form-group"><label for="econBaseHours">Baseline Breakdown (hrs/month)</label><input type="number" id="econBaseHours" class="form-control" step="0.5" min="0" required></div>
+              <div class="form-group"><label for="econReduction">Assumed Downtime Reduction (%)</label><input type="number" id="econReduction" class="form-control" step="1" min="0" max="100" required></div>
+              <div class="form-group"><label for="econHoldScrap">Held Parts Actually Scrapped (%)</label><input type="number" id="econHoldScrap" class="form-control" step="1" min="0" max="100" required></div>
+              <div class="form-group"><label for="econScrapReduction">Assumed Scrap Reduction (%)</label><input type="number" id="econScrapReduction" class="form-control" step="1" min="0" max="100" required></div>
+              <div class="form-group"><label for="econEnergySaving">Assumed Energy Saving (%)</label><input type="number" id="econEnergySaving" class="form-control" step="0.5" min="0" max="100" required></div>
+              <div class="form-group"><label for="econMonthHours">Operating Hours per Month</label><input type="number" id="econMonthHours" class="form-control" step="1" min="1" max="744" required></div>
+            </div>
+            <div class="formula-hint econ-err" id="econFormMsg" role="status"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn" id="econCancel">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="econSave">Save &amp; Recalculate</button>
+            </div>
+          </form>
         </div>
       </div>
       </div>
@@ -1829,7 +1916,6 @@
           <h4>Experience</h4>
           <ul class="footer-links">
             <li><a href="#predictive-ai">Predictive AI & RL</a></li>
-            <li><a href="#status">Machine Status</a></li>
             <li><a href="#dashboard">Dashboard</a></li>
             <li><a href="#what-if">What-If Sandbox</a></li>
             <li><a href="#how-it-works">How It Works</a></li>
@@ -2270,46 +2356,6 @@
     </div>
   </div>
 
-  <!-- ========================================================================
-       BACKEND CONNECTION SETTINGS MODAL
-       ======================================================================== -->
-  <div class="modal-overlay" id="connectionModal" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">Backend Connection</h3>
-          <div style="font-size:13px; color:var(--text-secondary);">Configure FastAPI REST host and WebSocket telemetry stream</div>
-        </div>
-        <button class="modal-close-btn" onclick="closeConnectionModal()" aria-label="Close modal">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <div class="apple-form-group">
-          <label class="apple-form-label">API Base URL</label>
-          <input type="text" class="apple-input" id="cfgApiBaseUrl" placeholder="same server (default)">
-        </div>
-
-        <div class="apple-form-group">
-          <label class="apple-form-label">Operator Authorization Token</label>
-          <input type="password" class="apple-input" id="cfgOperatorToken" placeholder="Leave empty for open local dev">
-          <span style="font-size:11px; color:var(--text-muted);">Sent via X-Operator-Token header for model promotions &amp; proposal approvals</span>
-        </div>
-
-        <div style="background:var(--bg-section-alt); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-light); margin:14px 0;">
-          <div style="font-size:12px; font-weight:700; color:var(--text-primary);">No simulated fallback</div>
-          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
-            Everything shown comes from the UDYAM-TWIN backend. If it stops, the status pill says so and the data stops updating until it reconnects.
-          </div>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:16px;">
-          <button class="btn-card-ghost" onclick="closeConnectionModal()">Close</button>
-          <button class="btn-primary" onclick="saveConnectionSettings()" style="padding:10px 20px; font-size:13px;">Save &amp; Reconnect</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Sleek Apple Floating Toast -->
   <div class="apple-toast" id="appleToast">Notification Message</div>
 
@@ -2326,6 +2372,7 @@
   <script src="/static/wokwi.js"></script>
   <script src="/static/reports.js"></script>
   <script src="/static/recent.js"></script>
+  <script src="/static/economics.js"></script>
   <script src="/static/chat.js"></script>
   <script src="/static/control_center.js"></script>
 </body>

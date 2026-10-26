@@ -121,6 +121,22 @@ def test_economics_endpoints(client):
     assert res_restore.json()["assumptions"]["inr_per_part"] == 450.0
 
 
+def test_economics_scrap_and_energy_assumptions(client):
+    a = client.get("/api/economics").json()["assumptions"]
+    assert a["assumed_scrap_reduction_pct"] == 30.0 and a["assumed_energy_saving_pct"] == 5.0
+    assert a["quality_hold_scrap_pct"] == 10.0
+    res = client.post("/api/economics", json={"assumed_scrap_reduction_pct": 40.0, "assumed_energy_saving_pct": 8.0,
+                                              "quality_hold_scrap_pct": 15.0})
+    assert res.status_code == 200
+    assert res.json()["assumptions"]["quality_hold_scrap_pct"] == 15.0
+    assert res.json()["assumptions"]["assumed_scrap_reduction_pct"] == 40.0
+    assert res.json()["assumptions"]["assumed_energy_saving_pct"] == 8.0
+    assert client.post("/api/economics", json={"assumed_energy_saving_pct": 120.0}).status_code == 422
+    assert client.post("/api/economics", json={"quality_hold_scrap_pct": -1}).status_code == 422
+    client.post("/api/economics", json={"assumed_scrap_reduction_pct": 30.0, "assumed_energy_saving_pct": 5.0,
+                                        "quality_hold_scrap_pct": 10.0})
+
+
 def test_websocket_telemetry_flow(client):
     with client.websocket_connect("/ws/telemetry") as ws:
         hello = ws.receive_json()

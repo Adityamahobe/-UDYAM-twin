@@ -20,6 +20,9 @@ site:
   baseline_unplanned_downtime_h_per_month: 12.0
   assumed_downtime_reduction_pct: 30.0      # an assumption for illustration, not a validated outcome
   sensor_nodes: 6.0
+  quality_hold_scrap_pct: 10.0              # share of quality-hold parts that end up scrapped (assumption)
+  assumed_scrap_reduction_pct: 30.0         # share of quality-hold parts the twin avoids (assumption)
+  assumed_energy_saving_pct: 5.0            # energy saved by timely maintenance (assumption)
 
 # Vibration severity profiles (velocity RMS, mm/s). Values are the commonly cited ISO 20816-3:2022
 # Group 2 boundaries (unchanged from the withdrawn ISO 10816-3:2009), used as configurable demo thresholds. verified: false makes every result
