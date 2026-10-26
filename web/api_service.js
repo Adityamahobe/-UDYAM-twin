@@ -15,7 +15,8 @@
                         window.location.port === "5500" || 
                         window.location.port === "3000" || 
                         window.location.port === "8080" ||
-                        !window.location.port;
+                        // a page on localhost without a port; a deployed site on the default https port is not local
+                        (!window.location.port && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname));
 
   const getSavedBaseUrl = () => {
     try {

@@ -9,3 +9,4 @@ openpyxl>=3.1      # Excel (.xlsx) report export
 google-genai>=2.33,<3   # Gemini (Google Gen AI SDK) for the Advisor chatbot; it answers offline without a key
 google-auth>=2.20       # verifies Firebase ID tokens (api/firebase_auth.py); already installed with google-genai
 requests>=2.31          # google-auth's HTTP transport for fetching Google's public signing keys
+paho-mqtt>=2.0         # Wokwi virtual devices and real MQTT sensors (hub/wokwi.py, hub/mqtt_bridge.py)
