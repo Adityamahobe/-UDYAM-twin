@@ -390,10 +390,15 @@ app.add_middleware(
 @app.middleware("http")
 async def revalidate_ui_files(request: Request, call_next):
     """Dashboard pages and scripts: the browser must revalidate (304 if unchanged), so an update never
-    mixes a new index.html with a stale cached app.js."""
+    mixes a new index.html with a stale cached app.js. Vendored libraries and the media in /assets (3D models,
+    video, images) change rarely and are large, so the browser keeps them without asking again."""
     response = await call_next(request)
     path = request.url.path
-    if path in ("/", "/operator", "/iot") or path.startswith("/static/"):
+    if path.startswith("/static/vendor/"):
+        response.headers["Cache-Control"] = "public, max-age=604800"  # 7 days: three.js, Firebase SDK
+    elif path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=86400"   # 1 day: 3D models, video, images
+    elif path in ("/", "/operator", "/iot") or path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
