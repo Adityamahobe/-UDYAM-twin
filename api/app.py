@@ -703,7 +703,14 @@ def _restore_custom_machines() -> None:
 
 @app.post("/api/machines")
 async def post_add_machine(req: AddMachineRequest):
-    """Add Your Machine: validated against config rules, live in every panel at once, kept across resets."""
+    """Add Your Machine: validated against config rules, live in every panel at once, kept across resets.
+
+    Future scope: off unless UDYAM_ENABLE_ADD_MACHINE=1. The twin runs the four default machines."""
+    if os.environ.get("UDYAM_ENABLE_ADD_MACHINE") != "1":
+        raise HTTPException(status_code=403, detail={
+            "error": "feature_disabled",
+            "message": "Adding machines is future scope: the twin runs its four default machines "
+                       "(VMC-01, LATHE-01, SAW-01, COMP-01)."})
     machine_id = factory_engine.next_machine_id(req.template)
     try:
         spec, entry, profile = _machine_spec(req, machine_id)

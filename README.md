@@ -150,6 +150,13 @@ Retrain with `python -m ml.train_ai4i`. Rebuild our simulation dataset and its m
 
 The suite covers config validation and ISO zones, derate maths, the snapshot and WebSocket schema, the calibration throttle and cooling alert, alert and work-order lifecycles (always on a temporary database), the AI4I pipeline and RUL, every fault-lab scenario and its resolution, reset completeness, three identical Auto Demo cycles, OEE/energy/CO₂/₹ maths, REPLAY and the LIVE guard, reports, time-range CSV and Excel export, the RL policy and its feedback loop, Add Your Machine, and the offline rule.
 
+## Future scope: adding your own machines
+
+The twin runs four default machines: VMC-01 (CNC mill), LATHE-01 (CNC lathe), SAW-01 (bar saw) and COMP-01 (air
+compressor). Adding machines from the dashboard ("Add Your Machine") is future scope: the button is removed and
+`POST /api/machines` answers 403 `feature_disabled`. The code is kept and tested; set `UDYAM_ENABLE_ADD_MACHINE=1`
+to turn it back on.
+
 ## Future scope: real machines
 
 Today, Real Data mode runs on **virtual sensors**: an ESP32 in the Wokwi simulator

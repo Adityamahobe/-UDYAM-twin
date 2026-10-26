@@ -9,3 +9,5 @@ from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="udyam-test-"))
 os.environ["UDYAM_DB_PATH"] = str(_TMP / "test.sqlite")
+# Add Your Machine is future scope (off by default); the suite keeps testing the dormant feature.
+os.environ.setdefault("UDYAM_ENABLE_ADD_MACHINE", "1")

@@ -172,3 +172,9 @@ def test_static_3d_assets_served(client):
         assert res.status_code == 200, f"Failed to fetch /assets/3d/{filename}"
         assert len(res.content) >= min_bytes, f"Asset {filename} size too small: {len(res.content)} bytes"
 
+
+
+def test_add_machine_is_future_scope_by_default(client, monkeypatch):
+    monkeypatch.delenv("UDYAM_ENABLE_ADD_MACHINE", raising=False)
+    r = client.post("/api/machines", json={"template": "air_compressor", "name": "Screw Compressor 2"})
+    assert r.status_code == 403 and r.json()["detail"]["error"] == "feature_disabled"
