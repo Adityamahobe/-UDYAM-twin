@@ -1,0 +1,51 @@
+# Render Blueprint for UDYAM-TWIN (https://render.com/docs/blueprint-spec).
+# One web service: the FastAPI server (api/app.py) serves the dashboard, the REST API and the WebSocket stream.
+# Secrets are NOT stored here: every `sync: false` value is entered once in the Render dashboard.
+services:
+  - type: web
+    name: udyam-twin
+    runtime: python
+    plan: free                 # sleeps after 15 min without visitors; the SQLite data resets on every deploy
+    region: singapore
+    branch: aditya-dev
+    buildCommand: pip install -r requirements.txt "scikit-learn==1.9.1"   # same version that trained the models in models/
+    # No --forwarded-allow-ips: the server must keep seeing Render's proxy, not a client-supplied X-Forwarded-For,
+    # so operator approvals are never treated as coming from the server machine itself (api/app.py _authorize_operator).
+    startCommand: uvicorn api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      - key: UDYAM_AUTO_DEMO
+        value: "0"
+      # Firebase sign-in (public web config, docs/AUTH_API.md)
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      # Advisor chatbot (optional: without a key it answers offline from the twin's tools)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: UDYAM_CHAT_OFFLINE_FALLBACK
+        value: "1"
+      # Required to approve Advisor proposals and model changes on a public server (long random value)
+      - key: UDYAM_OPERATOR_TOKEN
+        generateValue: true
+      # Wokwi virtual devices (optional, Real Data mode)
+      - key: UDYAM_WOKWI_BROKER
+        sync: false
+      - key: UDYAM_WOKWI_PORT
+        sync: false
+      - key: UDYAM_WOKWI_USER
+        sync: false
+      - key: UDYAM_WOKWI_PASS
+        sync: false
+      - key: UDYAM_WOKWI_TOPIC_PREFIX
+        sync: false
