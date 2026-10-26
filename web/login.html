@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UDYAM-TWIN Sign In</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg-primary); }
+    .login-card { flex: 0 0 auto; height: auto; margin: auto; width: 100%; max-width: 380px; background: var(--bg-surface); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+    .login-card h1 { margin: 0; font-size: 22px; letter-spacing: .02em; color: var(--text-primary); }
+    .login-card .sub { margin: -8px 0 4px; color: var(--text-secondary); font-size: 13px; }
+    .login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+    .login-card input { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm); padding: 9px 10px; font-size: 14px; }
+    .login-card input:focus { outline: none; border-color: var(--border-focus); }
+    .login-card .btn { width: 100%; justify-content: center; padding: 9px; font-size: 14px; }
+    .login-or { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
+    .login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--border-subtle); }
+    .login-links { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+    .login-links button { background: none; border: none; color: var(--accent-cyan); cursor: pointer; padding: 0; font-size: 12px; }
+    .login-msg { font-size: 13px; min-height: 18px; color: var(--text-secondary); }
+    .login-msg.err { color: var(--status-crit); }
+    .login-msg.ok { color: var(--status-ok); }
+    .login-card [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <h1>UDYAM-TWIN</h1>
+    <p class="sub" id="loginTitle">Sign in to the digital twin</p>
+    <form id="loginForm" novalidate>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label>Email <input type="email" id="loginEmail" autocomplete="email" required></label>
+        <label>Password <input type="password" id="loginPassword" autocomplete="current-password" required minlength="6"></label>
+        <label id="confirmRow" hidden>Repeat password <input type="password" id="loginPassword2" autocomplete="new-password"></label>
+        <button type="submit" class="btn btn-primary" id="loginSubmit">Sign in</button>
+      </div>
+    </form>
+    <div class="login-or">or</div>
+    <button type="button" class="btn" id="loginGoogle">Continue with Google</button>
+    <div class="login-links">
+      <button type="button" id="loginToggle">Create an account</button>
+      <button type="button" id="loginForgot">Forgot password?</button>
+    </div>
+    <div class="login-msg" id="loginMsg" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module" src="/static/login.js"></script>
+</body>
+</html>

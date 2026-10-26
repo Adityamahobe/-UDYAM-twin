@@ -5,6 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UDYAM-TWIN — Self-Calibrating Digital Twin Command Center</title>
   <link rel="stylesheet" href="/static/app.css">
+  <!-- Sign-in gate (Firebase: web/login.html, api/firebase_auth.py). Off when the server has no Firebase config. -->
+  <style>html.auth-pending body { visibility: hidden; } .auth-chip { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
+    .auth-chip span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 1200px) { .auth-chip span { display: none; } }</style>
+  <script>document.documentElement.classList.add("auth-pending");</script>
+  <script type="module">
+    const show = () => document.documentElement.classList.remove("auth-pending");
+    const FB = "/static/vendor/firebase";  // Firebase JS SDK 10.12.2, vendored (works offline)
+    let cfg = null;
+    try { cfg = await fetch("/api/auth/config").then(r => r.json()); } catch { show(); }
+    if (cfg && !cfg.enabled) show();
+    if (cfg && cfg.enabled) {
+      try {
+        const { initializeApp } = await import(`${FB}/firebase-app.js`);
+        const { getAuth, onAuthStateChanged, signOut } = await import(`${FB}/firebase-auth.js`);
+        const auth = getAuth(initializeApp(cfg.firebase));
+        onAuthStateChanged(auth, user => {
+          if (!user) return location.replace(`/static/login.html?next=${encodeURIComponent(location.pathname + location.hash)}`);
+          window.udyamAuth = { email: user.email, idToken: () => user.getIdToken() };  // for API calls: Authorization: Bearer
+          const chip = document.createElement("div");
+          chip.className = "auth-chip";
+          chip.innerHTML = '<span id="authEmail"></span><button type="button" class="btn btn-sm" id="authSignOut">Sign out</button>';
+          chip.querySelector("#authEmail").textContent = user.email || user.displayName || "Signed in";
+          chip.querySelector("#authSignOut").title = `Signed in as ${user.email || user.displayName || "this account"}`;
+          chip.querySelector("#authSignOut").onclick = () => signOut(auth);
+          (document.querySelector(".header-controls") || document.body).appendChild(chip);
+          show();
+        });
+      } catch {
+        document.body.textContent = "The sign-in service (Firebase) cannot be reached. Check the internet connection and reload.";
+        show();
+      }
+    }
+  </script>
 <script src="/static/vendor/three/three.min.js"></script>
 <script src="/static/vendor/three/OrbitControls.js"></script>
 <script src="/static/vendor/three/GLTFLoader.js"></script>

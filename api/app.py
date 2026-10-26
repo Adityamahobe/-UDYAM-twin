@@ -67,6 +67,7 @@ from config import ConfigError, get_config
 from ml.vibration.severity import SeverityAssessor
 from api.vibration import build_router as build_vibration_router
 from api.synthetic import build_router as build_synthetic_router
+from api.firebase_auth import router as auth_router
 from ml.synthetic import SyntheticStore
 from ml.ai4i import FEATURES as FEATURES_AI4I, MODEL_PATH as AI4I_MODEL_PATH
 from ml.candidate import GATE as MODEL_GATE, CandidateError, TrainingJob
@@ -398,6 +399,7 @@ app.include_router(build_router(iot_hub, factory_engine, mqtt_ref))
 app.include_router(build_vibration_router(iot_hub, vibration_monitor, lambda: list(factory_engine.plants)))
 synthetic_store = SyntheticStore()
 app.include_router(build_synthetic_router(synthetic_store))
+app.include_router(auth_router)  # Firebase sign-in (api/firebase_auth.py, docs/AUTH_API.md)
 model_registry = ModelRegistry()
 label_store = LabelStore(DB_PATH)
 # Wokwi virtual devices (hub/wokwi.py): own store, own MQTT connection; never fed into the simulation engine.
