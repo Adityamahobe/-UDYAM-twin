@@ -116,7 +116,7 @@
   const fmt = (v, d = 1) => (v == null ? "—" : (+v).toFixed(d));
 
   function lanes(r) {  // per machine: injected-fault bars (named), alert markers, event ticks
-    const W = 760, L = 92, R = 12, rowH = 30, top = 18, ms = Object.keys(r.machines), H = top + ms.length * rowH + 22;
+    const W = 760, L = 92, R = 12, rowH = 30, top = 18, ms = Object.keys(r.machines), H = top + ms.length * rowH + 32;
     const x = t => L + (W - L - R) * t / r.minutes;
     const rows = ms.map((mid, i) => {
       const y = top + i * rowH;
@@ -132,9 +132,17 @@
       return `<text x="${L - 8}" y="${y + 17}" font-size="11" text-anchor="end" fill="var(--text-secondary)">${esc(mid)}</text>
         <line x1="${L}" x2="${W - R}" y1="${y + 13}" y2="${y + 13}" stroke="var(--border-subtle)"/>${ticks}${bars}${marks}`;
     }).join("");
-    const axis = [0, r.minutes / 2, r.minutes].map((t, i) => `<text x="${x(t)}" y="${H - 4}" font-size="10"
-      text-anchor="${["start", "middle", "end"][i]}" fill="var(--text-muted)">${+t.toFixed(1)} min</text>`).join("");
-    return `<div class="fr-lanes"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faults, alerts and events per machine over the run">${rows}${axis}</svg></div>
+    // time axis: a tick and a faint gridline every minute; labelled every minute on short runs, every 5 min otherwise
+    const axisY = top + ms.length * rowH + 4, every = r.minutes <= 15 ? 1 : 5;
+    const mins = Array.from({ length: Math.floor(r.minutes) + 1 }, (_, m) => m), last = mins[mins.length - 1];
+    const grid = mins.map(m => `<line x1="${x(m)}" x2="${x(m)}" y1="${top}" y2="${axisY}" stroke="var(--border-subtle)" stroke-opacity="${m % 5 ? .35 : .8}"/>`).join("");
+    const axis = `<line x1="${L}" x2="${W - R}" y1="${axisY}" y2="${axisY}" stroke="var(--text-muted)" stroke-opacity=".5"/>` + mins.map(m => {
+      const major = m % 5 === 0;
+      return `<line x1="${x(m)}" x2="${x(m)}" y1="${axisY}" y2="${axisY + (major ? 6 : 3)}" stroke="var(--text-muted)"><title>${m} min</title></line>`
+        + (m === last || (m % every === 0 && last - m >= Math.max(1, every / 2 + .5)) ? `<text x="${x(m)}" y="${axisY + 16}" font-size="9" text-anchor="${m === 0 ? "start" : m === last ? "end" : "middle"}"
+          fill="var(--text-muted)">${m}${m === last ? " min" : ""}</text>` : "");
+    }).join("");
+    return `<div class="fr-lanes"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faults, alerts and events per machine over the run">${grid}${rows}${axis}</svg></div>
       <div class="wi-legend"><span><i style="background:var(--wi-2);height:8px"></i>injected fault (ground truth)</span>
         <span><i style="background:var(--status-warn);height:8px"></i>alert raised by the twin</span><span>dashed line: run event</span></div>`;
   }

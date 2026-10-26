@@ -1797,6 +1797,26 @@
         </p>
       </div>
 
+      <!-- Research results on public datasets (web/vibration_dataset.js → /api/datasets/ims, web/cmapss.js → /api/datasets/cmapss) -->
+      <div id="researchHost" class="ws-grid reveal-on-scroll">
+        <!-- IMS bearing run-to-failure validation of the ISO 20816-3 zones -->
+        <section class="panel panel-compact" id="imsPanel">
+          <div class="panel-header">
+            <h2>Vibration Dataset · ISO 20816-3 on IMS Run-to-Failure</h2>
+            <span class="badge-sim" style="font-size:10px;">NASA IMS DATA</span>
+          </div>
+          <div id="imsBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
+        </section>
+        <!-- NASA C-MAPSS turbofan RUL experiment: separate research, not the CNC machines -->
+        <section class="panel panel-compact" id="cmapssPanel">
+          <div class="panel-header">
+            <h2>Research · Turbofan RUL (NASA C-MAPSS)</h2>
+            <span class="badge-sim" style="font-size:10px;">EXPERIMENTAL</span>
+          </div>
+          <div id="cmapssBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
+        </section>
+      </div>
+
       <div class="references-grid reveal-on-scroll">
         <!-- Reference 1: AI4I 2020 Dataset -->
         <article class="reference-card">
@@ -1870,6 +1890,7 @@
           </div>
         </article>
       </div>
+
     </div>
   </section>
 
@@ -1915,7 +1936,7 @@
           © 2026 Tech Titans, NIT Raipur. Open academic digital twin architecture.
         </div>
         <div>
-          Clean industrial presentation inspired by Apple product design principles.
+          Live digital twin of a four-machine shop floor · Simulated data
         </div>
       </div>
     </div>
@@ -2352,6 +2373,8 @@
   <script src="/static/models.js"></script>
   <script src="/static/synthetic.js"></script>
   <script src="/static/whatif.js"></script>
+  <script src="/static/vibration_dataset.js"></script>
+  <script src="/static/cmapss.js"></script>
   <script src="/static/adaptive.js"></script>
   <script src="/static/rl.js"></script>
   <script src="/static/wokwi.js"></script>
