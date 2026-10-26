@@ -372,6 +372,13 @@ function updateMachineInspectorHUD(machineId) {
     const comp = LIVE_SNAPSHOTS["COMP-01"] || {};
     set("mLabel2", "Shared air supply");
     set("mVal2", (comp.signals || {}).pressure_bar != null ? `${comp.signals.pressure_bar} bar` : "—");
+    const kw = snaps.reduce((t, s) => t + (s.power_kw || 0), 0);
+    set("mLabel3", "Total power");
+    set("mVal3", snaps.length ? `${kw.toFixed(1)} kW` : "—");
+    const top = snaps.filter(s => s.vibration_rms_mm_s != null).sort((x, y) => y.vibration_rms_mm_s - x.vibration_rms_mm_s)[0];
+    set("mLabel4", "Highest vibration");
+    set("mVal4", top ? `${top.vibration_rms_mm_s.toFixed(2)} mm/s · ${top.machine_id}` : "—");
+    refreshInspectorVibration("FACTORY");
     if (riskEl) { riskEl.textContent = "Select a machine for its risk"; riskEl.className = "risk-indicator-badge risk-normal"; }
     return;
   }
@@ -381,11 +388,8 @@ function updateMachineInspectorHUD(machineId) {
   const zone = zoneOf(snap), ok = ["A", "B"].includes(zone) && !snap.active_scenario;
   if (statusEl) { statusEl.textContent = snap.severity ? `${ok ? "✓" : "⚠"} Zone ${zone} · ${snap.state || ""}${snap.derate_pct ? ` −${snap.derate_pct}%` : ""}` : "Waiting for live data…";
     statusEl.className = `status-indicator-pill ${ok ? "normal" : zone === "D" ? "problem" : "attention"}`; }
-  const sig = snap.signals || {};
-  const first = snap.rpm != null ? ["Speed", `${snap.rpm.toLocaleString()} RPM`] : sig.pressure_bar != null ? ["Header pressure", `${sig.pressure_bar} bar`] : ["Load", snap.load_pct != null ? `${snap.load_pct}%` : "—"];
-  set("mLabel1", first[0]); set("mVal1", first[1]);
-  set("mLabel2", snap.temp_c != null ? "Temperature" : "Vibration RMS");
-  set("mVal2", snap.temp_c != null ? `${snap.temp_c} °C · ${snap.vibration_rms_mm_s ?? "—"} mm/s` : `${snap.vibration_rms_mm_s ?? "—"} mm/s`);
+  machineReadings(machineId, snap).forEach(([label, val], k) => { set(`mLabel${k + 1}`, label); set(`mVal${k + 1}`, snap.machine_id ? val : "—"); });
+  refreshInspectorVibration(machineId);
   const risk = snap.risk || {}, ml = risk.ml || {};
   if (riskEl) {
     const r = risk.rules || "—";
@@ -398,6 +402,36 @@ function updateMachineInspectorHUD(machineId) {
     (risk.top_signals || []).length ? `Watch: ${risk.top_signals.join(", ")}.` :
     `No concern from the twin right now${rul.status === "OK" && rul.rul_minutes != null ? `; tool life ≈ ${Math.round(rul.rul_minutes)} min left (estimate)` : ""}.`);
   if (actions) actions.innerHTML = `<li>${m.ownerAction}</li><li>Open the Fault Lab or Work Orders for ${machineId} from the control bar.</li>`;
+}
+
+// Vibration Health in the plant-line panel: the selected machine's velocity trend (the backend's last 360 stream
+// ticks, GET /api/vibration/{id}), refreshed at most every 3 s while that machine stays selected.
+let inspectorVibFor = null, inspectorVibAt = 0;
+async function refreshInspectorVibration(machineId) {
+  const box = document.getElementById("inspectorVibSection");
+  if (!box) return;
+  if (machineId === "FACTORY" || !BASE_MACHINES[machineId]) { box.hidden = true; inspectorVibFor = null; return; }
+  box.hidden = false;
+  if (machineId === inspectorVibFor && Date.now() - inspectorVibAt < 3000) return;
+  if (machineId !== inspectorVibFor) document.getElementById("inspectorVibChart").innerHTML = "";
+  inspectorVibFor = machineId; inspectorVibAt = Date.now();
+  let v;
+  try { v = await window.UdyamAPI.getMachineVibration(machineId); } catch (_) { return; }
+  if (inspectorVibFor !== machineId) return;  // another machine was selected meanwhile
+  const pts = ((v.trend || {}).points || []).filter(p => typeof p[1] === "number");
+  const set = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+  const sev = v.severity || {};
+  set("inspectorVibZone", sev.zone ? `Zone ${sev.zone}` : "—");
+  const chart = document.getElementById("inspectorVibChart");
+  if (pts.length < 2) { chart.innerHTML = `<p class="inspector-vib-empty">Not enough samples for a trend yet.</p>`; set("inspectorVibSource", ""); set("inspectorVibPeak", ""); return; }
+  const w = 320, h = 70, pad = 4, vals = pts.map(p => p[1]), peak = Math.max(...vals), max = peak * 1.1 || 1;
+  const step = (w - 2 * pad) / (pts.length - 1);
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${(pad + i * step).toFixed(1)},${(h - pad - p[1] / max * (h - 2 * pad)).toFixed(1)}`).join(" ");
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Vibration velocity trend of ${machineId}, peak ${peak.toFixed(2)} mm/s">
+    <path d="${d}" fill="none" stroke="var(--apple-blue)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+  const modes = [...new Set(pts.map(p => p[2]).filter(Boolean))].join(" + ");
+  set("inspectorVibSource", `last ${pts.length} ticks · source ${modes || "—"}`);
+  set("inspectorVibPeak", `peak ${peak.toFixed(2)} mm/s`);
 }
 
 // -----------------------------------------------------------------------------
@@ -910,84 +944,6 @@ async function handleAddMachineSubmit(event) {
 }
 
 // -----------------------------------------------------------------------------
-// 10. What-If Simulation Sandbox
-// -----------------------------------------------------------------------------
-let whatIfRunning = false;
-
-// The same presets as the backend what-if sandbox (web/whatif.js); results come from POST /api/whatif/run
-const WHATIF_PRESETS = {
-  faster: { name: "Faster spindles (+15 %)", params: { "VMC-01": { spindle_speed_pct: 115 }, "LATHE-01": { spindle_speed_pct: 115 }, "SAW-01": { spindle_speed_pct: 115 } } },
-  hot: { name: "Hot day, weak coolant", params: { "VMC-01": { ambient_temp_c: 36, cooling_capacity_pct: 70 } } },
-  heavy: { name: "Heavier jobs (load 120 %)", params: { "VMC-01": { load_pct: 120 }, "LATHE-01": { load_pct: 120 } } },
-  coolant: { name: "Coolant fault, no self-healing", fault: { machine_id: "VMC-01", fault: "coolant_degradation", at_min: 2 }, auto_derate: false },
-  coolant_heal: { name: "Coolant fault, self-healing", fault: { machine_id: "VMC-01", fault: "coolant_degradation", at_min: 2 } },
-};
-let lastWhatIfId = null;
-
-async function runWhatIfSimulation() {
-  if (whatIfRunning || !window.UdyamAPI) return;
-  whatIfRunning = true;
-  const btn = document.getElementById("runWhatIfBtn");
-  const progressTrack = document.getElementById("whatIfProgressTrack");
-  const progressBar = document.getElementById("whatIfProgressBar");
-  const key = document.getElementById("whatIfScenarioSelect")?.value || "coolant_heal";
-  const minutes = parseInt(document.getElementById("whatIfDurationSelect")?.value || "10", 10);
-  const p = WHATIF_PRESETS[key] || WHATIF_PRESETS.coolant_heal;
-  const finish = () => { if (progressTrack) progressTrack.style.display = "none"; if (btn) btn.disabled = false; whatIfRunning = false; };
-  if (btn) btn.disabled = true;
-  if (progressTrack) progressTrack.style.display = "block";
-  if (progressBar) progressBar.style.width = "5%";
-  try {
-    await window.UdyamAPI.runWhatIf({ minutes, focus_machine: "VMC-01", scenarios: [
-      { name: "Baseline", params: {}, auto_derate: true },
-      { name: p.name, params: p.params || {}, fault: p.fault || null, auto_derate: p.auto_derate !== false }] });
-    let job;
-    for (;;) {  // the backend runs both scenarios on separate engines; poll its job
-      await new Promise(r => setTimeout(r, 500));
-      job = await window.UdyamAPI.getWhatIfJob();
-      if (progressBar && job.total) progressBar.style.width = `${Math.max(5, 100 * job.done / job.total)}%`;
-      if (job.state !== "running") break;
-    }
-    if (job.state !== "done") throw { message: job.error || job.state };
-    const r = await window.UdyamAPI.getWhatIfResults(job.id);
-    lastWhatIfId = r.id;
-    updateWhatIfResultsDisplay(r);
-    showToast(`What-if done in ${r.computed_in_s} s (simulated, ${r.minutes} min).`);
-  } catch (err) {
-    showToast(`What-If failed: ${err.message || err}`);
-  } finally {
-    finish();
-  }
-}
-
-function updateWhatIfResultsDisplay(r) {
-  const base = r.scenarios[0].kpis, s = r.scenarios[1].kpis;
-  const badge = (d, unit, goodIfUp) => {
-    const good = goodIfUp ? d >= 0 : d <= 0;
-    const sign = d > 0 ? "+" : "";
-    return `<span class="whatif-diff-badge ${good ? "pos" : "neg"}">${unit === "₹" ? (d < 0 ? "−" : "+") + "₹" + Math.abs(Math.round(d)).toLocaleString("en-IN") : sign + (+d.toFixed(unit === "parts" ? 0 : 2)) + " " + unit}</span>`;
-  };
-  const set = (id, html, sub) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = html;
-    const subEl = el && el.nextElementSibling;
-    if (subEl) subEl.textContent = sub;
-  };
-  set("wiResultParts", `${s.line_parts} ${badge(s.line_parts - base.line_parts, "parts", true)}`, `Baseline: ${base.line_parts} parts`);
-  set("wiResultCost", `₹${Math.round(s.line_value_inr).toLocaleString("en-IN")} ${badge(s.line_value_inr - base.line_value_inr, "₹", true)}`,
-      `Output value · baseline ₹${Math.round(base.line_value_inr).toLocaleString("en-IN")}`);
-  set("wiResultTemp", `${s.focus_peak_temp_c} °C ${badge(s.focus_peak_temp_c - base.focus_peak_temp_c, "°C", false)}`,
-      `VMC-01 peak · limit ${r.temperature_limit_c} °C`);
-  set("wiResultVib", `${s.focus_peak_vibration_mm_s} mm/s ${badge(s.focus_peak_vibration_mm_s - base.focus_peak_vibration_mm_s, "mm/s", false)}`,
-      `VMC-01 peak · ${s.focus_min_in_zone_c_or_d} min in zone C/D`);
-}
-
-function exportWhatIfResults() {
-  if (!lastWhatIfId) return showToast("Run a what-if first, then export its comparison.");
-  window.open(`${window.UdyamAPI.baseUrl}/api/whatif/results/${encodeURIComponent(lastWhatIfId)}/export?format=csv`, "_blank");
-}
-
-// -----------------------------------------------------------------------------
 // 11. Vibration Diagnostic Center (ISO 20816-3)
 // -----------------------------------------------------------------------------
 function openVibrationModal(machineId = null) {
@@ -1285,18 +1241,28 @@ function setupApiEventListeners() {
   });
 }
 
+// The four live readings shown for a machine, from its snapshot: [label, value] pairs. Used by the Dashboard cards
+// (whose labels in index.html follow this order) and the Factory section's plant-line panel.
+function machineReadings(machineId, snap) {
+  const sig = snap.signals || {};
+  const fmt = (v, d = 1) => (v == null ? "—" : (+v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }));
+  const vib = ["Vibration", `${fmt(snap.vibration_rms_mm_s, 2)} mm/s`], temp = ["Process Temp", `${fmt(snap.temp_c)} °C`];
+  const rpm = label => [label, `${fmt(snap.rpm, 0)} RPM${snap.derate_pct ? ` (−${snap.derate_pct}%)` : ""}`];
+  const wear = ["Tool Wear", `${fmt(sig.tool_wear_min, 0)} min`];
+  return {
+    "SAW-01": [rpm("Blade Speed"), ["Blade Wear", `${fmt(sig.blade_wear_pct, 0)}%`], ["Power", `${fmt(snap.power_kw, 2)} kW`], vib],
+    "LATHE-01": [rpm("Spindle Speed"), temp, vib, wear],
+    "VMC-01": [rpm("Spindle Speed"), temp, vib, wear],
+    "COMP-01": [["Header Pressure", `${fmt(sig.pressure_bar, 2)} bar`], ["Compressor Duty", `${fmt(sig.duty_pct, 0)}%`],
+      ["Discharge Temp", `${fmt(sig.discharge_temp_c)} °C`], vib],
+  }[machineId] || [];
+}
+
 function updateMachineCardReadings(machineId, snap) {
   const zone = (snap.severity || {}).zone || "A";
   const ok = (zone === "A" || zone === "B") && !snap.active_scenario;
   const sig = snap.signals || {};
-  const fmt = (v, d = 1) => (v == null ? "—" : (+v).toLocaleString(undefined, { maximumFractionDigits: d }));
-  // the two readings each card shows, from the live snapshot (pairs follow the card's labels in index.html)
-  const READINGS = {
-    "SAW-01": [`${fmt(sig.blade_wear_pct, 0)}% blade wear`, null],  // parts cut: refreshLiveFigures (analytics)
-    "LATHE-01": [`${fmt(snap.rpm, 0)} RPM`, `${fmt(sig.torque_nm)} Nm`],
-    "VMC-01": [`${fmt(snap.load_pct)}%${snap.derate_pct ? ` (derated ${snap.derate_pct}%)` : ""}`, `${fmt(snap.temp_c)} °C`],
-    "COMP-01": [`${fmt(sig.pressure_bar, 2)} bar`, `${fmt(sig.duty_pct, 0)}% duty`],
-  };
+  const fmt = (v, d = 1) => (v == null ? "—" : (+v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }));
   const META = { "SAW-01": `Wear ${fmt(sig.blade_wear_pct, 0)}%`, "LATHE-01": `${fmt(snap.rpm, 0)} RPM`,
     "VMC-01": `${fmt(snap.rpm, 0)} RPM`, "COMP-01": `${fmt(sig.pressure_bar, 1)} bar` };
   const card = document.getElementById(`card-${machineId}`);
@@ -1307,7 +1273,7 @@ function updateMachineCardReadings(machineId, snap) {
       pill.className = `status-indicator-pill ${ok ? "normal" : zone === "D" ? "problem" : "attention"}`;
     }
     const vals = card.querySelectorAll(".reading-val");
-    (READINGS[machineId] || []).forEach((v, k) => { if (v != null && vals[k]) vals[k].textContent = v; });
+    machineReadings(machineId, snap).forEach(([, v], k) => { if (vals[k]) vals[k].textContent = v; });
   }
   document.querySelectorAll(`.quick-station-pill[onclick*="'${machineId}'"]`).forEach(p => {
     const meta = p.querySelector(".station-meta"), dot = p.querySelector(".station-dot");
@@ -1458,8 +1424,6 @@ window.toggleAutoDemo = toggleAutoDemo;
 window.openAddMachineModal = openAddMachineModal;
 window.closeAddMachineModal = closeAddMachineModal;
 window.handleAddMachineSubmit = handleAddMachineSubmit;
-window.runWhatIfSimulation = runWhatIfSimulation;
-window.exportWhatIfResults = exportWhatIfResults;
 window.openVibrationModal = openVibrationModal;
 window.closeVibrationModal = closeVibrationModal;
 window.triggerWaveformCapture = triggerWaveformCapture;
@@ -1522,8 +1486,6 @@ async function refreshLiveFigures() {
     setBar("dashBar4", Math.min(1, open.length / 10));
     setText("woCountBadge", open.length);
     setText("qaFoot1", avail == null ? "—" : `Overall availability: ${pct1(avail)}`);
-    const sawVals = document.querySelectorAll("#card-SAW-01 .reading-val");
-    if (sawVals[1]) sawVals[1].textContent = `${((an.machines["SAW-01"] || {}).oee || {}).parts ?? "—"} bars since ${since}`;
   } catch (_) { /* the status pill already shows a backend problem */ }
   updateOwnerAnswers();
 }

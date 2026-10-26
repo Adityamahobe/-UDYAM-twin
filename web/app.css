@@ -4099,3 +4099,17 @@ button {
 
 /* What-If: its own section now */
 #what-if .whatif-sandbox-card { margin-top: 0; }
+
+/* Plant-line panel: four live readings and the Vibration Health velocity trend (index.html #inspectorVibSection) */
+#inspectorCard .inspector-readings-row .reading-val { font-size: 14px; }
+#inspectorVibSection[hidden] { display: none; }
+.inspector-vib-zone { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .04em; }
+.inspector-vib-chart { background: var(--bg-section-alt); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 6px; }
+.inspector-vib-chart svg { display: block; width: 100%; height: 70px; }
+.inspector-vib-empty { margin: 0; font-size: 12px; color: var(--text-muted); }
+.inspector-vib-caption { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* Plant-line panel framed like the 3D simulation card beside it: same rounded corners, height and depth
+   (the base .machine-info-card rule uses tokens this stylesheet never defines) */
+#inspectorCard.machine-info-card { background: #FFFFFF; border: 1px solid #E5E5EA; border-radius: 28px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .08); padding: 28px; }

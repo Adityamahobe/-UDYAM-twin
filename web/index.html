@@ -692,6 +692,14 @@
                   <span class="reading-lbl" id="mLabel2">Shared Air Supply</span>
                   <span class="reading-val" id="mVal2">—</span>
                 </div>
+                <div class="inspector-reading-item">
+                  <span class="reading-lbl" id="mLabel3">Total Power</span>
+                  <span class="reading-val" id="mVal3">—</span>
+                </div>
+                <div class="inspector-reading-item">
+                  <span class="reading-lbl" id="mLabel4">Highest Vibration</span>
+                  <span class="reading-val" id="mVal4">—</span>
+                </div>
               </div>
               <!-- Hidden compatibility hooks -->
               <div style="display:none;">
@@ -722,17 +730,21 @@
               </ul>
             </div>
 
+            <!-- Vibration Health: the selected machine's velocity trend (app.js refreshInspectorVibration → /api/vibration/{id}) -->
+            <div class="inspector-section" id="inspectorVibSection" hidden>
+              <div class="concern-header">
+                <div class="inspector-section-label">Vibration Health · Velocity Trend</div>
+                <span class="inspector-vib-zone" id="inspectorVibZone">—</span>
+              </div>
+              <div class="inspector-vib-chart" id="inspectorVibChart"></div>
+              <div class="inspector-vib-caption"><span id="inspectorVibSource">—</span><span id="inspectorVibPeak">—</span></div>
+            </div>
+
             <!-- Demonstration Note -->
             <div class="inspector-disclaimer-note">
               <span>ⓘ Live from the simulation (Testing mode) · not a real machine</span>
             </div>
 
-            <!-- Action Trigger -->
-            <div class="inspector-footer-actions">
-              <button class="btn-card-action" id="inspectorActionBtn" onclick="selectMachineIn3D('VMC-01')">
-                Inspect Hero Machine (VMC-01) →
-              </button>
-            </div>
           </aside>
         </div>
         <div id="simControlHost" class="ws-grid">
@@ -855,11 +867,19 @@
             
             <div class="machine-readings-row">
               <div class="reading-col">
+                <span class="reading-lbl">Blade Speed</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
                 <span class="reading-lbl">Blade Wear</span>
                 <span class="reading-val">—</span>
               </div>
               <div class="reading-col">
-                <span class="reading-lbl">Parts Cut</span>
+                <span class="reading-lbl">Power</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Vibration</span>
                 <span class="reading-val">—</span>
               </div>
             </div>
@@ -895,7 +915,15 @@
                 <span class="reading-val">—</span>
               </div>
               <div class="reading-col">
-                <span class="reading-lbl">Cutting Torque</span>
+                <span class="reading-lbl">Process Temp</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Vibration</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Tool Wear</span>
                 <span class="reading-val">—</span>
               </div>
             </div>
@@ -927,11 +955,19 @@
             
             <div class="machine-readings-row">
               <div class="reading-col">
-                <span class="reading-lbl">Spindle Load</span>
+                <span class="reading-lbl">Spindle Speed</span>
                 <span class="reading-val">—</span>
               </div>
               <div class="reading-col">
                 <span class="reading-lbl">Process Temp</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Vibration</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Tool Wear</span>
                 <span class="reading-val">—</span>
               </div>
             </div>
@@ -968,6 +1004,14 @@
               </div>
               <div class="reading-col">
                 <span class="reading-lbl">Compressor Duty</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Discharge Temp</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Vibration</span>
                 <span class="reading-val">—</span>
               </div>
             </div>
@@ -1083,7 +1127,7 @@
   </section>
 
   <!-- ========================================================================
-       SECTION C.2 — WHAT-IF SANDBOX (its own section; app.js runWhatIfSimulation → /api/whatif)
+       SECTION C.2 — WHAT-IF COMPARISON (its own section; web/whatif.js → /api/whatif)
        ======================================================================== -->
   <section class="section bg-light-grey" id="what-if">
     <div class="section-container">
@@ -1091,107 +1135,35 @@
         <span class="section-eyebrow">WHAT-IF</span>
         <h2 class="section-title">Try a Change Before You Make It.</h2>
         <p class="section-desc" style="margin:0 auto;">
-          Run the same shift twice on the simulator, once as it is and once with a change, and compare the results.
+          Run the same shift on the simulator with up to four different settings, then compare the results side by side.
         </p>
       </div>
 
-      <!-- What-If Comparison Sandbox Bento Card -->
-      <div class="whatif-sandbox-card reveal-on-scroll">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
-          <div>
-            <span class="section-eyebrow" style="color:var(--apple-blue);">INTERACTIVE SCENARIO COMPARISON</span>
-            <h3 style="font-size:24px; font-weight:700; color:var(--text-primary); margin-top:4px;">
-              What-If Digital Twin Sandbox
-            </h3>
-            <p style="font-size:14px; color:var(--text-secondary); margin-top:2px;">
-              Simulate operational perturbations, thermal degradation, and tool wear on parallel virtual lines without risking real machinery.
-            </p>
+      <!-- What-If Comparison (web/whatif.js): 2–4 scenarios on separate simulated lines, never the live simulation -->
+      <div id="whatIfHost" class="ws-grid reveal-on-scroll">
+        <section class="panel" id="whatifPanel">
+          <div class="panel-header">
+            <h2>What-If Comparison</h2>
+            <span class="synth-label" title="Runs on separate virtual lines. Not a prediction for real machines.">SIMULATED WHAT-IF</span>
           </div>
-          <button class="op-btn" onclick="exportWhatIfResults()">Export Comparison (CSV) ↓</button>
-        </div>
-
-        <div class="whatif-controls">
-          <div class="apple-form-group">
-            <label class="apple-form-label">Simulation Scenario</label>
-            <select class="apple-select" id="whatIfScenarioSelect">
-              <option value="coolant_heal">Coolant Loss with Twin Self-Healing (Auto-Derate)</option>
-              <option value="coolant">Coolant Loss WITHOUT Self-Healing</option>
-              <option value="heavy">Heavier Cutting Jobs (Spindle Load 120%)</option>
-              <option value="faster">Aggressive Spindle Speeds (+15% RPM)</option>
-              <option value="hot">High Summer Ambient (36°C) & Weak Coolant</option>
-            </select>
-          </div>
-
-          <div class="apple-form-group">
-            <label class="apple-form-label">Simulated Duration</label>
-            <select class="apple-select" id="whatIfDurationSelect">
-              <option value="10">10 Minutes (Fast Validation)</option>
-              <option value="30">30 Minutes (Shift Cycle)</option>
-              <option value="60">60 Minutes (Full Production Run)</option>
-            </select>
-          </div>
-
-          <div class="apple-form-group" style="display:flex; align-items:flex-end;">
-            <button class="btn-primary" id="runWhatIfBtn" onclick="runWhatIfSimulation()" style="width:100%; padding:10px 20px;">
-              ⚡ Run What-If Simulation
-            </button>
-          </div>
-        </div>
-
-        <!-- Animated Progress Track -->
-        <div id="whatIfProgressTrack" style="display:none; height:4px; background:var(--border-light); border-radius:var(--radius-pill); overflow:hidden; margin:12px 0;">
-          <div id="whatIfProgressBar" style="width:0%; height:100%; background:var(--apple-blue); transition:width 0.25s ease;"></div>
-        </div>
-
-        <!-- Comparison Metric Cards Grid -->
-        <div class="whatif-metric-grid">
-          <div class="whatif-metric-card">
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Line Output (Parts)</div>
-            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultParts">
-              —
+          <div class="synth-body">
+            <div class="synth-grid">
+              <label>Run time (min) <input type="number" id="wiMinutes" min="1" max="60" value="15"></label>
+              <label>Seed <input type="number" id="wiSeed" min="0" value="42"></label>
+              <label>Focus machine <select id="wiFocus"></select></label>
+              <label>Add a preset <select id="wiPreset"></select></label>
             </div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
-          </div>
-
-          <div class="whatif-metric-card">
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Estimated Downtime Loss</div>
-            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultCost">
-              —
+            <div class="wi-scenarios" id="wiScenarios"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm" id="wiAdd">+ Scenario</button>
+              <button class="btn btn-sm" id="wiFromLive" title="Copy the live Simulation Controls parameters into the baseline">Baseline = current settings</button>
+              <button class="btn btn-sm btn-primary" id="wiRun">Run comparison</button>
+              <button class="btn btn-sm" id="wiCancel" hidden>Cancel</button>
+              <span class="sc-hint" id="wiHint">Every scenario runs on its own virtual line with the same seed. The live simulation is not touched.</span>
             </div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
+            <div id="wiResult"></div>
           </div>
-
-          <div class="whatif-metric-card">
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Peak Process Temp</div>
-            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultTemp">
-              —
-            </div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
-          </div>
-
-          <div class="whatif-metric-card">
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Vibration Peak Zone</div>
-            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultVib">
-              —
-            </div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
-          </div>
-        </div>
-
-        <!-- Shift Export Toolbar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:24px; padding-top:16px; border-top:1px solid var(--border-light);">
-          <div style="font-size:13px; color:var(--text-secondary);">
-            Official production records generated from 500ms digital twin state snapshots.
-          </div>
-          <div style="display:flex; gap:10px;">
-            <a href="/api/reports/export.csv?section=summary" target="_blank" class="op-btn" style="text-decoration:none;">
-              Export Telemetry (.CSV) ↓
-            </a>
-            <a href="/api/reports/export.xlsx" target="_blank" class="op-btn" style="text-decoration:none;">
-              Export Excel Report (.XLSX) ↓
-            </a>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   </section>
@@ -1577,6 +1549,18 @@
               </div>
               <div class="formula-hint" id="exportHint">Times are your local time; files store UTC plus an India time (IST) column.</div>
             </div>
+            <!-- Report snapshot: what the summary sheet holds right now (web/reports.js → GET /api/reports) -->
+            <div class="export-snapshot">
+              <div class="export-snap-head"><span>Report snapshot</span><span id="snapSince">—</span></div>
+              <div class="export-snap-grid">
+                <div><span>Parts made</span><b id="snapParts">—</b></div>
+                <div><span>Average OEE</span><b id="snapOee">—</b></div>
+                <div><span>Site energy</span><b id="snapEnergy">—</b></div>
+                <div><span>Energy cost</span><b id="snapCost">—</b></div>
+                <div><span>CO₂ emitted</span><b id="snapCo2">—</b></div>
+                <div><span>Alerts · open work orders</span><b id="snapAlerts">—</b></div>
+              </div>
+            </div>
           </section>
 <section class="panel panel-compact" id="recentPanel">
             <div class="panel-header">
@@ -1917,7 +1901,7 @@
           <ul class="footer-links">
             <li><a href="#predictive-ai">Predictive AI & RL</a></li>
             <li><a href="#dashboard">Dashboard</a></li>
-            <li><a href="#what-if">What-If Sandbox</a></li>
+            <li><a href="#what-if">What-If Comparison</a></li>
             <li><a href="#how-it-works">How It Works</a></li>
             <li><a href="#references">Research & References</a></li>
             <li><a href="#about">About & FAQ</a></li>
@@ -2367,6 +2351,7 @@
   <script src="/static/factory_learning.js"></script>
   <script src="/static/models.js"></script>
   <script src="/static/synthetic.js"></script>
+  <script src="/static/whatif.js"></script>
   <script src="/static/adaptive.js"></script>
   <script src="/static/rl.js"></script>
   <script src="/static/wokwi.js"></script>

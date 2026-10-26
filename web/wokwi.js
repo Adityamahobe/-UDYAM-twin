@@ -16,19 +16,22 @@
     const l = d.last || {}, m = d.monitoring || {};
     const fault = l.simulated_fault ? `<span class="wk-fault">simulated fault: ${esc(l.simulated_fault.replace(/_/g, " "))}</span>` : "";
     const sources = Object.entries(l.value_sources || {}).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ");
+    // one row per device: identity on the left, the four readings side by side (horizontal) on the right
     return `<div class="wk-card ${d.state !== "ONLINE" ? "wk-dim" : ""}">
-      <div class="card-header">
-        <div class="card-title"><h3>${esc(d.machine_id)}</h3></div>
-        <div class="machine-badges"><span class="pill wk-src">WOKWI SIMULATOR</span><span class="pill wk-virtual">VIRTUAL DATA</span>
-          <span class="pill wk-${tone}">${esc(label)}</span></div>
+      <div class="wk-row">
+        <div class="wk-id">
+          <div class="card-title"><h3>${esc(d.machine_id)}</h3></div>
+          <div class="machine-badges"><span class="pill wk-src">WOKWI SIMULATOR</span><span class="pill wk-virtual">VIRTUAL DATA</span>
+            <span class="pill wk-${tone}">${esc(label)}</span></div>
+          <div class="mc-foot">Scenario <b>${esc((l.scenario || "—").replace(/_/g, " "))}</b> ${fault}</div>
+        </div>
+        <div class="mc-metrics wk-metrics">
+          <div class="mc-metric"><span>RPM</span><b>${f(l.rpm, 0, "rpm")}</b></div>
+          <div class="mc-metric"><span>Temperature</span><b>${f(l.temp_c, 1, "°C")}</b></div>
+          <div class="mc-metric"><span>Vibration</span><b>${f(l.vibration_rms_mm_s, 2, "mm/s")}</b></div>
+          <div class="mc-metric"><span>Current</span><b>${f(l.current_a, 2, "A")}</b></div>
+        </div>
       </div>
-      <div class="mc-metrics wk-metrics">
-        <div class="mc-metric"><span>RPM</span><b>${f(l.rpm, 0, "rpm")}</b></div>
-        <div class="mc-metric"><span>Temperature</span><b>${f(l.temp_c, 1, "°C")}</b></div>
-        <div class="mc-metric"><span>Vibration</span><b>${f(l.vibration_rms_mm_s, 2, "mm/s")}</b></div>
-        <div class="mc-metric"><span>Current</span><b>${f(l.current_a, 2, "A")}</b></div>
-      </div>
-      <div class="mc-foot">Scenario <b>${esc((l.scenario || "—").replace(/_/g, " "))}</b> ${fault}</div>
       <div class="mc-foot">Last message ${l.ts ? new Date(l.ts).toLocaleTimeString([], { hour12: false }) : "—"} (${esc(ago(d.age_s))})
         · #${esc(l.seq)} · ${esc(d.messages)} received · clock: ${esc(l.ts_source || "—")}</div>
       ${d.state === "OFFLINE" ? `<div class="mc-warn">No message for ${esc(dur(d.age_s))}${d.device_status === "offline" ? " (the device reported offline)" : ""}: values hidden.</div>`
@@ -43,13 +46,13 @@
   }
 
   // The Wokwi circuit (wokwi/udyam-virtual-machine/diagram.json) drawn with what each part simulates and its live value.
-  // Violet = a Wokwi virtual part feeding the reading; amber = the reading is computed by a software model in the sketch.
+  // Blue = a Wokwi virtual part feeding the reading; amber = the reading is computed by a software model in the sketch.
   function circuit(d, s) {
     const l = (d && d.state !== "OFFLINE" && d.last) || {};
     const live = !!(d && d.state === "ONLINE");
     const v = (x, n, u) => (x == null ? "—" : `${(+x).toFixed(n)} ${u}`);
     const faultOn = live && l.scenario && l.scenario !== "normal";
-    const VS = "#a78bfa", SW = "#fbbf24", WIRE = "var(--text-muted)";
+    const VS = "#3B9BFF", SW = "#fbbf24", WIRE = "var(--text-muted)";
     const T = (x, y, txt, o = {}) => `<text x="${x}" y="${y}" font-size="${o.size || 11}" fill="${o.fill || "var(--text-secondary)"}"
       ${o.anchor ? `text-anchor="${o.anchor}"` : ""} ${o.bold ? 'font-weight="700"' : ""} ${o.mono ? 'font-family="var(--font-mono)"' : ""}>${esc(txt)}</text>`;
     const part = (x, y, name, role, color, value) =>
@@ -132,7 +135,7 @@
     "board-esp32-devkit-c-v4": { tag: "wokwi-esp32-devkit-v1", note: "Board drawn as ESP32 DevKit V1 (open-source Wokwi drawing); the Wokwi project uses DevKit-C v4 with the same GPIOs.",
       pin: n => ({ TX: "TX0", RX: "RX0" }[n] || (/^\d+$/.test(n) ? `D${n}` : n)) },
   };
-  const LABELS = {  // what each part simulates; colour: violet = Wokwi virtual part, amber = software model
+  const LABELS = {  // what each part simulates; colour: blue = Wokwi virtual part, amber = software model
     potSpeed: { title: "SPEED potentiometer", role: "→ RPM setpoint", kind: "vs", at: "left" },
     potLoad: { title: "LOAD potentiometer", role: "→ current (software model)", kind: "sw", at: "above" },
     dht1: { title: "DHT22 · virtual sensor", role: "→ temperature", kind: "vs", at: "below" },

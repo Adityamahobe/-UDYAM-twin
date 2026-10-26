@@ -52,8 +52,31 @@
     }).catch(() => hint("Could not reach the server."));
   }
 
+  // Report snapshot: the figures the summary sheet would hold now, since the last reset (GET /api/reports "window")
+  function snapshot() {
+    if (document.visibilityState !== "visible") return;
+    fetch("/api/reports?trend_minutes=1").then(r => r.ok ? r.json() : Promise.reject(r.status)).then(rep => {
+      const w = rep.window || {}, ms = Object.values(w.machines || {});
+      const sum = f => ms.reduce((t, m) => t + (f(m) || 0), 0);
+      const oees = ms.map(m => (m.oee || {}).oee).filter(v => typeof v === "number");
+      const since = w.since ? new Date(w.since) : null;
+      const alerts = (rep.alerts || []).filter(x => !since || new Date(x.raised_at) >= since).length;
+      const open = (rep.work_orders || []).filter(x => x.status !== "Closed").length;
+      const set = (id, t) => { el(id).textContent = t; };
+      set("snapSince", since ? `since reset · ${since.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "—");
+      set("snapParts", sum(m => (m.oee || {}).parts).toLocaleString("en-IN"));
+      set("snapOee", oees.length ? `${(100 * oees.reduce((t, v) => t + v, 0) / oees.length).toFixed(1)}%` : "—");
+      set("snapEnergy", `${(w.site_energy_kwh || 0).toFixed(1)} kWh`);
+      set("snapCost", `₹${Math.round(sum(m => m.cost_inr)).toLocaleString("en-IN")}`);
+      set("snapCo2", `${sum(m => m.co2_kg).toFixed(1)} kg`);
+      set("snapAlerts", `${alerts} · ${open}`);
+    }).catch(() => { el("snapSince").textContent = "server unreachable"; });
+  }
+
   function start() {
     if (!el("exportPanel")) return;
+    snapshot();
+    setInterval(snapshot, 15000);
     el("exportQuick").querySelectorAll(".btn").forEach(b => b.onclick = () => setLast(+b.dataset.min));
     ["exportStart", "exportEnd", "exportSection"].forEach(id => el(id).addEventListener("change", () => {
       el("exportQuick").querySelectorAll(".btn").forEach(b => b.classList.remove("active")); hint();
