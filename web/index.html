@@ -139,6 +139,72 @@
     <!-- SIMULATE: Testing-mode tools (hidden in Real Data mode) -->
     <div class="ws-pane" data-pane="simulate" role="tabpanel" hidden>
       <div class="ws-grid">
+        <!-- Factory Run Designer (web/factory_run.js): whole-factory test runs from an event list -->
+        <section class="panel testing-only" id="factoryRunPanel" data-testing-note="Factory runs are Testing-mode simulation tools.">
+          <div class="panel-header">
+            <h2>Factory Run Designer</h2>
+            <span class="synth-label" title="Simulated factory runs. Not real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
+          </div>
+          <div class="synth-body">
+            <div class="synth-grid">
+              <label>Preset <select id="frPreset"></select></label>
+              <label>Name <input type="text" id="frName" maxlength="60" value="Factory run"></label>
+              <label>Length (min) <input type="number" id="frMinutes" min="1" max="120" value="30"></label>
+              <label>Seed <input type="number" id="frSeed" min="0" value="7"></label>
+              <label class="fr-check"><input type="checkbox" id="frHeal" checked> Twin self-healing</label>
+            </div>
+            <div class="synth-sub">Events · at minute X, on machine Y, do Z</div>
+            <div class="fr-events" id="frEvents"></div>
+            <div class="control-bar"><button class="btn btn-sm" id="frAdd">+ Add event</button></div>
+            <div class="fr-run">
+              <div class="control-bar">
+                <button class="btn btn-sm btn-primary" id="frRun" title="Runs on a separate copy of the factory in a few seconds">Run (fast)</button>
+                <button class="btn btn-sm" id="frLive" title="Plays the events on the live simulation in real time">▶ Play on live simulation</button>
+                <button class="btn btn-sm" id="frLiveStop" hidden>■ Stop live run</button>
+                <span class="sc-hint" id="frLiveState"></span>
+              </div>
+              <div class="control-bar fr-batch">
+                <span class="sc-label">Batch</span>
+                <label class="sc-label">runs <input type="number" id="frRuns" class="sc-num" min="2" max="100" value="10"></label>
+                <label class="sc-label">event time ± <input type="number" id="frJitter" class="sc-num" min="0" max="30" step="0.5" value="2"> min</label>
+                <label class="sc-label">severity <input type="number" id="frSevLo" class="sc-num" min="0.5" max="2" step="0.1" value="0.7">–<input type="number" id="frSevHi" class="sc-num" min="0.5" max="2" step="0.1" value="1.4"></label>
+                <label class="sc-label">parameters ± <input type="number" id="frParamJ" class="sc-num" min="0" max="50" value="10"> %</label>
+                <button class="btn btn-sm" id="frBatch">Run batch</button>
+                <button class="btn btn-sm" id="frCancel" hidden>Cancel</button>
+              </div>
+            </div>
+            <div class="sc-hint" id="frHint">Fast runs and batches use a separate copy of the factory: the live dashboard is not touched.</div>
+            <div id="frResult"></div>
+          </div>
+        </section>
+
+        <section class="panel testing-only" id="factoryDatasetPanel" data-testing-note="Factory datasets are collected from Testing-mode simulation runs.">
+          <div class="panel-header">
+            <h2>Factory Dataset</h2>
+            <span class="synth-label" title="Collected from simulated factory runs. Not real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
+          </div>
+          <div class="synth-body">
+            <div class="sc-hint">Collect labelled data for learning from the run designs above. Each run is recorded on a separate copy of the factory: every machine every 2 s, 60 s feature windows every 10 s, the line state, events, alerts and the injected ground truth. Train and test are split by whole run.</div>
+            <div class="synth-sub">Recipe</div>
+            <div id="fdRecipe"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm" id="fdAdd" title="Adds the run design above, repeated with its batch settings (runs, event time, severity, parameters)">+ Add current design (with its batch settings)</button>
+              <span class="sc-hint" id="fdTotal"></span>
+            </div>
+            <div class="control-bar fr-batch">
+              <label class="sc-label">name <input type="text" id="fdName" maxlength="60" placeholder="Factory dataset"></label>
+              <label class="sc-label">test runs <input type="number" id="fdTest" class="sc-num" min="0" max="50" value="20"> %</label>
+              <label class="sc-label">split seed <input type="number" id="fdSplitSeed" class="sc-num" min="0" value="0"></label>
+              <button class="btn btn-sm btn-primary" id="fdCollect">Collect dataset</button>
+              <button class="btn btn-sm" id="fdCancel" hidden>Cancel</button>
+            </div>
+            <div class="sc-hint" id="fdHint"></div>
+            <div class="synth-sub">Datasets</div>
+            <div id="fdList"></div>
+            <div id="fdDetail"></div>
+          </div>
+        </section>
+
         <!-- Fault Injection & Supervised Control Toolbar -->
         <section class="panel testing-only" data-testing-note="Fault injection and derates are simulator controls: switch to Testing mode to use them.">
           <div class="panel-header">
@@ -295,6 +361,23 @@
               <button class="btn btn-sm testing-only" id="mdRollback">Roll back to previous production</button>
               <span class="sc-hint" id="mdHint"></span>
             </div>
+          </div>
+        </section>
+
+        <!-- Factory learning (web/factory_learning.js): fault diagnosis, time to limit, RL policy from factory datasets -->
+        <section class="panel" id="factoryLearningPanel">
+          <div class="panel-header">
+            <h2>Factory Learning · Diagnosis, Time to Limit, RL Policy</h2>
+            <span class="synth-label" title="Trained and evaluated on simulated factory runs only.">SYNTHETIC DIGITAL TWIN DATA</span>
+          </div>
+          <div class="synth-body">
+            <div class="sc-hint">Models trained on Factory Datasets (Simulate tab). They learn only from each dataset's training runs and are measured only on its held-out test runs. A candidate must pass its evaluation gate (fixed before training) and an operator must promote it; rollback is always available. None has learned from real machines.</div>
+            <div class="synth-sub">Factory datasets to learn from</div>
+            <div class="synth-faults" id="flDatasets"></div>
+            <div class="fl-kinds" id="flKinds"></div>
+            <div class="sc-hint" id="flHint"></div>
+            <div class="synth-sub">Live: production models on the live simulation (last 60 s, read-only)</div>
+            <div id="flLive"></div>
           </div>
         </section>
 
@@ -662,6 +745,9 @@
   <script src="/static/wokwi.js"></script>
   <script src="/static/synthetic.js"></script>
   <script src="/static/whatif.js"></script>
+  <script src="/static/factory_run.js"></script>
+  <script src="/static/factory_dataset.js"></script>
+  <script src="/static/factory_learning.js"></script>
   <script src="/static/models.js"></script>
   <script src="/static/adaptive.js"></script>
 </body>

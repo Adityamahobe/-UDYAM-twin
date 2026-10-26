@@ -38,10 +38,18 @@ def _now() -> str:
 
 
 class ModelRegistry:
-    def __init__(self, root: Path = REGISTRY_DIR, baseline_model: Path = MODEL_PATH, baseline_metrics: Path = METRICS_PATH):
+    """baseline_model=None starts an empty registry (no production version until an operator promotes one).
+    artifact is the file name of each version's model; baseline_card replaces the AI4I baseline's card fields."""
+
+    def __init__(self, root: Path = REGISTRY_DIR, baseline_model: Path | None = MODEL_PATH,
+                 baseline_metrics: Path | None = METRICS_PATH, artifact: str = "model.joblib",
+                 baseline_card: dict[str, Any] | None = None, name: str = "ai4i_failure"):
         self.root = root
         self.baseline_model = baseline_model
         self.baseline_metrics = baseline_metrics
+        self.artifact = artifact
+        self.baseline_card = baseline_card
+        self.name = name
         self.lock = threading.RLock()
 
     # -- storage ---------------------------------------------------------------
@@ -61,12 +69,17 @@ class ModelRegistry:
 
     def _init(self) -> dict[str, Any]:
         """Register the shipped model as v001 (baseline) the first time the registry is used."""
+        if self.baseline_model is None:
+            reg = {"model": self.name, "production": None, "versions": [], "history": []}
+            self.root.mkdir(parents=True, exist_ok=True)
+            self._save(reg)
+            return reg
         if not self.baseline_model.is_file():
             raise RegistryError(f"{self.baseline_model} not found; run `python -m ml.train_ai4i` first")
         vdir = self.root / "v001"
         vdir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.baseline_model, vdir / "model.joblib")
-        metrics = json.loads(self.baseline_metrics.read_text()) if self.baseline_metrics.is_file() else {}
+        shutil.copy2(self.baseline_model, vdir / self.artifact)
+        metrics = json.loads(self.baseline_metrics.read_text()) if self.baseline_metrics and self.baseline_metrics.is_file() else {}
         (vdir / "metrics.json").write_text(json.dumps(metrics, indent=2))
         card = {
             "version": "v001", "kind": "baseline", "status": "production", "created_at": _now(),
@@ -77,7 +90,9 @@ class ModelRegistry:
             "gate": {"passed": True, "baseline": True, "checks": []},
             "ai4i_test": (metrics.get("per_class") or {}).get("machine_failure"),
         }
-        reg = {"model": "ai4i_failure", "production": "v001", "versions": [card],
+        if self.baseline_card is not None:
+            card = {k: v for k, v in card.items() if k not in ("ai4i_test", "trained_on", "summary")} | self.baseline_card
+        reg = {"model": self.name, "production": "v001", "versions": [card],
                "history": [{"at": card["created_at"], "action": "register_baseline", "version": "v001", "by": "system"}]}
         self.root.mkdir(parents=True, exist_ok=True)
         self._save(reg)
@@ -97,7 +112,7 @@ class ModelRegistry:
 
     def model_path(self, version: str) -> Path:
         self.card(version)
-        return self.root / version / "model.joblib"
+        return self.root / version / self.artifact
 
     def metrics(self, version: str) -> dict[str, Any]:
         p = self.root / self.card(version)["version"] / "metrics.json"
@@ -112,7 +127,7 @@ class ModelRegistry:
     # -- writes ----------------------------------------------------------------
     def next_version(self) -> str:
         reg = self.state()
-        return f"v{max(int(v['version'][1:]) for v in reg['versions']) + 1:03d}"
+        return f"v{max((int(v['version'][1:]) for v in reg['versions']), default=0) + 1:03d}"
 
     def add_candidate(self, version: str, card: dict[str, Any]) -> dict[str, Any]:
         """Record a trained candidate (its files are already in root/version)."""

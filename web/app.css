@@ -1252,3 +1252,64 @@ body.real-mode .lower-layout.rd-solo { grid-template-columns: 1fr; }
 .real-banner .rb-future { font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed var(--border-subtle); padding-top: 5px; margin-top: 2px; }
 .real-banner .rb-future b { color: var(--text-secondary); }
 body.real-mode #workOrdersPanel { display: none !important; }  /* Real Data mode: no work orders on the Live tab */
+
+/* Factory Run Designer (web/factory_run.js) */
+#factoryRunPanel [hidden] { display: none !important; }
+.ws-grid > #factoryRunPanel { grid-column: 1 / -1; }
+#factoryRunPanel { --wi-1: #3987e5; --wi-2: #d95926; }
+.synth-grid label.fr-check { flex-direction: row; align-items: center; gap: 6px; align-self: end; padding-bottom: 6px; white-space: nowrap; }
+.synth-grid label.fr-check input { width: auto; }
+.fr-events { overflow-x: auto; }
+.fr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.fr-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11px; padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); }
+.fr-table td { padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; white-space: nowrap; }
+.fr-table input, .fr-table select { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 3px 5px; font-size: 12px; }
+.fr-table input[type=number] { width: 64px; }
+.fr-table .fr-at { width: 56px; }
+.fr-args { display: flex; gap: 4px; align-items: center; }
+.fr-run { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-subtle); padding-top: 6px; }
+.fr-batch { background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px 8px; }
+.fr-batch .sc-num { width: 52px; }
+.fr-kpis { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
+.fr-kpis b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fr-lanes svg { width: 100%; min-width: 560px; height: auto; display: block; }
+.fr-lanes { overflow-x: auto; background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px; }
+.wi-table.fr-left td, .wi-table.fr-left th { text-align: left; }
+.fr-ok { color: var(--status-ok); } .fr-miss { color: var(--status-crit); }
+.fr-alert { white-space: normal !important; max-width: 320px; color: var(--text-secondary); font-size: 11px; }
+
+/* Factory Dataset (web/factory_dataset.js) */
+.ws-grid > #factoryDatasetPanel { grid-column: 1 / -1; }
+#factoryDatasetPanel { --wi-1: #3987e5; --wi-2: #d95926; }
+#factoryDatasetPanel [hidden] { display: none !important; }
+#factoryDatasetPanel .fr-batch input[type=text] { width: 180px; }
+.fd-sel td { background: var(--bg-card); }
+.fd-actions { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+.fd-warn { color: var(--status-warn); }
+.fd-detail { border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 6px; }
+.fd-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 900px) { .fd-cols { grid-template-columns: 1fr; } }
+.fd-checks { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--text-secondary); }
+.fd-checks li { padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
+.fd-checks b { color: var(--text-primary); font-weight: 600; margin-right: 4px; }
+.fd-checks .fd-pass b { color: var(--status-ok); }
+.fd-checks .fd-warn b { color: var(--status-warn); }
+.fd-checks .fd-fail b { color: var(--status-crit); }
+.fd-chart, .fd-trace { background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px; margin: 4px 0; overflow-x: auto; }
+.fd-chart svg, .fd-trace svg { width: 100%; min-width: 420px; height: auto; display: block; }
+.fd-read { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+#fdRecipe { overflow-x: auto; }
+#fdRecipe td.sc-label { white-space: normal; min-width: 160px; }
+
+/* Factory Learning (web/factory_learning.js) */
+.ws-grid > #factoryLearningPanel { grid-column: 1 / -1; }
+.fl-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+@media (max-width: 1100px) { .fl-kinds { grid-template-columns: 1fr; } }
+.fl-kind { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fl-kind h3 { margin: 0; font-size: 13px; display: flex; justify-content: space-between; gap: 6px; align-items: center; flex-wrap: wrap; }
+.fl-kind .md-versions { max-height: 520px; }
+.fl-kind .md-table { overflow-x: auto; display: block; }
+.fl-what { font-size: 11px; color: var(--text-muted); }
+#flLive { overflow-x: auto; }
+.fl-p { color: var(--text-muted); font-size: 11px; }

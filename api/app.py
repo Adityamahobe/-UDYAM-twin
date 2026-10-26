@@ -82,6 +82,8 @@ from ml.vibration.monitor import VibrationMonitor
 from sim.analytics import Analytics
 from sim.controls import ParamError
 from sim import whatif
+from sim import factory_run
+from ml import factory_dataset, factory_learning
 from sim.factory import FactoryEngine, TICK_S
 from sim.scenarios import SCENARIOS
 
@@ -229,7 +231,7 @@ async def broadcast_messages(messages: List[Dict[str, Any]]) -> None:
     vibration_monitor.observe(messages)  # sees every frame, including RESET from a manual reset
     analytics.observe(messages)
     for name, observer in (("advisor", advisor), ("rl", rl_agent), ("telemetry", telemetry_recorder),
-                           ("drift", drift_monitor)):
+                           ("drift", drift_monitor), ("factory models", live_factory_models)):
         try:
             observer.observe(messages)
         except Exception as err:  # decision support and history must never break telemetry
@@ -320,8 +322,9 @@ async def engine_ticker_loop() -> None:
     next_at = loop.time()
     while True:
         try:
-            if factory_engine.running:  # paused or stopped: the Auto Demo clock waits too
+            if factory_engine.running:  # paused or stopped: the Auto Demo clock (and a live factory run) waits too
                 await auto_demo.tick()
+                await factory_playback.tick()
             await broadcast_messages(factory_engine.step())
         except Exception as err:
             print(f"[ticker error]: {err}")
@@ -415,6 +418,76 @@ def production_reference() -> TrainingReference:
 
 drift_monitor = DriftMonitor(production_reference)
 whatif_jobs = whatif.WhatIfJobs()
+factory_run_jobs = factory_run.RunJobs()
+factory_datasets = factory_dataset.FactoryDatasetStore()
+factory_registries = factory_learning.registries()
+factory_training = factory_learning.FactoryTrainingJob(factory_registries, factory_datasets)
+live_factory_models = factory_learning.LiveFactoryModels(factory_registries)
+
+
+class FactoryPlayback:
+    """Plays a factory run's event list on the live simulation in real time (Testing mode only)."""
+
+    def __init__(self):
+        self.state = "idle"
+        self.spec: Optional[factory_run.RunSpec] = None
+        self.events: List[Dict[str, Any]] = []
+        self.idx = 0
+        self.start_t = 0.0
+        self.applied: List[Dict[str, Any]] = []
+
+    def status(self) -> Dict[str, Any]:
+        elapsed = (factory_engine.t - self.start_t) / 60 if self.state == "running" else None
+        nxt = self.events[self.idx] if self.state == "running" and self.idx < len(self.events) else None
+        return {"state": self.state, "name": self.spec.name if self.spec else None,
+                "minutes": self.spec.minutes if self.spec else None,
+                "elapsed_min": round(elapsed, 2) if elapsed is not None else None,
+                "next_event": {**nxt, "text": factory_run.describe(nxt)} if nxt else None,
+                "applied": self.applied[-20:]}
+
+    async def start(self, spec: factory_run.RunSpec) -> None:
+        _testing_only("Playing a factory run on the live simulation")
+        events = factory_run.validate(spec, factory_run.machines_of(factory_engine.custom_machines))
+        if auto_demo.on:
+            await auto_demo.set(False)  # its own story would fight the run; also resets the plant
+        else:
+            await clean_reset()
+        await broadcast_messages(factory_engine.reset_params())
+        await broadcast_messages(factory_engine.run_control("start"))
+        factory_engine.auto_derate = spec.self_healing
+        self.spec, self.events, self.idx, self.applied = spec, events, 0, []
+        self.start_t, self.state = factory_engine.t, "running"
+        factory_engine._emit_event(None, "SIM_RUN", "INFO", f"Factory run '{spec.name}' started on the live simulation "
+                                   f"({spec.minutes:g} min, {len(events)} events)", data={"factory_run": spec.name})
+        await broadcast_messages(factory_engine.flush_events())
+
+    async def stop(self, why: str = "stopped") -> None:
+        if self.state != "running":
+            return
+        self.state = why
+        factory_engine.auto_derate = True  # back to the default
+        factory_engine._emit_event(None, "SIM_RUN", "INFO", f"Factory run '{self.spec.name}' {why}",
+                                   data={"factory_run": self.spec.name})
+        await broadcast_messages(factory_engine.flush_events())
+
+    async def tick(self) -> None:
+        if self.state != "running":
+            return
+        elapsed = (factory_engine.t - self.start_t) / 60
+        while self.idx < len(self.events) and self.events[self.idx]["at_min"] <= elapsed + 1e-9:
+            ev = self.events[self.idx]
+            self.idx += 1
+            msgs = factory_run.apply_event(factory_engine, ev)
+            text = factory_run.describe(ev)
+            self.applied.append({"at_min": ev["at_min"], "text": text})
+            factory_engine._emit_event(ev.get("machine_id"), "SIM_RUN", "INFO", f"Run event at {ev['at_min']:g} min: {text}",
+                                       data={"factory_run": self.spec.name, "event": ev})
+            await broadcast_messages(msgs + factory_engine.flush_events())
+        if elapsed >= self.spec.minutes:
+            await self.stop("finished")
+
+
+factory_playback = FactoryPlayback()
 
 
 def _deployed_model_path() -> Path:
@@ -1122,6 +1195,7 @@ async def post_operating_mode(req: OperatingModeRequest):
     if not operating_mode.set(req.mode):
         return operating_mode_status()
     if req.mode == REAL_DATA:
+        await factory_playback.stop("stopped: switched to Real Data mode")
         # Real readings reach the dashboard through the engine tick (IoT overlay), so it must be running.
         await broadcast_messages(factory_engine.run_control("start"))
         if factory_engine.mode == "REPLAY":
@@ -1884,6 +1958,374 @@ def get_whatif_export(rid: str, format: str = Query(default="csv", pattern="^(cs
     cols = ["label", "scenario", *keys, *[f"delta_{k}" for k in keys]]
     return Response(_csv(rows, cols), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{rid}.csv"'})
+
+
+# -----------------------------------------------------------------------------
+# Factory Run Designer (sim/factory_run.py): whole-factory test runs, fast or played live
+# -----------------------------------------------------------------------------
+class FactoryRunSpecIn(BaseModel):
+    name: str = Field(default="Factory run", min_length=1, max_length=60)
+    minutes: float = Field(default=30.0, ge=1.0, le=factory_run.MAX_MINUTES)
+    seed: int = Field(default=7, ge=0, le=2**31 - 1)
+    self_healing: bool = True
+    events: List[Dict[str, Any]] = Field(default_factory=list, max_length=factory_run.MAX_EVENTS)
+
+    def spec(self) -> factory_run.RunSpec:
+        return factory_run.RunSpec(self.name.strip(), self.minutes, self.seed, self.self_healing, [dict(e) for e in self.events])
+
+
+class FactoryBatchIn(BaseModel):
+    spec: FactoryRunSpecIn
+    runs: int = Field(default=10, ge=2, le=factory_run.MAX_BATCH)
+    fault_time_jitter_min: float = Field(default=0.0, ge=0, le=30)
+    severity_range: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    param_jitter_pct: float = Field(default=0.0, ge=0, le=50)
+
+
+def _run_error(err: Exception) -> HTTPException:
+    return HTTPException(status_code=409 if "already" in str(err) else 422,
+                         detail={"error": "factory_run", "message": str(err)})
+
+
+@app.get("/api/factory-run/options")
+def get_factory_run_options():
+    machines = factory_run.machines_of(factory_engine.custom_machines)
+    from sim import controls as _controls
+    return {"label": factory_run.DATA_LABEL, "actions": list(factory_run.ACTIONS), "max_minutes": factory_run.MAX_MINUTES,
+            "max_events": factory_run.MAX_EVENTS, "max_batch": factory_run.MAX_BATCH, "severity_range": factory_run.SEVERITY_RANGE,
+            "presets": factory_run.PRESETS,
+            "machines": [{"machine_id": mid, "name": m["name"], "template": m["template"],
+                          "faults": list(factory_run.FAULTS_BY_TEMPLATE.get(m["template"], ())),
+                          "params": _controls.specs_for(m["template"], m["nameplate"])} for mid, m in machines.items()]}
+
+
+@app.post("/api/factory-run/run", status_code=202)
+def post_factory_run(req: FactoryRunSpecIn):
+    """Fast run on a separate engine (the live simulation is not touched)."""
+    spec, custom, econ = req.spec(), list(factory_engine.custom_machines), get_economics()
+    try:
+        factory_run.validate(spec, factory_run.machines_of(custom))
+        return factory_run_jobs.start("run", lambda progress, cancelled: factory_run.run(spec, econ, custom, cancelled), 1)
+    except factory_run.RunError as err:
+        raise _run_error(err)
+
+
+@app.post("/api/factory-run/batch", status_code=202)
+def post_factory_batch(req: FactoryBatchIn):
+    spec, custom, econ = req.spec.spec(), list(factory_engine.custom_machines), get_economics()
+    var = factory_run.Variation(req.fault_time_jitter_min, req.severity_range, req.param_jitter_pct)
+    try:
+        factory_run.validate(spec, factory_run.machines_of(custom))
+        if var.severity_range and not (factory_run.SEVERITY_RANGE[0] <= var.severity_range[0] <= var.severity_range[1]
+                                       <= factory_run.SEVERITY_RANGE[1]):
+            raise factory_run.RunError("severity range must be within 0.5–2 and min ≤ max")
+        return factory_run_jobs.start("batch", lambda progress, cancelled: factory_run.batch(
+            spec, var, req.runs, econ, custom, progress, cancelled), req.runs)
+    except factory_run.RunError as err:
+        raise _run_error(err)
+
+
+@app.get("/api/factory-run/job")
+def get_factory_run_job():
+    return factory_run_jobs.status()
+
+
+@app.post("/api/factory-run/job/cancel")
+def post_factory_run_cancel():
+    factory_run_jobs.cancel()
+    return factory_run_jobs.status()
+
+
+@app.get("/api/factory-run/results")
+def get_factory_run_results():
+    return [{"id": r["id"], "kind": r["kind"], "name": r["name"], "created_at": r["created_at"], "minutes": r["minutes"],
+             "runs": r.get("runs", 1)} for r in reversed(list(factory_run_jobs.results.values()))]
+
+
+def _factory_result(rid: str) -> Dict[str, Any]:
+    r = factory_run_jobs.results.get(rid)
+    if r is None:
+        raise HTTPException(status_code=404, detail=f"No factory run result {rid}")
+    return r
+
+
+@app.get("/api/factory-run/results/{rid}")
+def get_factory_run_result(rid: str):
+    return _factory_result(rid)
+
+
+@app.get("/api/factory-run/results/{rid}/export")
+def get_factory_run_export(rid: str, format: str = Query(default="csv", pattern="^(csv|json)$")):
+    """CSV: one row per machine every 10 s, with the faults active at that moment as the label. JSON: everything."""
+    r = _factory_result(rid)
+    if format == "json":
+        return JSONResponse(r, headers={"Content-Disposition": f'attachment; filename="SYNTHETIC_{rid}.json"'})
+    if r["kind"] == "batch":  # a batch keeps each run's summary: export the ground-truth labels and detection
+        cols = ["data_label", "run", "seed", "machine_id", "fault", "severity", "start_min", "end_min", "detected",
+                "detection_delay_min", "first_alert"]
+        rows = [{"data_label": factory_run.DATA_LABEL, "run": run_["name"], "seed": run_["seed"], **lab}
+                for run_ in r["detail"] for lab in run_["labels"]]
+        return Response(_csv(rows, cols), media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="SYNTHETIC_{rid}_labels.csv"'})
+    cols = ["data_label", "run", "seed", "t_min", "machine_id", "state", "rpm", "power_kw", "temp_c", "vibration_mm_s",
+            "pressure_bar", "derate_pct", "zone", "label_faults"]
+    rows = []
+    for run_ in [r]:
+        trends = run_.get("trends")
+        for mid, pts in trends.items():
+            for p in pts:
+                rows.append({"data_label": factory_run.DATA_LABEL, "run": run_["name"], "seed": run_["seed"], "machine_id": mid,
+                             **{k: p.get(k) for k in cols if k in p}, "label_faults": "|".join(p["faults"]) or "normal"})
+    return Response(_csv(rows, cols), media_type="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="SYNTHETIC_{rid}.csv"'})
+
+
+@app.get("/api/factory-run/live")
+def get_factory_live():
+    return factory_playback.status()
+
+
+@app.post("/api/factory-run/live/start")
+async def post_factory_live_start(req: FactoryRunSpecIn):
+    """Play the run on the live simulation in real time (Testing mode only). Resets the live plant first."""
+    if factory_playback.state == "running":
+        raise HTTPException(status_code=409, detail={"error": "factory_run", "message": "a run is already playing"})
+    try:
+        await factory_playback.start(req.spec())
+    except factory_run.RunError as err:
+        raise _run_error(err)
+    return factory_playback.status()
+
+
+@app.post("/api/factory-run/live/stop")
+async def post_factory_live_stop():
+    await factory_playback.stop("stopped by the operator")
+    return factory_playback.status()
+
+
+# -----------------------------------------------------------------------------
+# Factory datasets (ml/factory_dataset.py): labelled whole-factory data collected from run designs
+# -----------------------------------------------------------------------------
+class FactoryDatasetPartIn(BaseModel):
+    spec: FactoryRunSpecIn
+    runs: int = Field(default=10, ge=1, le=factory_dataset.MAX_RUNS)
+    fault_time_jitter_min: float = Field(default=0.0, ge=0, le=30)
+    severity_range: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    param_jitter_pct: float = Field(default=0.0, ge=0, le=50)
+
+
+class FactoryDatasetIn(BaseModel):
+    name: str = Field(default="", max_length=60)
+    test_share: float = Field(default=0.2, ge=0.0, le=0.5)
+    split_seed: int = Field(default=0, ge=0, le=2**31 - 1)
+    parts: List[FactoryDatasetPartIn] = Field(min_length=1, max_length=factory_dataset.MAX_PARTS)
+
+
+def _dataset_error(err: Exception, code: int = 422) -> HTTPException:
+    return HTTPException(status_code=code, detail={"error": "factory_dataset", "message": str(err)})
+
+
+def _factory_dataset_meta(dataset_id: str) -> Dict[str, Any]:
+    try:
+        return factory_datasets.metadata(dataset_id)
+    except factory_dataset.DatasetError as err:
+        raise _dataset_error(err, 400)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No factory dataset {dataset_id}")
+
+
+@app.post("/api/factory-dataset/collect", status_code=202)
+def post_factory_dataset_collect(req: FactoryDatasetIn):
+    """Collect a dataset from the recipe on separate engines (the live simulation is not touched)."""
+    parts = [factory_dataset.Part(p.spec.spec(), p.runs, factory_run.Variation(p.fault_time_jitter_min, p.severity_range,
+                                                                              p.param_jitter_pct)) for p in req.parts]
+    try:
+        return factory_datasets.start(parts, get_economics(), req.name, req.test_share, req.split_seed,
+                                      list(factory_engine.custom_machines))
+    except factory_dataset.DatasetError as err:
+        raise _dataset_error(err, 409 if "already" in str(err) else 422)
+
+
+@app.get("/api/factory-dataset/job")
+def get_factory_dataset_job():
+    return factory_datasets.status()
+
+
+@app.post("/api/factory-dataset/job/cancel")
+def post_factory_dataset_cancel():
+    factory_datasets.cancel()
+    return factory_datasets.status()
+
+
+@app.get("/api/factory-dataset/datasets")
+def get_factory_datasets():
+    return {"data_label": factory_dataset.DATA_LABEL, "datasets": factory_datasets.list(),
+            "limits": {"runs": factory_dataset.MAX_RUNS, "parts": factory_dataset.MAX_PARTS,
+                       "simulated_minutes": factory_dataset.MAX_RUN_MINUTES}}
+
+
+@app.get("/api/factory-dataset/datasets/{dataset_id}")
+def get_factory_dataset(dataset_id: str):
+    return _factory_dataset_meta(dataset_id)
+
+
+@app.get("/api/factory-dataset/datasets/{dataset_id}/preview")
+def get_factory_dataset_preview(dataset_id: str, run_id: Optional[str] = None, machine_id: Optional[str] = None):
+    _factory_dataset_meta(dataset_id)
+    return factory_datasets.preview(dataset_id, run_id, machine_id)
+
+
+@app.get("/api/factory-dataset/datasets/{dataset_id}/download")
+def get_factory_dataset_download(dataset_id: str,
+                                 part: str = Query(default="zip", pattern="^(zip|metadata|readings|windows|line|events|labels|runs)$"),
+                                 split: str = Query(default="all", pattern="^(all|train|test)$")):
+    """zip: every file with metadata. A CSV part can be limited to the train or test runs."""
+    meta = _factory_dataset_meta(dataset_id)
+    base = f"SYNTHETIC_{dataset_id}"
+    hdr = {"X-Data-Label": factory_dataset.DATA_LABEL}
+    if part == "zip":
+        return Response(factory_datasets.zip_bytes(dataset_id), media_type="application/zip",
+                        headers={**hdr, "Content-Disposition": f'attachment; filename="{base}.zip"'})
+    if part == "metadata":
+        return Response(json.dumps(meta, indent=2), media_type="application/json",
+                        headers={**hdr, "Content-Disposition": f'attachment; filename="{base}_metadata.json"'})
+    path = factory_datasets.file(dataset_id, part)
+    if split == "all":
+        body = path.read_bytes()
+    else:
+        with open(path, newline="") as fh:
+            reader = csv.reader(fh)
+            head = next(reader)
+            col = head.index("split")
+            out = io.StringIO()
+            w = csv.writer(out, lineterminator="\r\n")
+            w.writerow(head)
+            w.writerows(r for r in reader if r[col] == split)
+        body = out.getvalue().encode()
+    suffix = "" if split == "all" else f"_{split}"
+    return Response(body, media_type="text/csv",
+                    headers={**hdr, "Content-Disposition": f'attachment; filename="{base}_{part}{suffix}.csv"'})
+
+
+@app.delete("/api/factory-dataset/datasets/{dataset_id}")
+def delete_factory_dataset(dataset_id: str):
+    try:
+        factory_datasets.delete(dataset_id)
+    except factory_dataset.DatasetError as err:
+        raise _dataset_error(err, 409)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No factory dataset {dataset_id}")
+    return {"deleted": dataset_id}
+
+
+# -----------------------------------------------------------------------------
+# Factory learning (ml/factory_learning.py): fault diagnosis, time to limit and the RL policy, trained on factory
+# datasets, evaluated on held-out runs, gated, deployed only by an operator, with rollback
+# -----------------------------------------------------------------------------
+class FactoryTrainIn(BaseModel):
+    datasets: List[str] = Field(min_length=1, max_length=10)
+    episodes: int = Field(default=1500, ge=200, le=20000)
+
+
+def _factory_kind(kind: str):
+    if kind not in factory_learning.KINDS:
+        raise HTTPException(status_code=404, detail=f"No factory model kind {kind}")
+    return factory_registries[kind]
+
+
+def factory_learning_status() -> Dict[str, Any]:
+    out = {}
+    for kind, title in factory_learning.KINDS.items():
+        reg = _registry_call(factory_registries[kind].state)
+        out[kind] = {**reg, "title": title, "gate_criteria": factory_learning.GATES[kind]}
+    return {"data_label": factory_learning.DATA_LABEL, "models": out, "training": factory_training.status(),
+            "datasets": [{k: d.get(k) for k in ("dataset_id", "name", "created_at", "counts")} for d in factory_datasets.list()],
+            "note": "Every factory model is trained and evaluated only on SYNTHETIC DIGITAL TWIN DATA (held-out simulated "
+                    "runs); none has learned from real machines. Deploying needs an operator and Testing mode."}
+
+
+def _rl_production_path() -> Optional[Path]:
+    reg = factory_registries["rl"]
+    if reg.index_path.is_file() and reg.production() not in (None, "v001"):
+        return reg.production_model_path()
+    return None
+
+
+def _use_rl_production() -> None:
+    """The live RL agent recommends with the production policy of the factory_rl registry (v001 is the shipped one)."""
+    from ml.maintenance_rl import POLICY_PATH, QPolicy
+    pol = QPolicy.load(_rl_production_path() or POLICY_PATH)
+    if pol is not None:
+        rl_agent.policy, rl_agent.trained = pol, True
+
+
+_use_rl_production()
+
+
+@app.get("/api/factory-learning")
+def get_factory_learning():
+    return factory_learning_status()
+
+
+@app.get("/api/factory-learning/live")
+def get_factory_learning_live():
+    """The production fault and time-to-limit models on the live simulation's last 60 s (read-only)."""
+    if operating_mode.mode != "TESTING":
+        return {"machines": [], "models": {}, "note": "Factory models run on the simulation only (Testing mode)."}
+    return live_factory_models.predict()
+
+
+@app.post("/api/factory-learning/{kind}/train", status_code=202)
+def post_factory_learning_train(kind: str, req: FactoryTrainIn):
+    """Train a candidate in the background. Training never deploys anything: it is only registered with its gate."""
+    reg = _factory_kind(kind)
+    _registry_call(reg.state)  # registers the RL baseline (the shipped policy) first if needed
+    try:
+        return factory_training.start(kind, req.datasets, by="dashboard", episodes=req.episodes)
+    except factory_learning.LearningError as err:
+        raise HTTPException(status_code=409 if "already" in str(err) else 422,
+                            detail={"error": "factory_learning", "message": str(err)})
+
+
+@app.get("/api/factory-learning/{kind}/{version}/metrics")
+def get_factory_learning_metrics(kind: str, version: str):
+    reg = _factory_kind(kind)
+    return _registry_call(lambda: reg.metrics(version))
+
+
+async def _factory_model_switched(kind: str, action: str, reg: Dict[str, Any], operator: str) -> Dict[str, Any]:
+    if kind == "rl":
+        _use_rl_production()
+    last = reg["history"][-1]
+    factory_engine._emit_event(None, "MODEL", "INFO",
+                               f"{factory_learning.KINDS[kind]} model {action}: {last['from'] or 'none'} → {last['version']} (by {operator})",
+                               data={"action": action, "model": f"factory_{kind}", **last})
+    await broadcast_messages(factory_engine.flush_events())
+    return factory_learning_status()
+
+
+@app.post("/api/factory-learning/{kind}/{version}/promote")
+async def post_factory_learning_promote(kind: str, version: str, request: Request, body: Optional[ModelDeployRequest] = None,
+                                        x_operator_token: Optional[str] = Header(default=None)):
+    """Deploy a candidate that passed its gate. Needs an operator; refused in Real Data mode."""
+    reg = _factory_kind(kind)
+    _authorize_operator(request, x_operator_token)
+    _testing_only("Changing a deployed factory model")
+    operator = (body.operator if body else "operator").strip() or "operator"
+    state = _registry_call(lambda: reg.promote(version, by=operator))
+    return await _factory_model_switched(kind, "promoted", state, operator)
+
+
+@app.post("/api/factory-learning/{kind}/rollback")
+async def post_factory_learning_rollback(kind: str, request: Request, body: Optional[ModelDeployRequest] = None,
+                                         x_operator_token: Optional[str] = Header(default=None)):
+    """Make an earlier production version (default: the previous one) production again."""
+    reg = _factory_kind(kind)
+    _authorize_operator(request, x_operator_token)
+    _testing_only("Changing a deployed factory model")
+    operator = (body.operator if body else "operator").strip() or "operator"
+    state = _registry_call(lambda: reg.rollback(by=operator, to_version=body.to_version if body else None))
+    return await _factory_model_switched(kind, "rolled back", state, operator)
 
 
 @app.post("/api/chat/proposals/{proposal_id}/approve")

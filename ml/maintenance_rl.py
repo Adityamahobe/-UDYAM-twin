@@ -222,7 +222,10 @@ COMPRESSOR_FAULTS = {"pressure_drop"}
 class VmcEnv:
     """The VMC and the compressor that feeds its air interlock, stepped in 20 s decisions."""
 
-    def __init__(self, seed: int, scenario: str | None = None, decisions: int = 36):
+    def __init__(self, seed: int, scenario: str | None = None, decisions: int = 36, severity: float | None = None,
+                 inject_at: int | None = None):
+        """severity and inject_at fix the fault's severity and decision of onset (factory scenarios, ml/factory_learning.py);
+        they are applied after the random draws, so the rest of the episode is the same as without them."""
         from sim.plant import PlantMachine
 
         self.rng = random.Random(seed)
@@ -236,6 +239,10 @@ class VmcEnv:
         p.noise_scale = self.rng.uniform(0.8, 1.2)
         p.fault_severity = self.rng.uniform(0.7, 1.3)
         p.tool_wear_min = self.rng.uniform(20.0, 190.0)
+        if severity is not None:
+            p.fault_severity = self.comp.fault_severity = float(severity)
+        if inject_at is not None:
+            self.inject_at = int(inject_at)
         self.rated_kw = float(p.nameplate["rated_kw"])
         self.done = False
         self.inspection: str | None = None
