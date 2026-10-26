@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UDYAM-TWIN — Self-Calibrating Digital Twin Command Center</title>
+  <title>UDYAM-TWIN — Digital Twin for Modern Manufacturing</title>
+  <meta name="description" content="Apple-quality digital twin platform for precision manufacturing machine shops. Clean light design, authentic factory footage, accessible 4-machine monitoring.">
+  <meta name="theme-color" content="#FFFFFF">
+
+  <!-- Core Stylesheet -->
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/control_center.css">
   <!-- Sign-in gate (Firebase: web/login.html, api/firebase_auth.py). Off when the server has no Firebase config. -->
   <style>html.auth-pending body { visibility: hidden; } .auth-chip { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
     .auth-chip span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -26,11 +31,11 @@
           window.udyamAuth = { email: user.email, idToken: () => user.getIdToken() };  // for API calls: Authorization: Bearer
           const chip = document.createElement("div");
           chip.className = "auth-chip";
-          chip.innerHTML = '<span id="authEmail"></span><button type="button" class="btn btn-sm" id="authSignOut">Sign out</button>';
+          chip.innerHTML = '<span id="authEmail"></span><button type="button" class="op-btn" id="authSignOut">Sign out</button>';
           chip.querySelector("#authEmail").textContent = user.email || user.displayName || "Signed in";
           chip.querySelector("#authSignOut").title = `Signed in as ${user.email || user.displayName || "this account"}`;
           chip.querySelector("#authSignOut").onclick = () => signOut(auth);
-          (document.querySelector(".header-controls") || document.body).appendChild(chip);
+          (document.querySelector(".op-control-bar .op-control-group:last-child") || document.body).appendChild(chip);
           show();
         });
       } catch {
@@ -39,75 +44,229 @@
       }
     }
   </script>
-<script src="/static/vendor/three/three.min.js"></script>
-<script src="/static/vendor/three/OrbitControls.js"></script>
-<script src="/static/vendor/three/GLTFLoader.js"></script>
-<script src="/static/three_mill.js"></script>
+
+  <!-- Three.js r128 & loaders, vendored (works offline) -->
+  <script src="/static/vendor/three/three.min.js"></script>
+  <script src="/static/vendor/three/OrbitControls.js"></script>
+  <script src="/static/vendor/three/GLTFLoader.js"></script>
+  
+  <!-- Local 3D Kinematics & Client Controller -->
+  <script src="/static/three_mill.js"></script>
+  <script src="/static/api_service.js"></script>
+  <script src="/static/app.js"></script>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
-  <header>
-    <div class="brand">
-      <h1>UDYAM-TWIN</h1>
-      <button type="button" class="badge-sim mode-switch" id="globalModeBadge" title="Switch between Testing mode (simulation) and Real Data mode (live telemetry)">TESTING MODE · SIMULATION</button>
+  <!-- ========================================================================
+       1. OPENING LOADER — REAL MANUFACTURING FACTORY WITH WORKERS
+       ======================================================================== -->
+  <aside id="introLoader" aria-label="Loading UDYAM-TWIN Digital Twin Experience">
+    <button class="loader-skip-btn" onclick="dismissLoader()" aria-label="Skip introduction animation">
+      Enter Website [ESC]
+    </button>
+
+    <!-- Real Machine Shop Video Background (NASA GSFC Precision Machine Shop B-Roll) -->
+    <div class="loader-video-container">
+      <img class="loader-video" src="/assets/3d/UDYAM_TWIN_Factory_Interior_Hero.jpg" alt="Industrial Manufacturing Floor" style="width:100%; height:100%; object-fit:cover;">
+      <div class="loader-overlay-gradient"></div>
     </div>
-    <div class="header-controls">
-      <div class="connection-status">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="connectionStatusText">Connecting...</span>
+
+    <div class="loader-bottom-content">
+      <div class="loader-badge">
+        <span>INDUSTRIAL DIGITAL TWIN PLATFORM</span>
       </div>
-      <button class="btn btn-sm testing-only" id="btnAutoDemo" onclick="toggleAutoDemo()">Auto Demo: ON</button>
-      <button class="btn btn-sm testing-only" onclick="resetScenario()">Reset Scenario</button>
-      <a href="/operator" class="btn btn-sm" style="text-decoration:none;">Operator View 📱</a>
+      <div class="loader-wordmark">UDYAM-TWIN</div>
+      <div class="loader-tagline">MAKING EVERY MACHINE VISIBLE.</div>
+
+      <div class="loader-progress-track">
+        <div class="loader-progress-fill" id="loaderFill"></div>
+      </div>
+
+      <div class="loader-telemetry-text" id="loaderText" aria-live="polite">
+        INITIALIZING SHOP FLOOR SENSORS
+      </div>
+    </div>
+  </aside>
+
+  <!-- Restrained Desktop Spotlight Highlight -->
+  <div class="cursor-spotlight" aria-hidden="true"></div>
+
+  <!-- ========================================================================
+       2. PERSISTENT APPLE-STYLE FROSTED GLASS NAVIGATION (52px)
+       Centered, optically balanced, no link overcrowding
+       ======================================================================== -->
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="brand-wrapper">
+        <a href="#hero" class="brand-mark" aria-label="UDYAM-TWIN Home">UDYAM-TWIN</a>
+      </div>
+
+      <nav class="nav-links" aria-label="Main Navigation">
+        <a href="#hero" class="nav-link active">Overview</a>
+        <a href="#real-data" class="nav-link real-only-link">Wokwi Live</a>
+        <a href="#problem" class="nav-link">The Problem</a>
+        <a href="#factory" class="nav-link">Factory</a>
+        <a href="#dashboard" class="nav-link">Dashboard</a>
+        <a href="#what-if" class="nav-link">What-If</a>
+        <a href="#predictive-ai" class="nav-link">Predictive AI</a>
+        <a href="#status" class="nav-link">Status</a>
+        <a href="#alerts" class="nav-link">Alerts</a>
+        <a href="#control-center" class="nav-link">Control Center</a>
+        <a href="#about" class="nav-link">About</a>
+        <a href="#references" class="nav-link">References</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button class="nav-item-ai" onclick="window.udyamChat && udyamChat.toggle()" title="Ask the twin (Advisor chat)" aria-label="Open the Advisor chat">
+          <span class="ai-spark-icon">✨</span>
+          <span class="ai-nav-label">Ask the Twin</span>
+        </button>
+        <button class="btn-nav-replay" onclick="replayIntro()" title="Replay Cinematic Intro">↺ Tour</button>
+        <button class="btn-nav-cta" onclick="handleExploreFactory(event)" aria-label="Explore 3D Factory">
+          Explore Factory
+        </button>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle Mobile Menu">
+          ☰
+        </button>
+      </div>
     </div>
   </header>
 
-  <main>
-    <!-- Real Data mode: connection status (web/mode.js); hidden in Testing mode -->
-    <section class="real-banner" id="realBanner" hidden aria-live="polite"></section>
+  <!-- Mobile Navigation Drawer -->
+  <div class="mobile-nav-drawer" id="mobileNavDrawer" aria-label="Mobile Navigation">
+    <div class="mobile-drawer-top">
+      <div class="brand-wrapper">
+        <span class="brand-mark">UDYAM-TWIN</span>
+        <span class="brand-pill">MENU</span>
+      </div>
+      <button class="mobile-drawer-close" onclick="closeMobileMenu()" aria-label="Close Navigation">✕</button>
+    </div>
 
-    <!-- Workspace tabs (web/workspace.js): one screen per job instead of one long page -->
-    <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Dashboard sections">
-      <button type="button" role="tab" class="ws-tab" data-tab="live" aria-selected="true">Live <span class="ws-count" id="wsAlertCount" hidden></span></button>
-      <button type="button" role="tab" class="ws-tab ws-testing" data-tab="simulate" aria-selected="false">Simulate</button>
-      <button type="button" role="tab" class="ws-tab" data-tab="ai" aria-selected="false">Data &amp; AI</button>
-      <button type="button" role="tab" class="ws-tab" data-tab="reports" aria-selected="false">Reports</button>
-    </nav>
+    <div class="mobile-drawer-featured">
+      <button class="btn-nav-cta mobile-cta-full" onclick="handleExploreFactory(event)">
+        Explore 3D Factory
+      </button>
+      <button class="nav-item-ai mobile-ai-full" onclick="closeMobileMenu(); window.udyamChat && udyamChat.toggle();">
+        <span>💬 Ask the Twin</span>
+      </button>
+    </div>
 
-    <!-- LIVE: the plant now -->
-    <div class="ws-pane" data-pane="live" role="tabpanel">
-      <!-- Line Flow & Throughput Banner -->
-      <section class="line-banner sim-view">
-        <div class="line-flow" id="lineStationsFlow">
-          <div class="station-node"><span>SAW-01</span><span class="buffer-pill">buf 0/10</span><span class="pill OK">RUNNING</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="station-node"><span>LATHE-01</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="station-node"><span>VMC-01 ★</span><span class="buffer-pill">buf 4/10</span><span class="pill OK">RUNNING</span></div>
+    <div class="mobile-drawer-links">
+      <a href="#hero" class="nav-link" onclick="closeMobileMenu()">Overview</a>
+      <a href="#real-data" class="nav-link real-only-link" onclick="closeMobileMenu()">Wokwi Live</a>
+      <a href="#problem" class="nav-link" onclick="closeMobileMenu()">The Problem</a>
+      <a href="#factory" class="nav-link" onclick="closeMobileMenu()">Factory</a>
+      <a href="#dashboard" class="nav-link" onclick="closeMobileMenu()">Dashboard</a>
+      <a href="#what-if" class="nav-link" onclick="closeMobileMenu()">What-If</a>
+      <a href="#predictive-ai" class="nav-link" onclick="closeMobileMenu()">Predictive AI</a>
+      <a href="#status" class="nav-link" onclick="closeMobileMenu()">Status</a>
+      <a href="#alerts" class="nav-link" onclick="closeMobileMenu()">Alerts</a>
+      <a href="#control-center" class="nav-link" onclick="closeMobileMenu()">Control Center</a>
+      <a href="#about" class="nav-link" onclick="closeMobileMenu()">About</a>
+      <a href="#references" class="nav-link" onclick="closeMobileMenu()">References</a>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       3. HERO SECTION — A REAL CNC MACHINE, APPLE-STYLE (CLEAN WHITE CANVAS)
+       ======================================================================== -->
+  <section class="hero-section" id="hero">
+    <!-- Global Operational Control Bar (Real-Time Backend Status & Mode Controls) -->
+    <div class="op-control-bar">
+      <div class="op-control-group">
+        <span class="op-status-pill simulated" id="opStatusPill" onclick="openConnectionModal()" title="Click to configure backend connection">
+          ◌ Connecting to backend…
+        </span>
+        <span class="op-mode-pill" id="opModePill">
+          <span>MODE:</span> <b>SIMULATION</b>
+        </span>
+      </div>
+
+      <div class="op-control-group">
+        <button class="op-btn" id="opAutoDemoBtn" onclick="toggleAutoDemo()" title="Start 90-second automated walkthrough">
+          ▶ Auto-Demo (90s)
+        </button>
+        <button class="op-btn" onclick="openFaultLabModal()" title="Inject faults or run failure scenarios">
+          ⚡ Fault Lab
+        </button>
+        <button class="op-btn" onclick="openWorkOrdersModal()" title="View and advance maintenance work orders">
+          📋 Work Orders (<span id="woCountBadge">1</span>)
+        </button>
+        <button class="op-btn danger" onclick="triggerResetBaseline()" title="Reset factory engine to clean baseline">
+          ↺ Clean Baseline
+        </button>
+      </div>
+    </div>
+    <div class="hero-content reveal-on-scroll">
+      <div class="hero-eyebrow">DIGITAL TWIN FOR MODERN MANUFACTURING</div>
+      <h1 class="hero-headline">
+        Your Factory.<br>
+        Made Visible.
+      </h1>
+      <p class="hero-supporting">
+        Understand your machines, monitor operations, and make better decisions—all in one clear view.
+      </p>
+
+      <div class="hero-ctas">
+        <a href="#digital-twin" class="btn-primary">
+          Explore Your Factory →
+        </a>
+        <a href="#how-it-works" class="btn-secondary">
+          Discover How It Works ›
+        </a>
+      </div>
+    </div>
+
+    <!-- Huge Cinematic CNC Machine Showcase Visual (Real Flood-Coolant CNC Milling Center) -->
+    <div class="hero-showcase-frame reveal-on-scroll">
+      <!-- High-Tech Optical Scanner Sweep Line -->
+      <div class="scanner-line" aria-hidden="true"></div>
+
+      <img class="hero-showcase-video" src="/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg" alt="CNC Machining Center in Operation" style="width:100%; height:100%; object-fit:cover;">
+    </div>
+
+    <!-- Apple Specs HUD Strip with Active Telemetry Binding -->
+    <div class="hero-hud-strip reveal-on-scroll" role="status" aria-label="Plant Status Summary">
+      <div class="hud-item">
+        <span class="hud-label">Connected Assets</span>
+        <span class="hud-val">4 Production Stations</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Hero Spindle Rate</span>
+        <span class="hud-val" id="hudRpm">1,540 RPM</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Process Temp</span>
+        <span class="hud-val" id="hudTemp">38.5 °C (Nominal)</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Line Availability</span>
+        <span class="hud-val" id="heroAvail" style="color:var(--status-normal-text);">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       REAL DATA MODE — WOKWI VIRTUAL SENSORS (web/wokwi.js; banner in web/control_center.js). Shown only in Real
+       Data mode, as in the previous dashboard: VIRTUAL telemetry from the Wokwi ESP32 simulator, never mixed with the
+       Testing simulation; real machines are future scope.
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="real-data">
+    <div class="section-container">
+      <div class="section-header text-center">
+        <span class="section-eyebrow">REAL DATA MODE · WOKWI VIRTUAL SENSORS</span>
+        <h2 class="section-title">Live From The Wokwi Simulator.</h2>
+        <p class="section-desc" style="margin:0 auto;">An ESP32 running in the Wokwi simulator publishes clearly labelled VIRTUAL telemetry over MQTT. Read-only: the twin never sends it commands. Real machines are future scope.</p>
+        <div style="display:flex; justify-content:center; gap:12px; margin-top:18px; flex-wrap:wrap;">
+          <a class="btn-primary" href="https://wokwi.com/projects/478892389956224001" target="_blank" rel="noopener noreferrer"
+             style="padding:10px 22px; font-size:14px; text-decoration:none;">Open the Wokwi simulator ↗</a>
         </div>
-        <div class="line-kpis">
-          <div class="kpi-item">
-            <span class="kpi-label">Line Rate</span>
-            <span class="kpi-val" id="lineThroughput">— /h</span>
-          </div>
-          <div class="kpi-item">
-            <span class="kpi-label">Line Loss Est.</span>
-            <span class="kpi-val" id="lineLoss" style="color:var(--status-warn);">₹0 /h</span>
-          </div>
-          <div class="kpi-item">
-            <span class="kpi-label">Bottleneck</span>
-            <span class="kpi-val" id="lineBottleneck">—</span>
-          </div>
-          <div class="kpi-item">
-            <span class="kpi-label">Air Supply (Shared Utility)</span>
-            <span class="kpi-val" id="lineAirSupply" style="color:var(--status-ok);">OPTIMAL</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Wokwi virtual devices (web/wokwi.js): Real Data mode only; VIRTUAL data, separate from the simulated plant -->
-      <section class="panel real-only" id="wokwiPanel" aria-live="polite">
+        <p class="section-desc" style="margin:10px auto 0; font-size:13px;">Press ▶ in Wokwi to start the virtual ESP32; its readings appear below within a few seconds. Wokwi pauses the simulation when its tab is in the background.</p>
+      </div>
+      <div id="realDataHost">
+        <div id="rdBanner" class="real-banner" role="status"></div>
+        <div class="ws-grid">
+<section class="panel real-only" id="wokwiPanel" aria-live="polite">
         <div class="panel-header">
           <h2>Virtual Devices · Wokwi Simulator</h2>
           <span class="wk-chip" id="wkState">—</span>
@@ -115,65 +274,1100 @@
         <div id="wkBody"><div class="sc-hint">Loading…</div></div>
         <div id="wkCircuit" class="wk-circuit-wrap" hidden></div>
       </section>
-
-      <!-- 4-Machine Factory Assets Grid -->
-      <section class="machine-grid" id="machineGrid">
-        <!-- Populated dynamically by app.js -->
-      </section>
-
-      <div class="lower-layout">
-        <div class="ws-col">
-          <!-- Detailed Inspector Panel -->
-          <section class="panel" id="detailView">
-            <div class="text-muted">Loading telemetry model inspector...</div>
-          </section>
-
-          <!-- Vibration Health (ml/vibration): measured vs simulated, rule-based severity, ML prediction -->
-          <section class="panel" id="vibrationPanel">
-            <div class="text-muted">Loading vibration health...</div>
-          </section>
-        </div>
-        <div class="ws-col">
-          <!-- Active alerts (server alert store) + explainable event log -->
-          <section class="panel panel-compact">
-            <div class="panel-header">
-              <h2>Alerts &amp; Explainable Event Log</h2>
-              <span class="count-pill crit" id="alertCount" title="Active alerts">0 active</span>
-            </div>
-            <div id="alertList" class="alert-list scroll-list"></div>
-            <div class="event-filters" id="eventFilters">
-              <div class="sev-chips" role="group" aria-label="Filter by severity">
-                <button type="button" class="sev-chip active" data-sev="ALL">All</button>
-                <button type="button" class="sev-chip INFO" data-sev="INFO">Info</button>
-                <button type="button" class="sev-chip WARN" data-sev="WARN">Warning</button>
-                <button type="button" class="sev-chip CRITICAL" data-sev="CRITICAL">Critical</button>
-              </div>
-              <select id="eventKindFilter" aria-label="Filter by event type"><option value="ALL">All types</option></select>
-            </div>
-            <div class="event-log scroll-list" id="eventLog">
-              <!-- Populated dynamically -->
-            </div>
-          </section>
-
-          <!-- Work Orders Panel (Testing mode only: hidden in Real Data mode) -->
-          <section class="panel panel-compact" id="workOrdersPanel">
-            <div class="panel-header">
-              <h2>Operator Work Orders <span class="count-pill" id="woCount">0</span></h2>
-              <button class="btn btn-sm btn-primary" onclick="createWorkOrderFromAlert('VMC-01', 'Scheduled Inspection')">+ New Order</button>
-            </div>
-            <div id="workOrderList" class="wo-list scroll-list">
-              <!-- Populated dynamically -->
-            </div>
-          </section>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- SIMULATE: Testing-mode tools (hidden in Real Data mode) -->
-    <div class="ws-pane" data-pane="simulate" role="tabpanel" hidden>
-      <div class="ws-grid">
-        <!-- Factory Run Designer (web/factory_run.js): whole-factory test runs from an event list -->
-        <section class="panel testing-only" id="factoryRunPanel" data-testing-note="Factory runs are Testing-mode simulation tools.">
+  <!-- ========================================================================
+       SECTION 1.5 — THE PROBLEM STATEMENT ("The MSME Downtime Crisis")
+       ======================================================================== -->
+  <section class="section bg-white" id="problem">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">THE MSME DOWNTIME CHALLENGE</span>
+        <h2 class="section-title">Big Industry Has Digital Twins.<br>Small Machine Shops Have Costly Surprises.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          Small and medium manufacturers operate on razor-thin delivery windows. When an unmonitored spindle overheats or a cutting tool breaks mid-shift, production stops, orders miss deadlines, and thousands are lost in scrap.
+        </p>
+      </div>
+
+      <!-- Problem 3-Card Bento Grid -->
+      <div class="problem-grid reveal-on-scroll">
+        <div class="problem-card">
+          <div class="problem-card-badge">THE COST BARRIER</div>
+          <h3 class="problem-card-title">Commercial Twins Cost ₹5+ Lakhs</h3>
+          <p class="problem-card-text">
+            Enterprise digital twins demand costly software subscriptions, proprietary cloud lock-in, and expensive system integrators. For an independent 10-machine workshop in industrial belts like Urla, Siltara, or Bhilai, this upfront investment is impossible to justify before proving returns.
+          </p>
+          <div class="problem-stat-callout">
+            <span class="stat-num">₹0</span>
+            <span class="stat-lbl">Licence fee with UDYAM-TWIN’s open architecture</span>
+          </div>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-badge">LINE DEPENDENCY</div>
+          <h3 class="problem-card-title">One Breakdown Halts the Whole Line</h3>
+          <p class="problem-card-text">
+            In a sequential job-shop, cutting, turning, milling, and shared air compression are tightly coupled. When the hero milling center experiences thermal drift or tool wear, upstream buffers pile up, downstream assembly is starved, and shop-wide throughput drops.
+          </p>
+          <div class="problem-stat-callout">
+            <span class="stat-num">4 Cells</span>
+            <span class="stat-lbl">Sequentially linked across one unified line twin</span>
+          </div>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-badge">PRACTICAL SOLUTION</div>
+          <h3 class="problem-card-title">Start Virtual, Earn Trust, Then Connect</h3>
+          <p class="problem-card-text">
+            UDYAM-TWIN removes adoption risk entirely. Factory owners test simulated faults, evaluate virtual PLC interlocks, and calculate ₹ downtime exposure on a calibrated software twin first—before attaching non-invasive ₹2,000 clip-on sensor nodes.
+          </p>
+          <div class="problem-stat-callout">
+            <span class="stat-num">&lt; ₹2,500</span>
+            <span class="stat-lbl">Indicative clip-on sensor node BOM per machine</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Value Proposition Comparison Bar -->
+      <div class="problem-comparison-box reveal-on-scroll">
+        <div class="comparison-column enterprise">
+          <span class="comp-tag">TRADITIONAL ENTERPRISE TWINS</span>
+          <ul class="comp-list">
+            <li>✕ ₹5,00,000+ proprietary software licences</li>
+            <li>✕ Invasive sensors void machine manufacturer warranties</li>
+            <li>✕ Complex cloud data pipelines requiring dedicated IT teams</li>
+            <li>✕ Static alarm thresholds with frequent false alarms</li>
+          </ul>
+        </div>
+        <div class="comparison-divider">VS</div>
+        <div class="comparison-column udyam">
+          <span class="comp-tag highlight">UDYAM-TWIN (INAE HACKATHON HT14)</span>
+          <ul class="comp-list">
+            <li>✓ ₹0 software licence cost — runs locally in modern web browsers</li>
+            <li>✓ 100% non-invasive clip-on sensing (current, temp, vibration)</li>
+            <li>✓ Self-calibrating physics twin that adapts to machine aging</li>
+            <li>✓ Plain-English actionable guidance designed for senior plant owners</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION A — FACTORY: architecture, then the simulator (Simulator Control / Simulator Information)
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="factory">
+    <!-- Anchor alias for #digital-twin navigation -->
+    <div id="digital-twin" style="position:relative; top:-90px;" aria-hidden="true"></div>
+
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">THE FACTORY</span>
+        <h2 class="section-title">Factory.</h2>
+        <p class="factory-arch-lead">Built from authentic shop floor architecture.</p>
+        <p class="section-desc" style="margin:0 auto;">
+          Every component in UDYAM-TWIN is modeled to mechanical scale from real industrial equipment. The digital twin reflects the true physical layout, from exterior vehicle access to interior safety pathways.
+        </p>
+      </div>
+
+      <div class="plant-blueprint-grid reveal-on-scroll">
+        <!-- Card 1: Facility Architecture & Signage -->
+        <div class="blueprint-card">
+          <div class="blueprint-img-box">
+            <img src="/assets/3d/UDYAM_TWIN_Factory_Exterior_Hero.jpg" alt="Industrial Facility Architecture with Road and FACTORY Signage">
+          </div>
+          <div class="blueprint-body">
+            <span class="blueprint-tag">FACILITY INFRASTRUCTURE</span>
+            <h4>Enclosed Plant & Architectural Signage</h4>
+            <p>A 5.2m industrial FACTORY sign mounted prominently above the single main vehicle entrance gate with downward LED wash lighting, heavy aggregate asphalt road, dashed yellow centerlines, and perimeter grass landscaping.</p>
+          </div>
+        </div>
+
+        <!-- Card 2: Standardized Machine Plaques -->
+        <div class="blueprint-card">
+          <div class="blueprint-img-box">
+            <img src="/assets/3d/UDYAM_TWIN_Factory_Walkway_Entrance.jpg" alt="Factory Interior Green Thoroughfare Walkway with Standardized Identification Plaques">
+          </div>
+          <div class="blueprint-body">
+            <span class="blueprint-tag">PHYSICAL IDENTIFICATION</span>
+            <h4>Standardized Industrial Machine Plaques</h4>
+            <p>Four physical nameplates attached to SAW-01, LATHE-01, VMC-01, and COMP-01 with signature teal trim and high-contrast white lettering ensure operators and plant managers correlate physical machines with digital telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Card 3: Real Kinematic Envelopes -->
+        <div class="blueprint-card">
+          <div class="blueprint-img-box">
+            <img src="/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg" alt="CNC Milling Machining Envelope Hero View">
+          </div>
+          <div class="blueprint-body">
+            <span class="blueprint-tag">ACTIVE KINEMATICS</span>
+            <h4>120-Frame Seamless Operational Loops</h4>
+            <p>The 3D model contains authentic operational animation loops: continuous lathe spindle rotation, VMC table feeds and Z-axis plunging, saw downward stroke kinematics, and compressor cooling ventilation.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Link to Launch 3D Simulation in Factory View -->
+      <div class="blueprint-cta-box reveal-on-scroll">
+        <div>
+          <h3 style="font-size:20px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">Ready to inspect the live 3D plant?</h3>
+          <p style="font-size:15px; color:var(--text-secondary); margin:0;">Experience orbit navigation, machine raycasting selection, and operational kinematics in real time.</p>
+        </div>
+        <button class="btn-primary" onclick="setFactoryMode('simulation'); document.getElementById('factorySimulator').scrollIntoView({behavior:'smooth'});">
+          <span>Enter Interactive 3D Simulation</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- Simulator: two views, one button each (app.js setFactoryMode: "simulation" = control, "overview" = information) -->
+      <div class="factory-header-bar reveal-on-scroll" id="factorySimulator">
+        <div class="factory-header-text">
+          <span class="section-eyebrow">CONNECTED OPERATIONS</span>
+          <h3 class="factory-sub-title">Inside a More Connected Factory.</h3>
+          <p class="section-desc">
+            Run and steer the simulated plant in 3D, or read how each station works.
+          </p>
+        </div>
+
+        <div class="factory-mode-switcher" role="tablist" aria-label="Factory Simulator">
+          <button id="tabFactorySimulation"
+                  class="factory-mode-btn"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="factorySimulationView"
+                  onclick="setFactoryMode('simulation')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Simulator Control
+          </button>
+          <button id="tabFactoryOverview"
+                  class="factory-mode-btn active"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="factoryOverviewView"
+                  onclick="setFactoryMode('overview')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="11" x2="12" y2="16"></line><line x1="12" y1="8" x2="12" y2="8.01"></line></svg>
+            Simulator Information
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           STATE 1: FACTORY OVERVIEW (Clean Editorial Layout)
+           ================================================================== -->
+      <div id="factoryOverviewView" class="factory-mode-panel active">
+        <div class="factory-editorial-grid">
+          <!-- Left: High-Res Shop Floor Visual with Interactive Overlay -->
+          <div class="factory-editorial-visual reveal-on-scroll" onclick="setFactoryMode('simulation')" style="cursor:pointer;" title="Click to launch interactive 3D simulation">
+            <img src="/assets/3d/UDYAM_TWIN_Factory_Interior_Hero.jpg" alt="Modern Precision Machine Shop Floor Interior">
+            <div class="factory-visual-cta-overlay">
+              <span class="visual-cta-pill">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Launch 3D Simulation
+              </span>
+            </div>
+            <div class="visual-caption">Figure 1.1 · Enclosed MSME Machine Cell with Standardized Identification Plaques</div>
+          </div>
+
+          <!-- Right: Narrative & 3 Feature Pillars -->
+          <div class="reveal-on-scroll">
+            <h3 style="font-size:24px; font-weight:600; margin-bottom:14px; color:var(--text-primary); letter-spacing:-0.02em;">
+              Complete Shop Floor Visibility for Independent Manufacturers.
+            </h3>
+            <p class="section-desc" style="margin-bottom:24px;">
+              UDYAM-TWIN transforms traditional machine shop machinery into intelligent digital twins. By combining non-invasive clamp-on sensing with real-time thermodynamic modeling, independent manufacturers achieve aerospace-grade visibility without altering machine controls or recurring software licenses.
+            </p>
+
+            <div class="factory-feature-list">
+              <div class="factory-feature-item">
+                <div class="factory-feature-num">01</div>
+                <div class="factory-feature-text">
+                  <h4>Every Machine Connected</h4>
+                  <p>From primary bar cutting to turning, milling, and shared utility air, every station reports unified telemetry into one browser screen.</p>
+                </div>
+              </div>
+
+              <div class="factory-feature-item">
+                <div class="factory-feature-num">02</div>
+                <div class="factory-feature-text">
+                  <h4>Physics-Calibrated Twins</h4>
+                  <p>Not simple thresholds. Our reduced-order models self-calibrate to tool wear, ambient heat, and motor loading in real time.</p>
+                </div>
+              </div>
+
+              <div class="factory-feature-item">
+                <div class="factory-feature-num">03</div>
+                <div class="factory-feature-text">
+                  <h4>Plain-English Actions</h4>
+                  <p>Designed specifically for senior plant owners. Clear advisories explain what happened, why it matters, and what to do next.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Prominent Launch CTA Button -->
+            <div style="margin-top:32px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+              <button class="btn-primary" onclick="setFactoryMode('simulation')">
+                <span>Enter 3D Factory Simulation</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+              <span style="font-size:13px; color:var(--text-muted);">
+                Interactive WebGL · 4 Machining Stations
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Station Quick-Jump Strip for Senior Plant Owners -->
+        <div class="factory-quick-line reveal-on-scroll">
+          <div class="quick-line-title">Explore Production Stations in 3D:</div>
+          <div class="quick-line-cards">
+            <button class="quick-station-pill" onclick="selectMachineIn3D('SAW-01')">
+              <span class="station-dot attention"></span>
+              <span class="station-lbl">Station 1: Bar Saw (SAW-01)</span>
+              <span class="station-meta">Wear 42% · Focus 3D →</span>
+            </button>
+            <button class="quick-station-pill" onclick="selectMachineIn3D('LATHE-01')">
+              <span class="station-dot normal"></span>
+              <span class="station-lbl">Station 2: Lathe (LATHE-01)</span>
+              <span class="station-meta">1,800 RPM · Focus 3D →</span>
+            </button>
+            <button class="quick-station-pill" onclick="selectMachineIn3D('VMC-01')">
+              <span class="station-dot normal"></span>
+              <span class="station-lbl">Station 3: Hero Mill (VMC-01)</span>
+              <span class="station-meta">1,540 RPM · Focus 3D →</span>
+            </button>
+            <button class="quick-station-pill" onclick="selectMachineIn3D('COMP-01')">
+              <span class="station-dot normal"></span>
+              <span class="station-lbl">Station 4: Air Compressor (COMP-01)</span>
+              <span class="station-meta">7.2 bar · Focus 3D →</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           STATE 2: 3D SIMULATION / INTERACTIVE 3D VIEW
+           ================================================================== -->
+      <div id="factorySimulationView" class="factory-mode-panel" style="display:none;">
+        <!-- Return Bar with Back Button -->
+        <div class="sim-return-bar">
+          <div class="sim-meta-tags">
+            <span id="simStatusPill" class="sim-status-chip">● 4 Stations Active · 7 Action Loops</span>
+            <span class="sim-demo-chip">DEMO KINEMATICS · OFFLINE READY</span>
+          </div>
+        </div>
+
+        <!-- Station Quick Selector Strip -->
+        <div class="station-strip-buttons">
+          <button class="station-strip-btn active" data-station="FACTORY" onclick="selectMachineIn3D('FACTORY')">
+            <span>Whole Plant</span>
+          </button>
+          <button class="station-strip-btn" data-station="SAW-01" onclick="selectMachineIn3D('SAW-01')">
+            <span class="station-dot attention"></span>
+            <span>1: Bar Saw (SAW-01)</span>
+          </button>
+          <button class="station-strip-btn" data-station="LATHE-01" onclick="selectMachineIn3D('LATHE-01')">
+            <span class="station-dot normal"></span>
+            <span>2: CNC Lathe (LATHE-01)</span>
+          </button>
+          <button class="station-strip-btn" data-station="VMC-01" onclick="selectMachineIn3D('VMC-01')">
+            <span class="station-dot normal"></span>
+            <span>3: Hero Mill (VMC-01)</span>
+          </button>
+          <button class="station-strip-btn" data-station="COMP-01" onclick="selectMachineIn3D('COMP-01')">
+            <span class="station-dot normal"></span>
+            <span>4: Compressor (COMP-01)</span>
+          </button>
+        </div>
+
+        <!-- 2-Column Side-by-Side Simulation Workspace -->
+        <div class="factory-sim-workspace">
+          <!-- Left Column: 3D Spatial Viewport Container -->
+          <div class="factory-viewport-container">
+            <!-- Viewport Toolbar -->
+            <div class="viewport-toolbar">
+              <div class="viewport-title-group">
+                <span class="viewport-badge">SPATIAL TWIN</span>
+                <span id="viewportMachineTitle" style="font-weight:600; color:#FFFFFF; font-size:14px;">
+                  Complete Factory Floor · 4 Machines Synchronized
+                </span>
+              </div>
+
+              <!-- Camera Perspective Preset Tabs -->
+              <div class="viewport-camera-tabs" role="tablist" aria-label="Camera Presets">
+                <button class="camera-tab-btn active" data-target="FACTORY" onclick="selectMachineIn3D('FACTORY')" role="tab" aria-selected="true">
+                  Full Factory
+                </button>
+                <button class="camera-tab-btn" data-target="FRONT" onclick="selectMachineIn3D('FRONT')" role="tab" aria-selected="false">
+                  Entrance
+                </button>
+                <button class="camera-tab-btn" data-target="TOP" onclick="selectMachineIn3D('TOP')" role="tab" aria-selected="false">
+                  Top View
+                </button>
+                <button class="camera-tab-btn" onclick="if(window.resetThreeView) window.resetThreeView()" title="Reset Camera View">
+                  ⟲ Reset
+                </button>
+              </div>
+
+              <!-- Kinematics Playback Controls -->
+              <div class="viewport-playback-controls">
+                <button id="btnPlayPause" class="btn-sim-control" onclick="toggleSimPlayback()" title="Pause/Play 3D Kinematics">
+                  ⏸ Pause
+                </button>
+                <button id="btnResetAnim" class="btn-sim-control" onclick="resetSimPlayback()" title="Reset Kinematic Cycle">
+                  ↺ Frame 0
+                </button>
+              </div>
+            </div>
+
+            <!-- Canvas Container with Interactive WebGL Canvas -->
+            <div class="viewport-canvas-wrapper" id="threeCanvasWrapper">
+              <div class="scanner-line" aria-hidden="true"></div>
+              <img id="viewportFallbackImg"
+                   class="viewport-fallback-img"
+                   src="/assets/3d/UDYAM_TWIN_Factory_Interior_Hero.jpg"
+                   alt="Factory Floor 3D Visualizer Fallback">
+            </div>
+
+            <!-- Viewport Legend & Interaction Guidance -->
+            <div class="viewport-legend-bar">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>Orbit: Left-drag · Pan: Right-drag · Zoom: Scroll · Click machine to inspect</span>
+              </div>
+              <div id="threeModelBadge" style="color:var(--status-normal-text); font-weight:600; font-size:12px;">
+                Blender Photorealistic GLB (Active)
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Compact 5-Second Machine Information Panel -->
+          <aside class="machine-info-card" id="inspectorCard" aria-label="Machine Telemetry and Actions">
+            <div class="inspector-card-header">
+              <div class="inspector-header-left">
+                <div class="station-meta-row">
+                  <span class="inspector-station-badge" id="inspectorStation">COMPLETE PLANT LINE</span>
+                  <button id="btnDeselect" class="btn-deselect" onclick="selectMachineIn3D('FACTORY')" style="display:none;" title="Clear Selection">
+                    ✕ Deselect
+                  </button>
+                </div>
+                <h3 class="inspector-machine-title" id="inspectorTitle">UDYAM-TWIN Plant Overview · 4 Stations</h3>
+              </div>
+              <span class="status-indicator-pill normal" id="inspectorStatus">Waiting for live data…</span>
+            </div>
+
+            <!-- Machine Function -->
+            <div class="inspector-section">
+              <div class="inspector-section-label">Function</div>
+              <p class="inspector-function-text" id="inspectorFunction">
+                Four sequentially connected manufacturing stations: horizontal bar cutting, slant turning, vertical milling, and utility air compression.
+              </p>
+              <p class="inspector-plain-desc" id="inspectorDesc" style="display:none;">
+                Real-time physical digital twin coupling primary cutting, slant turning, vertical milling, and pneumatic compression across the enclosed MSME manufacturing facility.
+              </p>
+            </div>
+
+            <!-- Illustrative Demonstration Readings -->
+            <div class="inspector-section">
+              <div class="inspector-section-label">Live Readings</div>
+              <div class="inspector-readings-row">
+                <div class="inspector-reading-item">
+                  <span class="reading-lbl" id="mLabel1">Connected Assets</span>
+                  <span class="reading-val" id="mVal1">—</span>
+                </div>
+                <div class="inspector-reading-item">
+                  <span class="reading-lbl" id="mLabel2">Shared Air Supply</span>
+                  <span class="reading-val" id="mVal2">—</span>
+                </div>
+              </div>
+              <!-- Hidden compatibility hooks -->
+              <div style="display:none;">
+                <span id="inspM1">4 Connected</span>
+                <span id="inspM2">1,540 RPM</span>
+                <span id="inspM3">38.5 °C</span>
+                <span id="inspM4">7.2 bar (Stable)</span>
+              </div>
+            </div>
+
+            <!-- Potential Concern & Demo Risk -->
+            <div class="inspector-section concern-section">
+              <div class="concern-header">
+                <div class="inspector-section-label">Potential Concern</div>
+                <span class="risk-indicator-badge risk-normal" id="inspectorRiskBadge">—</span>
+              </div>
+              <p class="inspector-concern-text" id="inspectorConcern">
+                Plant-wide kinematics synchronized. Click any machine directly in the 3D model, or select from the station pills to inspect status and maintenance recommendations.
+              </p>
+            </div>
+
+            <!-- Recommended Actions -->
+            <div class="inspector-section actions-section">
+              <div class="inspector-section-label">Recommended Actions</div>
+              <ul class="inspector-actions-list" id="inspectorActionsList">
+                <li>Inspect upstream infeed buffer and cutting stock availability.</li>
+                <li>Maintain regular shift preventative walk-throughs across all four cells.</li>
+              </ul>
+            </div>
+
+            <!-- Demonstration Note -->
+            <div class="inspector-disclaimer-note">
+              <span>ⓘ Live from the simulation (Testing mode) · not a real machine</span>
+            </div>
+
+            <!-- Action Trigger -->
+            <div class="inspector-footer-actions">
+              <button class="btn-card-action" id="inspectorActionBtn" onclick="selectMachineIn3D('VMC-01')">
+                Inspect Hero Machine (VMC-01) →
+              </button>
+            </div>
+          </aside>
+        </div>
+        <div id="simControlHost" class="ws-grid">
+<section class="panel testing-only" id="simControlsPanel" data-testing-note="Simulation parameters and run control are Testing-mode controls: they never change real machines.">
+          <div class="panel-header">
+            <h2>Simulation Controls</h2>
+            <span class="sc-run" id="scRunState">—</span>
+          </div>
+          <div class="control-bar">
+            <button class="btn btn-sm" id="scPause">Pause</button>
+            <button class="btn btn-sm" id="scResume">Resume</button>
+            <button class="btn btn-sm btn-danger" id="scStop" title="Stop and reset the plant to a clean baseline (parameters are kept)">Stop</button>
+            <span class="sc-sep"></span>
+            <label class="sc-label" for="scMinutes">Run for</label>
+            <input type="number" id="scMinutes" class="sc-num" min="0.5" max="240" step="0.5" value="5">
+            <span class="sc-label">min</span>
+            <button class="btn btn-sm" id="scRunFor">Run, then pause</button>
+          </div>
+          <div class="control-bar sc-machine-bar">
+            <label class="sc-label" for="scMachine">Machine:</label>
+            <select id="scMachine"></select>
+            <span class="sc-tag" id="scTag"></span>
+          </div>
+          <div class="sc-params" id="scParams"></div>
+          <div class="control-bar">
+            <button class="btn btn-sm btn-primary" id="scApply">Apply to simulation</button>
+            <button class="btn btn-sm" id="scResetOne">Defaults (this machine)</button>
+            <button class="btn btn-sm" id="scResetAll">Defaults (all)</button>
+          </div>
+          <div class="sc-hint" id="scHint">Parameters change the simulated plant only. The twin is not told; it has to notice the effect in the telemetry.</div>
+        </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION B — CNC PRODUCT SHOWCASE ("Precision You Can Understand.")
+       Cinematic Dark Showcase Accent
+       ======================================================================== -->
+  <section class="section bg-cinema" id="cnc">
+    <div class="section-container">
+      <div class="cnc-showcase-split">
+        <div class="reveal-on-scroll">
+          <span class="section-eyebrow">HIGH-PRECISION MACHINING</span>
+          <h2 class="section-title">Precision You Can Understand.</h2>
+          <p class="section-desc">
+            Precision turning and milling rely on microscopic thermal balance and cutting-edge tool health. When coolant degrades or bearings wear, dimensions drift long before an operator hears a change.
+          </p>
+          <p style="font-size:16px; color:#A1A1A6; margin-top:16px; line-height:1.5;">
+            UDYAM-TWIN continuously monitors cutting torque, spindle harmonics, and thermal drift to guarantee part tolerance on every single cycle.
+          </p>
+
+          <div class="cnc-specs-grid">
+            <div class="cnc-spec-box">
+              <div class="val">18.5 kW</div>
+              <div class="lbl">Continuous Spindle Power</div>
+            </div>
+            <div class="cnc-spec-box">
+              <div class="val">±2.5 µm</div>
+              <div class="lbl">Thermal Repeatability</div>
+            </div>
+            <div class="cnc-spec-box">
+              <div class="val">12-Station</div>
+              <div class="lbl">Indexing Tool Turret</div>
+            </div>
+            <div class="cnc-spec-box">
+              <div class="val">ISO 20816</div>
+              <div class="lbl">Calibrated Vibration Band</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cnc-showcase-media reveal-on-scroll">
+          <div class="scanner-line" aria-hidden="true"></div>
+          <!-- Authentic Precision Lathe Turning Video (Nottingham Hackspace CNC Lathe) -->
+          <img src="/assets/3d/UDYAM_TWIN_Camera_LATHE_Detail.jpg" alt="CNC Lathe Turning Operation" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION C — DASHBOARD: the four machines (row 1), then the plant metrics (row 2)
+       ======================================================================== -->
+  <section class="section bg-white" id="dashboard">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">ESSENTIAL METRICS</span>
+        <h2 class="section-title">Everything Important in One Place.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          The numbers that matter to production managers: output volume, equipment availability, total downtime, and scheduled maintenance.
+        </p>
+      </div>
+
+      <div class="dash-machines-head reveal-on-scroll">
+        <div>
+          <span class="section-eyebrow">YOUR FACTORY LINE</span>
+          <h3 class="dash-row-title">Four Essential Shop Floor Machines</h3>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <span class="btn-secondary" style="padding:10px 24px; font-size:14px; cursor:default; opacity:.7;" title="The twin runs its four default machines">Add Your Machine · future scope</span>
+          <button class="btn-secondary" onclick="openFaultLabModal()" style="padding:10px 24px; font-size:14px;">⚡ Fault Injection Lab</button>
+        </div>
+      </div>
+      <div class="machines-grid dash-machines-row">
+        <!-- Machine 1: Bar-Cutting Saw -->
+        <article class="machine-card-large reveal-on-scroll" id="card-SAW-01">
+          <div class="machine-card-image-box">
+            <img src="/assets/3d/UDYAM_TWIN_Camera_SAW_Detail.jpg" alt="Industrial Metal Band Saw (SAW-01)">
+          </div>
+          <div class="machine-card-body">
+            <div class="machine-card-header">
+              <div class="machine-identity">
+                <span class="machine-id-badge">STATION 01 · INFEED</span>
+                <h3 class="machine-name-title">Bar-Cutting Saw (SAW-01)</h3>
+              </div>
+              <span class="status-indicator-pill attention">⚠ ATTENTION</span>
+            </div>
+            
+            <div class="machine-readings-row">
+              <div class="reading-col">
+                <span class="reading-lbl">Blade Wear</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Parts Cut</span>
+                <span class="reading-val">—</span>
+              </div>
+            </div>
+
+            <p class="machine-plain-desc">
+              The cutting blade is wearing normally but should be inspected before the next production run. Upstream buffer is adequately fed.
+            </p>
+
+            <div class="machine-card-actions">
+              <button class="btn-card-action" onclick="openMachineModal('SAW-01')">View Machine Details →</button>
+              <button class="btn-card-ghost" onclick="select3DTarget('SAW-01')">Focus 3D View</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Machine 2: CNC Lathe -->
+        <article class="machine-card-large reveal-on-scroll" id="card-LATHE-01">
+          <div class="machine-card-image-box">
+            <img src="/assets/3d/UDYAM_TWIN_Camera_LATHE_Detail.jpg" alt="CNC Turning Lathe (LATHE-01)">
+          </div>
+          <div class="machine-card-body">
+            <div class="machine-card-header">
+              <div class="machine-identity">
+                <span class="machine-id-badge">STATION 02 · TURNING</span>
+                <h3 class="machine-name-title">CNC Lathe (LATHE-01)</h3>
+              </div>
+              <span class="status-indicator-pill normal">✓ NORMAL</span>
+            </div>
+            
+            <div class="machine-readings-row">
+              <div class="reading-col">
+                <span class="reading-lbl">Spindle Speed</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Cutting Torque</span>
+                <span class="reading-val">—</span>
+              </div>
+            </div>
+
+            <p class="machine-plain-desc">
+              Turning operations are smooth. All dimensions and spindle vibrations are within precision manufacturing specification.
+            </p>
+
+            <div class="machine-card-actions">
+              <button class="btn-card-action" onclick="openMachineModal('LATHE-01')">View Machine Details →</button>
+              <button class="btn-card-ghost" onclick="select3DTarget('LATHE-01')">Focus 3D View</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Machine 3: CNC Milling Machine (Hero Machine) -->
+        <article class="machine-card-large reveal-on-scroll" id="card-VMC-01">
+          <div class="machine-card-image-box">
+            <img src="/assets/3d/UDYAM_TWIN_Camera_Machine_Detail.jpg" alt="CNC Vertical Machining Center (VMC-01)">
+          </div>
+          <div class="machine-card-body">
+            <div class="machine-card-header">
+              <div class="machine-identity">
+                <span class="machine-id-badge">STATION 03 · HERO MILLING</span>
+                <h3 class="machine-name-title">CNC Milling Machine (VMC-01)</h3>
+              </div>
+              <span class="status-indicator-pill normal">✓ NORMAL</span>
+            </div>
+            
+            <div class="machine-readings-row">
+              <div class="reading-col">
+                <span class="reading-lbl">Spindle Load</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Process Temp</span>
+                <span class="reading-val">—</span>
+              </div>
+            </div>
+
+            <p class="machine-plain-desc">
+              Spindle cooling and cutting forces are nominal. Operating well within safe thermal envelope with zero thermal lag.
+            </p>
+
+            <div class="machine-card-actions">
+              <button class="btn-card-action" onclick="openMachineModal('VMC-01')">View Machine Details →</button>
+              <button class="btn-card-ghost" onclick="select3DTarget('VMC-01')">Focus 3D View</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Machine 4: Air Compressor -->
+        <article class="machine-card-large reveal-on-scroll" id="card-COMP-01">
+          <div class="machine-card-image-box">
+            <img src="/assets/3d/UDYAM_TWIN_Camera_COMP_Detail.jpg" alt="Rotary Screw Air Compressor (COMP-01)">
+          </div>
+          <div class="machine-card-body">
+            <div class="machine-card-header">
+              <div class="machine-identity">
+                <span class="machine-id-badge">UTILITY · COMMON HEADER</span>
+                <h3 class="machine-name-title">Air Compressor (COMP-01)</h3>
+              </div>
+              <span class="status-indicator-pill normal">✓ NORMAL</span>
+            </div>
+            
+            <div class="machine-readings-row">
+              <div class="reading-col">
+                <span class="reading-lbl">Header Pressure</span>
+                <span class="reading-val">—</span>
+              </div>
+              <div class="reading-col">
+                <span class="reading-lbl">Compressor Duty</span>
+                <span class="reading-val">—</span>
+              </div>
+            </div>
+
+            <p class="machine-plain-desc">
+              Providing steady 7.2 bar pneumatic pressure to lathe chucks and mill tool changers across the shop floor.
+            </p>
+
+            <div class="machine-card-actions">
+              <button class="btn-card-action" onclick="openMachineModal('COMP-01')">View Machine Details →</button>
+              <button class="btn-card-ghost" onclick="select3DTarget('COMP-01')">Focus 3D View</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h3 class="dash-row-title dash-metrics-title reveal-on-scroll">Plant Metrics</h3>
+      <div class="dashboard-grid">
+        <!-- Metric 1 -->
+        <article class="dash-metric-card reveal-on-scroll">
+          <div class="dash-metric-header">Today's Production</div>
+          <div class="dash-metric-number" id="dashNum1">—<span class="dash-metric-unit"></span>
+          </div>
+          <div class="dash-metric-sub" id="dashSub1">Waiting for live data…</div>
+          <div class="dash-meter-track">
+            <div class="dash-meter-fill" id="dashBar1" style="width:0%;"></div>
+          </div>
+        </article>
+
+        <!-- Metric 2 -->
+        <article class="dash-metric-card reveal-on-scroll">
+          <div class="dash-metric-header">Machine Status</div>
+          <div class="dash-metric-number" id="dashNum2" style="color:var(--status-normal-text);">—<span class="dash-metric-unit"></span>
+          </div>
+          <div class="dash-metric-sub" id="dashSub2">Waiting for live data…</div>
+          <div class="dash-meter-track">
+            <div class="dash-meter-fill" id="dashBar2" style="width:0%; background:var(--status-normal);"></div>
+          </div>
+        </article>
+
+        <!-- Metric 3 -->
+        <article class="dash-metric-card reveal-on-scroll">
+          <div class="dash-metric-header">Total Downtime Today</div>
+          <div class="dash-metric-number" id="dashNum3">—<span class="dash-metric-unit"></span>
+          </div>
+          <div class="dash-metric-sub" id="dashSub3">Waiting for live data…</div>
+          <div class="dash-meter-track">
+            <div class="dash-meter-fill" id="dashBar3" style="width:0%;"></div>
+          </div>
+        </article>
+
+        <!-- Metric 4 -->
+        <article class="dash-metric-card reveal-on-scroll">
+          <div class="dash-metric-header">Maintenance Needed</div>
+          <div class="dash-metric-number" id="dashNum4" style="color:var(--status-attention-text);">—<span class="dash-metric-unit"></span>
+          </div>
+          <div class="dash-metric-sub" id="dashSub4">Waiting for live data…</div>
+          <div class="dash-meter-track">
+            <div class="dash-meter-fill" id="dashBar4" style="width:0%; background:var(--status-attention);"></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION C.2 — WHAT-IF SANDBOX (its own section; app.js runWhatIfSimulation → /api/whatif)
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="what-if">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">WHAT-IF</span>
+        <h2 class="section-title">Try a Change Before You Make It.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          Run the same shift twice on the simulator, once as it is and once with a change, and compare the results.
+        </p>
+      </div>
+
+      <!-- What-If Comparison Sandbox Bento Card -->
+      <div class="whatif-sandbox-card reveal-on-scroll">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+          <div>
+            <span class="section-eyebrow" style="color:var(--apple-blue);">INTERACTIVE SCENARIO COMPARISON</span>
+            <h3 style="font-size:24px; font-weight:700; color:var(--text-primary); margin-top:4px;">
+              What-If Digital Twin Sandbox
+            </h3>
+            <p style="font-size:14px; color:var(--text-secondary); margin-top:2px;">
+              Simulate operational perturbations, thermal degradation, and tool wear on parallel virtual lines without risking real machinery.
+            </p>
+          </div>
+          <button class="op-btn" onclick="exportWhatIfResults()">Export Comparison (CSV) ↓</button>
+        </div>
+
+        <div class="whatif-controls">
+          <div class="apple-form-group">
+            <label class="apple-form-label">Simulation Scenario</label>
+            <select class="apple-select" id="whatIfScenarioSelect">
+              <option value="coolant_heal">Coolant Loss with Twin Self-Healing (Auto-Derate)</option>
+              <option value="coolant">Coolant Loss WITHOUT Self-Healing</option>
+              <option value="heavy">Heavier Cutting Jobs (Spindle Load 120%)</option>
+              <option value="faster">Aggressive Spindle Speeds (+15% RPM)</option>
+              <option value="hot">High Summer Ambient (36°C) & Weak Coolant</option>
+            </select>
+          </div>
+
+          <div class="apple-form-group">
+            <label class="apple-form-label">Simulated Duration</label>
+            <select class="apple-select" id="whatIfDurationSelect">
+              <option value="10">10 Minutes (Fast Validation)</option>
+              <option value="30">30 Minutes (Shift Cycle)</option>
+              <option value="60">60 Minutes (Full Production Run)</option>
+            </select>
+          </div>
+
+          <div class="apple-form-group" style="display:flex; align-items:flex-end;">
+            <button class="btn-primary" id="runWhatIfBtn" onclick="runWhatIfSimulation()" style="width:100%; padding:10px 20px;">
+              ⚡ Run What-If Simulation
+            </button>
+          </div>
+        </div>
+
+        <!-- Animated Progress Track -->
+        <div id="whatIfProgressTrack" style="display:none; height:4px; background:var(--border-light); border-radius:var(--radius-pill); overflow:hidden; margin:12px 0;">
+          <div id="whatIfProgressBar" style="width:0%; height:100%; background:var(--apple-blue); transition:width 0.25s ease;"></div>
+        </div>
+
+        <!-- Comparison Metric Cards Grid -->
+        <div class="whatif-metric-grid">
+          <div class="whatif-metric-card">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Line Output (Parts)</div>
+            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultParts">
+              —
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
+          </div>
+
+          <div class="whatif-metric-card">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Estimated Downtime Loss</div>
+            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultCost">
+              —
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
+          </div>
+
+          <div class="whatif-metric-card">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Peak Process Temp</div>
+            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultTemp">
+              —
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
+          </div>
+
+          <div class="whatif-metric-card">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Vibration Peak Zone</div>
+            <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin-top:4px;" id="wiResultVib">
+              —
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Run a scenario to compare with the baseline</div>
+          </div>
+        </div>
+
+        <!-- Shift Export Toolbar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:24px; padding-top:16px; border-top:1px solid var(--border-light);">
+          <div style="font-size:13px; color:var(--text-secondary);">
+            Official production records generated from 500ms digital twin state snapshots.
+          </div>
+          <div style="display:flex; gap:10px;">
+            <a href="/api/reports/export.csv?section=summary" target="_blank" class="op-btn" style="text-decoration:none;">
+              Export Telemetry (.CSV) ↓
+            </a>
+            <a href="/api/reports/export.xlsx" target="_blank" class="op-btn" style="text-decoration:none;">
+              Export Excel Report (.XLSX) ↓
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION D.3 — PREDICTIVE AI & REINFORCEMENT LEARNING
+       Aligning with presentation: "Integrating 3D Digital Twins, Predictive AI
+       and Reinforcement Learning for Smart Factories"
+       ======================================================================== -->
+  <section class="section bg-cinema" id="predictive-ai">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">INTELLIGENT SMART FACTORY</span>
+        <h2 class="section-title">Predictive AI, Digital Twins & Reinforcement Learning.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          Bridging physics-based twins, explainable predictive analytics, and future autonomous decision support for brownfield Indian machine shops.
+        </p>
+      </div>
+
+      <!-- 4 Pillars Grid -->
+      <div class="ai-pillars-grid reveal-on-scroll">
+        <!-- 1. 3D Digital Twin -->
+        <div class="ai-pillar-card">
+          <div class="pillar-top">
+            <span class="pillar-status implemented">● Implemented</span>
+            <span class="pillar-num">01</span>
+          </div>
+          <h3 class="pillar-title">3D Digital Twin</h3>
+          <p class="pillar-text">
+            A real-time spatial and mathematical replica of the 4-machine line. It mirrors active mechanical kinematics in Three.js WebGL while running nominal physics equations in parallel to predict what the machine <i>should</i> do under given rotational speeds and cutting loads.
+          </p>
+          <div class="pillar-feature">
+            <span>✓ Dual Views:</span> Operator guidance & Engineer telemetry<br>
+            <span>✓ Synchronisation:</span> 7 concurrent Blender kinematic loops
+          </div>
+        </div>
+
+        <!-- 2. Predictive Maintenance & AI -->
+        <div class="ai-pillar-card">
+          <div class="pillar-top">
+            <span class="pillar-status implemented">● Implemented</span>
+            <span class="pillar-num">02</span>
+          </div>
+          <h3 class="pillar-title">Predictive Maintenance</h3>
+          <p class="pillar-text">
+            Rather than raw threshold alarms, the twin evaluates residual drift (e = y - ŷ). Sustained thermal drift triggers bounded recalibration of cooling coefficients (h_cool), treating parameter drift itself as a diagnostic health signal before tool breakage or dimensional drift occurs.
+          </p>
+          <div class="pillar-feature">
+            <span>✓ Random Forest (AI4I 2020 test set):</span> <span id="aiMetricsLine">loading metrics…</span><br>
+            <span>✓ Forecast Engine:</span> Minutes to thermal/wear limit
+          </div>
+        </div>
+
+        <!-- 3. Reinforcement Learning -->
+        <div class="ai-pillar-card">
+          <div class="pillar-top">
+            <span class="pillar-status implemented">● Implemented (simulation)</span>
+            <span class="pillar-num">03</span>
+          </div>
+          <h3 class="pillar-title">Reinforcement Learning</h3>
+          <p class="pillar-text">
+            A proposed autonomous decision-support agent formulated as a Markov Decision Process (MDP). The agent safely explores feed-rate and spindle derate trade-offs in simulation, balancing part production quotas against cutting tool degradation and thermal strain.
+          </p>
+          <div class="pillar-feature">
+            <span>✓ Reward Function:</span> Throughput vs Tool Wear & Thermal Penalty<br>
+            <span>✓ Safety Gate:</span> Advisory-only proposals in live mode
+          </div>
+        </div>
+
+        <!-- 4. Future Staged Roadmap -->
+        <div class="ai-pillar-card">
+          <div class="pillar-top">
+            <span class="pillar-status roadmap">→ Staged Roadmap</span>
+            <span class="pillar-num">04</span>
+          </div>
+          <h3 class="pillar-title">Progressive Roadmap</h3>
+          <p class="pillar-text">
+            A structured path from software demonstrator to shop-floor validation: Stage A (current software demonstrator), Stage B (NIT Raipur Mechanical workshop motor test), Stage C (Urla/Bhilai MSME read-only pilot), and Stage D (supervised closed-loop actuation).
+          </p>
+          <div class="pillar-feature">
+            <span>✓ Current TRL:</span> Stage A (Software demonstrator)<br>
+            <span>✓ Safety Policy:</span> Read-only telemetry before actuation
+          </div>
+        </div>
+      </div>
+
+      <!-- Benchmarked Model Metrics Table -->
+      <div class="ai-benchmark-box reveal-on-scroll">
+        <div class="benchmark-header">
+          <div>
+            <h4 style="font-size:17px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">
+              Model Evaluation Benchmark (AI4I 2020 Predictive Maintenance Dataset)
+            </h4>
+            <p style="font-size:13px; color:#A1A1A6; margin:0;">
+              8,000 train samples / 2,000 test samples · Stratified seeded split · Random Forest vs Rule Baseline
+            </p>
+          </div>
+          <span class="benchmark-tag" id="bTag">MEASURED ON THE TEST SPLIT</span>
+        </div>
+
+        <div class="benchmark-metrics-grid">
+          <div class="b-metric-item">
+            <span class="b-val" id="bVal1">—</span>
+            <span class="b-lbl">Model Precision</span>
+            <span class="b-sub" id="bSub1">Low false alarm rate (0.55%)</span>
+          </div>
+          <div class="b-metric-item">
+            <span class="b-val" id="bVal2">—</span>
+            <span class="b-lbl">Model Recall</span>
+            <span class="b-sub" id="bSub2">Catches 541 / 548 test failures</span>
+          </div>
+          <div class="b-metric-item">
+            <span class="b-val" id="bVal3">—</span>
+            <span class="b-lbl">F1-Score</span>
+            <span class="b-sub" id="bSub3">Harmonic balance</span>
+          </div>
+          <div class="b-metric-item">
+            <span class="b-val" id="bVal4">—</span>
+            <span class="b-lbl">ROC-AUC</span>
+            <span class="b-sub" id="bSub4">Reliable discrimination curve</span>
+          </div>
+        </div>
+
+        <div class="benchmark-disclaimer">
+          ⓘ <b>Honest Research Disclaimer:</b> AI4I failure modes are generated from underlying synthetic rules; high benchmark scores demonstrate algorithmic correctness and reproducibility rather than real-world machine validation. Field validation occurs during Stages B and C.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION E — MACHINE STATUS ("Know What Needs Attention.")
+       ======================================================================== -->
+  <section class="section bg-white" id="status">
+    <div class="section-container">
+      <div class="section-header reveal-on-scroll">
+        <span class="section-eyebrow">HEALTH & AVAILABILITY</span>
+        <h2 class="section-title">Know What Needs Attention.</h2>
+        <p class="section-desc">
+          Designed specifically for factory owners and managing directors. You shouldn't have to decipher complex sensor graphs to know if your shop is safe and profitable.
+        </p>
+      </div>
+
+      <div class="disclaimer-banner reveal-on-scroll" role="note">
+        <span><b>LIVE</b> — ANSWERS COMPUTED FROM THE TWIN'S CURRENT READINGS</span>
+        <span>SIMULATION IN TESTING MODE · NOT A CERTIFIED ASSESSMENT</span>
+      </div>
+
+      <div class="owner-qa-grid">
+        <!-- Question 1 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 01</div>
+            <h3 class="qa-question">Is my factory working properly today?</h3>
+            <div class="qa-answer" id="qaAns1">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail1"></p>
+          </div>
+          <div id="qaFoot1" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
+        </article>
+
+        <!-- Question 2 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 02</div>
+            <h3 class="qa-question">Which machine needs attention first?</h3>
+            <div class="qa-answer" id="qaAns2">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail2"></p>
+          </div>
+          <div id="qaFoot2" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">—</div>
+        </article>
+
+        <!-- Question 3 -->
+        <article class="owner-qa-card reveal-on-scroll">
+          <div>
+            <div class="qa-number">QUESTION 03</div>
+            <h3 class="qa-question">Are my parts being cut accurately?</h3>
+            <div class="qa-answer" id="qaAns3">Checking the live twin…</div>
+            <p class="qa-detail" id="qaDetail3"></p>
+          </div>
+          <div id="qaFoot3" style="margin-top:24px; font-size:13px; color:var(--text-muted); font-family:var(--font-mono);">
+—
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION F — ACTION-ORIENTED ALERTS
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="alerts">
+    <div class="section-container">
+      <div class="section-header reveal-on-scroll">
+        <span class="section-eyebrow">ACTIONABLE ADVISORIES</span>
+        <h2 class="section-title">Problems Should Be Easy to Understand.</h2>
+        <p class="section-desc">
+          We replace cryptic error codes with simple explanations: what happened, why it matters, and what you should do next.
+        </p>
+      </div>
+
+      <div class="alerts-toolbar reveal-on-scroll">
+        <div class="alert-filter-group" role="tablist" aria-label="Alert Filter">
+          <button class="alert-filter-btn active" data-filter="all" onclick="filterAlerts('all')">All Advisories (<span id="alertCountall">0</span>)</button>
+          <button class="alert-filter-btn" data-filter="active" onclick="filterAlerts('active')">Needs Attention (<span id="alertCountactive">0</span>)</button>
+          <button class="alert-filter-btn" data-filter="resolved" onclick="filterAlerts('resolved')">Normal (<span id="alertCountresolved">0</span>)</button>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="op-btn primary" onclick="openWorkOrdersModal()">Manage Work Orders ↗</button>
+          <button class="btn-card-ghost" onclick="acknowledgeAllAlerts()">Acknowledge All</button>
+        </div>
+      </div>
+
+      <div class="alerts-list" id="alertsList">
+          <div class="sc-hint" style="padding:24px; text-align:center;">Loading alerts from the twin…</div>
+        </div>
+    </div>
+  </section>
+
+    <!-- ========================================================================
+       CONTROL CENTER — the backend features the redesign does not show elsewhere (existing, tested panels;
+       web/control_center.css restyles them, web/control_center.js switches tabs and follows the operating mode)
+       ======================================================================== -->
+  <section class="section bg-white" id="control-center">
+    <div class="section-container">
+      <div class="section-header text-center">
+        <span class="section-eyebrow">CONTROL CENTER</span>
+        <h2 class="section-title">Every Twin Control, In One Place.</h2>
+        <p class="section-desc" style="margin:0 auto;">Factory runs and datasets, model training with evaluation gates, and reports, all on the live backend. Simulation Controls are in the Factory section under Simulator Control. In Real Data mode the Wokwi simulator appears near the top of the page.</p>
+      </div>
+      <div id="controlCenter">
+        <div class="cc-tabs" role="tablist" aria-label="Control Center"><button type="button" role="tab" class="cc-tab" data-cc-tab="sim" aria-selected="true">Runs &amp; Datasets</button><button type="button" role="tab" class="cc-tab" data-cc-tab="ai" aria-selected="false">Models &amp; Learning</button><button type="button" role="tab" class="cc-tab" data-cc-tab="reports" aria-selected="false">Reports</button></div>
+      <div class="cc-pane" data-cc-pane="sim" role="tabpanel">
+        <div class="ws-grid">
+<section class="panel testing-only" id="factoryRunPanel" data-testing-note="Factory runs are Testing-mode simulation tools.">
           <div class="panel-header">
             <h2>Factory Run Designer</h2>
             <span class="synth-label" title="Simulated factory runs. Not real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
@@ -210,8 +1404,7 @@
             <div id="frResult"></div>
           </div>
         </section>
-
-        <section class="panel testing-only" id="factoryDatasetPanel" data-testing-note="Factory datasets are collected from Testing-mode simulation runs.">
+<section class="panel testing-only" id="factoryDatasetPanel" data-testing-note="Factory datasets are collected from Testing-mode simulation runs.">
           <div class="panel-header">
             <h2>Factory Dataset</h2>
             <span class="synth-label" title="Collected from simulated factory runs. Not real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
@@ -237,113 +1430,50 @@
             <div id="fdDetail"></div>
           </div>
         </section>
-
-        <!-- Fault Injection & Supervised Control Toolbar -->
-        <section class="panel testing-only" data-testing-note="Fault injection and derates are simulator controls: switch to Testing mode to use them.">
+        </div>
+      </div>
+      <div class="cc-pane" data-cc-pane="ai" role="tabpanel" hidden>
+        <div class="ws-grid">
+<section class="panel" id="factoryLearningPanel">
           <div class="panel-header">
-            <h2>Controlled Fault Injection & Self-Healing Testing</h2>
-          </div>
-          <div class="control-bar">
-            <label style="font-size:12px; color:var(--text-secondary);">Target Asset:</label>
-            <select id="faultMachineSelect">
-              <option value="VMC-01">VMC-01 (CNC Mill)</option>
-              <option value="LATHE-01">LATHE-01 (CNC Lathe)</option>
-              <option value="SAW-01">SAW-01 (Bar Saw)</option>
-              <option value="COMP-01">COMP-01 (Air Compressor)</option>
-            </select>
-
-            <label style="font-size:12px; color:var(--text-secondary);">Fault Mode:</label>
-            <select id="faultTypeSelect">
-              <option value="coolant_degradation">Gradual Coolant Degradation (Triggers Calibration)</option>
-              <option value="bearing_defect">Spindle Bearing Defect (Abrupt Anomaly - Freezes θ)</option>
-              <option value="overload">Spindle Overload Step (+22 Nm)</option>
-              <option value="tool_wear_accel">Accelerated Tool Wear (4x Rate)</option>
-              <option value="sensor_stuck">Process Temp Sensor Stuck (DQ Fault - Freezes θ)</option>
-              <option value="sensor_dropout">Process Temp Sensor Dropout (Missing)</option>
-              <option value="pressure_drop">Compressor Pressure Drop (Common Cause)</option>
-              <option value="blade_wear">Saw Blade Accelerated Wear</option>
-              <option value="order_surge">Order Surge (Rush Job: +15% Spindle, +10% Load)</option>
-            </select>
-
-            <button class="btn btn-danger" onclick="injectSelectedFault()">Inject Fault</button>
-            <button class="btn" onclick="clearAllFaults()">Clear Faults</button>
-            <button class="btn" onclick="applyDerate(20)">Supervised Derate 20%</button>
-          </div>
-
-          <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-subtle); flex-wrap:wrap;">
-            <span style="font-size:11px; font-weight:700; color:var(--accent-blue);">Competition Demo Scenarios:</span>
-            <button class="btn btn-sm" onclick="demoScenario('coolant')">1. Coolant Drift (VMC)</button>
-            <button class="btn btn-sm" onclick="demoScenario('bearing')">2. Bearing Anomaly (LATHE)</button>
-            <button class="btn btn-sm" onclick="demoScenario('compressor')">3. Compressor Common-Cause</button>
-            <button class="btn btn-sm" onclick="demoScenario('tool_wear')">4. Tool Wear Feedback</button>
-          </div>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-            Note: All fault injection targets the virtual plant simulator only. The digital twin is never pre-informed of injected faults.
-          </div>
-        </section>
-
-        <!-- Testing-mode machine parameters and run control (web/sim_controls.js); simulation only -->
-        <section class="panel testing-only" id="simControlsPanel" data-testing-note="Simulation parameters and run control are Testing-mode controls: they never change real machines.">
-          <div class="panel-header">
-            <h2>Simulation Controls</h2>
-            <span class="sc-run" id="scRunState">—</span>
-          </div>
-          <div class="control-bar">
-            <button class="btn btn-sm" id="scPause">Pause</button>
-            <button class="btn btn-sm" id="scResume">Resume</button>
-            <button class="btn btn-sm btn-danger" id="scStop" title="Stop and reset the plant to a clean baseline (parameters are kept)">Stop</button>
-            <span class="sc-sep"></span>
-            <label class="sc-label" for="scMinutes">Run for</label>
-            <input type="number" id="scMinutes" class="sc-num" min="0.5" max="240" step="0.5" value="5">
-            <span class="sc-label">min</span>
-            <button class="btn btn-sm" id="scRunFor">Run, then pause</button>
-          </div>
-          <div class="control-bar sc-machine-bar">
-            <label class="sc-label" for="scMachine">Machine:</label>
-            <select id="scMachine"></select>
-            <span class="sc-tag" id="scTag"></span>
-          </div>
-          <div class="sc-params" id="scParams"></div>
-          <div class="control-bar">
-            <button class="btn btn-sm btn-primary" id="scApply">Apply to simulation</button>
-            <button class="btn btn-sm" id="scResetOne">Defaults (this machine)</button>
-            <button class="btn btn-sm" id="scResetAll">Defaults (all)</button>
-          </div>
-          <div class="sc-hint" id="scHint">Parameters change the simulated plant only. The twin is not told; it has to notice the effect in the telemetry.</div>
-        </section>
-
-        <!-- What-if comparisons (web/whatif.js); separate simulated lines, never the live simulation -->
-        <section class="panel" id="whatifPanel">
-          <div class="panel-header">
-            <h2>What-If Comparison</h2>
-            <span class="synth-label" title="Runs on separate virtual lines. Not a prediction for real machines.">SIMULATED WHAT-IF</span>
+            <h2>Factory Learning · Diagnosis, Time to Limit, RL Policy</h2>
+            <span class="synth-label" title="Trained and evaluated on simulated factory runs only.">SYNTHETIC DIGITAL TWIN DATA</span>
           </div>
           <div class="synth-body">
-            <div class="synth-grid">
-              <label>Run time (min) <input type="number" id="wiMinutes" min="1" max="60" value="15"></label>
-              <label>Seed <input type="number" id="wiSeed" min="0" value="42"></label>
-              <label>Focus machine <select id="wiFocus"></select></label>
-              <label>Add a preset <select id="wiPreset"></select></label>
-            </div>
-            <div class="wi-scenarios" id="wiScenarios"></div>
-            <div class="control-bar">
-              <button class="btn btn-sm" id="wiAdd">+ Scenario</button>
-              <button class="btn btn-sm" id="wiFromLive" title="Copy the live Simulation Controls parameters into the baseline">Baseline = current settings</button>
-              <button class="btn btn-sm btn-primary" id="wiRun">Run comparison</button>
-              <button class="btn btn-sm" id="wiCancel" hidden>Cancel</button>
-              <span class="sc-hint" id="wiHint">Every scenario runs on its own virtual line with the same seed. The live simulation is not touched.</span>
-            </div>
-            <div id="wiResult"></div>
+            <div class="sc-hint">Models trained on Factory Datasets (Simulate tab). They learn only from each dataset's training runs and are measured only on its held-out test runs. A candidate must pass its evaluation gate (fixed before training) and an operator must promote it; rollback is always available. None has learned from real machines.</div>
+            <div class="synth-sub">Factory datasets to learn from</div>
+            <div class="synth-faults" id="flDatasets"></div>
+            <div class="fl-kinds" id="flKinds"></div>
+            <div class="sc-hint" id="flHint"></div>
+            <div class="synth-sub">Live: production models on the live simulation (last 60 s, read-only)</div>
+            <div id="flLive"></div>
           </div>
         </section>
-      </div>
-    </div>
-
-    <!-- DATA & AI: datasets, models, drift and labels, RL policy -->
-    <div class="ws-pane" data-pane="ai" role="tabpanel" hidden>
-      <div class="ws-grid">
-        <!-- Synthetic dataset generator (web/synthetic.js); separate engines, never the live simulation -->
-        <section class="panel" id="synthPanel">
+<section class="panel" id="modelPanel">
+          <div class="panel-header">
+            <h2>Model Registry · Failure-Risk Model</h2>
+            <span class="badge-sim" id="mdProd" style="font-size:10px;">—</span>
+          </div>
+          <div class="synth-body">
+            <div class="sc-hint">Every version is trained on synthetic data only (AI4I 2020 and SYNTHETIC DIGITAL TWIN DATA): none has learned from real machines. A candidate is never deployed automatically; it must pass the evaluation gate and an operator must promote it.</div>
+            <div class="synth-sub">Train a candidate: AI4I 2020 + synthetic datasets</div>
+            <div class="synth-faults" id="mdDatasets"></div>
+            <div class="control-bar">
+              <label class="sc-label" for="mdWeight">Synthetic row weight</label>
+              <input type="number" id="mdWeight" class="sc-num" min="0.1" max="5" step="0.1" value="1">
+              <label class="sc-label"><input type="checkbox" id="mdUseLabels"> Include operator-confirmed labels (<span id="mdLabelCount">0</span>)</label>
+              <button class="btn btn-sm btn-primary" id="mdTrain">Train candidate</button>
+              <span class="sc-hint" id="mdJob"></span>
+            </div>
+            <details class="md-gate"><summary>Evaluation gate (fixed before training)</summary><ul id="mdGate"></ul></details>
+            <div class="md-versions" id="mdVersions"></div>
+            <div class="control-bar">
+              <button class="btn btn-sm testing-only" id="mdRollback">Roll back to previous production</button>
+              <span class="sc-hint" id="mdHint"></span>
+            </div>
+          </div>
+        </section>
+<section class="panel" id="synthPanel">
           <div class="panel-header">
             <h2>Synthetic Dataset Generator</h2>
             <span class="synth-label" title="Generated by the simulator. Contains no readings from real machines.">SYNTHETIC DIGITAL TWIN DATA</span>
@@ -370,52 +1500,7 @@
             <div class="synth-list" id="synList"></div>
           </div>
         </section>
-
-        <!-- Failure-risk model registry (web/models.js): candidates, evaluation gate, promotion, rollback -->
-        <section class="panel" id="modelPanel">
-          <div class="panel-header">
-            <h2>Model Registry · Failure-Risk Model</h2>
-            <span class="badge-sim" id="mdProd" style="font-size:10px;">—</span>
-          </div>
-          <div class="synth-body">
-            <div class="sc-hint">Every version is trained on synthetic data only (AI4I 2020 and SYNTHETIC DIGITAL TWIN DATA): none has learned from real machines. A candidate is never deployed automatically; it must pass the evaluation gate and an operator must promote it.</div>
-            <div class="synth-sub">Train a candidate: AI4I 2020 + synthetic datasets</div>
-            <div class="synth-faults" id="mdDatasets"></div>
-            <div class="control-bar">
-              <label class="sc-label" for="mdWeight">Synthetic row weight</label>
-              <input type="number" id="mdWeight" class="sc-num" min="0.1" max="5" step="0.1" value="1">
-              <label class="sc-label"><input type="checkbox" id="mdUseLabels"> Include operator-confirmed labels (<span id="mdLabelCount">0</span>)</label>
-              <button class="btn btn-sm btn-primary" id="mdTrain">Train candidate</button>
-              <span class="sc-hint" id="mdJob"></span>
-            </div>
-            <details class="md-gate"><summary>Evaluation gate (fixed before training)</summary><ul id="mdGate"></ul></details>
-            <div class="md-versions" id="mdVersions"></div>
-            <div class="control-bar">
-              <button class="btn btn-sm testing-only" id="mdRollback">Roll back to previous production</button>
-              <span class="sc-hint" id="mdHint"></span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Factory learning (web/factory_learning.js): fault diagnosis, time to limit, RL policy from factory datasets -->
-        <section class="panel" id="factoryLearningPanel">
-          <div class="panel-header">
-            <h2>Factory Learning · Diagnosis, Time to Limit, RL Policy</h2>
-            <span class="synth-label" title="Trained and evaluated on simulated factory runs only.">SYNTHETIC DIGITAL TWIN DATA</span>
-          </div>
-          <div class="synth-body">
-            <div class="sc-hint">Models trained on Factory Datasets (Simulate tab). They learn only from each dataset's training runs and are measured only on its held-out test runs. A candidate must pass its evaluation gate (fixed before training) and an operator must promote it; rollback is always available. None has learned from real machines.</div>
-            <div class="synth-sub">Factory datasets to learn from</div>
-            <div class="synth-faults" id="flDatasets"></div>
-            <div class="fl-kinds" id="flKinds"></div>
-            <div class="sc-hint" id="flHint"></div>
-            <div class="synth-sub">Live: production models on the live simulation (last 60 s, read-only)</div>
-            <div id="flLive"></div>
-          </div>
-        </section>
-
-        <!-- Adaptive learning (web/adaptive.js): input drift vs the model's training data, operator-confirmed labels -->
-        <section class="panel" id="adaptivePanel">
+<section class="panel" id="adaptivePanel">
           <div class="panel-header">
             <h2>Adaptive Learning · Drift &amp; Confirmed Labels</h2>
             <span class="badge-sim" id="adRef" style="font-size:10px;">—</span>
@@ -444,24 +1529,18 @@
             <div class="md-versions" id="adLabels"></div>
           </div>
         </section>
-
-        <!-- Reinforcement-learning maintenance policy (web/rl.js) -->
-        <section class="panel" id="rlPanel">
+<section class="panel" id="rlPanel">
           <div class="panel-header">
             <h2>Reinforcement Learning · Maintenance Policy</h2>
             <span class="badge-sim" style="font-size:10px;">SIM-TRAINED</span>
           </div>
           <div id="rlBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
         </section>
+        </div>
       </div>
-    </div>
-
-    <!-- REPORTS: export, economics, research -->
-    <div class="ws-pane" data-pane="reports" role="tabpanel" hidden>
-      <div class="ws-grid">
-        <div class="ws-col">
-          <!-- Time-range export (web/reports.js) -->
-          <section class="panel" id="exportPanel">
+      <div class="cc-pane" data-cc-pane="reports" role="tabpanel" hidden>
+        <div class="ws-grid">
+<section class="panel" id="exportPanel">
             <div class="panel-header">
               <h2>Reports &amp; Export</h2>
               <span class="badge-sim" style="font-size:10px;">CSV · EXCEL</span>
@@ -497,9 +1576,7 @@
               <div class="formula-hint" id="exportHint">Times are your local time; files store UTC plus an India time (IST) column.</div>
             </div>
           </section>
-
-          <!-- Live records (web/recent.js): the newest rows written to the database, i.e. what the exports contain -->
-          <section class="panel panel-compact" id="recentPanel">
+<section class="panel panel-compact" id="recentPanel">
             <div class="panel-header">
               <h2>Live Records</h2>
               <button type="button" class="btn btn-sm" id="rcPause" aria-pressed="false">Pause</button>
@@ -516,272 +1593,740 @@
             <div class="sc-hint" id="rcHint">Newest first. Updates every 2 s while this tab is open.</div>
           </section>
         </div>
-
-        <!-- MSME Economics & Sustainability Calculator -->
-        <section class="panel sim-view">
-          <div class="panel-header">
-            <div>
-              <h2>MSME Business Impact & Sustainability Calculator</h2>
-              <span style="font-size:11px; color:var(--text-muted);">Editable Shop Model · Transparent Formulas · CEA Grid Baseline v20</span>
-            </div>
-            <button class="btn btn-sm btn-primary" onclick="openEconomicsModal()">⚙ Edit Assumptions</button>
-          </div>
-          <div class="calc-grid">
-            <div class="calc-card">
-              <div class="calc-label">Line Production Loss Rate</div>
-              <div class="calc-val" id="calcLineLoss" style="color:var(--status-warn);">₹0 /hr</div>
-              <div class="formula-hint">max(0, nominal_rate - actual_rate) × ₹<span id="econInrPerPartHint">450</span>/part</div>
-            </div>
-            <div class="calc-card">
-              <div class="calc-label">Indicative Sensor Payback</div>
-              <div class="calc-val" id="calcPayback" style="color:var(--status-ok);">0.4 Months</div>
-              <div class="formula-hint">(4 nodes × ₹<span id="econNodeCostHint">2,200</span>) / monthly avoided breakdown value</div>
-            </div>
-            <div class="calc-card">
-              <div class="calc-label">Line Energy Consumption</div>
-              <div class="calc-val" id="calcEnergy">₹125.4 /hr (14.8 kW)</div>
-              <div class="formula-hint">Sum(kW) × ₹<span id="econTariffHint">8.5</span>/kWh industrial tariff</div>
-            </div>
-            <div class="calc-card">
-              <div class="calc-label">Carbon Emission Rate</div>
-              <div class="calc-val" id="calcCo2">10.6 kg/hr</div>
-              <div class="formula-hint">kWh × <span id="econCeaHint">0.716</span> kg CO₂/kWh (CEA Grid Factor 2024-25)</div>
-            </div>
-          </div>
-
-          <!-- Scenario Comparison & Sensitivity Matrix -->
-          <div style="margin-top:14px; background:var(--bg-card); border-radius:var(--radius-sm); padding:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <h4 style="font-size:13px; color:var(--text-secondary); font-weight:700;">Scenario Comparison: Reactive Baseline vs UDYAM-Twin Self-Calibrating Intervention</h4>
-              <span class="badge-sim" style="font-size:10px;">MSME SHOP MODEL</span>
-            </div>
-            <table class="telemetry-table" style="font-size:12px; margin-bottom:8px;">
-              <thead>
-                <tr style="color:var(--text-muted); text-align:left;">
-                  <th>Operating Dimension</th>
-                  <th>Baseline (Reactive)</th>
-                  <th>With UDYAM-Twin</th>
-                  <th style="color:var(--status-ok);">Net MSME Benefit</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Unplanned Downtime (hrs/mo)</td>
-                  <td id="scenBaseHours">12.0 hrs</td>
-                  <td id="scenTwinHours">3.6 hrs (-70%)</td>
-                  <td id="scenDowntimeSave" style="color:var(--status-ok); font-weight:700;">₹21,000 /mo saved</td>
-                </tr>
-                <tr>
-                  <td>Tool Breakages & Scrap Risk</td>
-                  <td>High (Catastrophic wear)</td>
-                  <td>Low (Predictive derate)</td>
-                  <td id="scenScrapSave" style="color:var(--status-ok); font-weight:700;">₹6,500 /mo saved</td>
-                </tr>
-                <tr>
-                  <td>Energy & Carbon Footprint</td>
-                  <td id="scenBaseEnergy">₹50,320 /mo · 4,238 kg CO₂</td>
-                  <td id="scenTwinEnergy">₹47,800 /mo · 4,025 kg CO₂</td>
-                  <td id="scenEnergySave" style="color:var(--status-ok); font-weight:700;">₹2,520 /mo · 213 kg CO₂</td>
-                </tr>
-                <tr style="border-top:1px solid var(--border-subtle); font-weight:700;">
-                  <td>Net Monthly Shop Benefit</td>
-                  <td style="color:var(--text-muted);">₹0</td>
-                  <td id="scenNetMonthly" style="color:var(--status-ok); font-size:13px;">₹30,020 /mo</td>
-                  <td id="scenRoiAnnual" style="color:var(--status-ok); font-size:13px;">1-Yr Net ROI: 3990%</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <!-- Sensitivity Matrix -->
-            <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:8px;">
-              <span><b>Sensitivity Analysis:</b> Payback at ₹1,500/hr = <b id="sensPay1500">0.7 mo</b> · at ₹2,500/hr = <b id="sensPay2500" style="color:var(--status-ok)">0.4 mo</b> · at ₹3,500/hr = <b id="sensPay3500">0.3 mo</b></span>
-              <span style="font-style:italic;">Engineering estimation model</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- AI4I Research Intelligence & Benchmark Metrics Panel -->
-        <section class="panel">
-          <div class="panel-header">
-            <h2>AI4I Research Intelligence & Benchmark Evaluation</h2>
-            <span class="badge-sim" style="font-size:10px;">UCI BENCHMARK</span>
-          </div>
-          <div id="mlMetricsPanel" style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
-            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
-              <div class="calc-card" style="padding:8px;">
-                <div class="calc-label">Random Forest F1</div>
-                <div class="calc-val" style="font-size:15px; color:var(--status-ok);" id="mlRfF1">98.6%</div>
-                <div class="formula-hint">Rule baseline: <span id="mlRuleF1">98.9%</span></div>
-              </div>
-              <div class="calc-card" style="padding:8px;">
-                <div class="calc-label">ROC-AUC / PR-AUC</div>
-                <div class="calc-val" style="font-size:15px; color:var(--status-ok);" id="mlRocAuc">0.996</div>
-                <div class="formula-hint">Precision: <span id="mlPrec">98.5%</span></div>
-              </div>
-              <div class="calc-card" style="padding:8px;">
-                <div class="calc-label">False Alarm Rate</div>
-                <div class="calc-val" style="font-size:15px; color:var(--status-info);" id="mlFpr">0.55%</div>
-                <div class="formula-hint">8 FP / 1444 TN test</div>
-              </div>
-            </div>
-
-            <!-- Feature Importances -->
-            <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:10px;">
-              <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Top Algorithmic Feature Importances (AI4I Classifier)</div>
-              <div style="display:flex; flex-direction:column; gap:4px; font-family:var(--font-mono); font-size:11px;">
-                <div style="display:flex; justify-content:space-between;"><span>1. Tool Wear [min]:</span><b>51.5%</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>2. Power [kW]:</span><b>25.5%</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>3. Torque [Nm]:</span><b>13.0%</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>4. Rotational Speed [RPM]:</span><b>4.8%</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>5. Temperature Delta [K]:</span><b>3.4%</b></div>
-              </div>
-            </div>
-
-            <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
-              <b>Research Integrity:</b> Vibration and current signals are reserved exclusively for the physical rule engine to prevent synthetic leakage. Evaluated on stratified 80/20 split (2,000 test samples).
-            </div>
-          </div>
-        </section>
-
-        <!-- IMS bearing run-to-failure validation of the ISO 20816-3 zones (web/vibration_dataset.js) -->
-        <section class="panel panel-compact" id="imsPanel">
-          <div class="panel-header">
-            <h2>Vibration Dataset · ISO 20816-3 on IMS Run-to-Failure</h2>
-            <span class="badge-sim" style="font-size:10px;">NASA IMS DATA</span>
-          </div>
-          <div id="imsBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
-        </section>
-
-        <!-- NASA C-MAPSS turbofan RUL experiment (web/cmapss.js): separate research, not the CNC machines -->
-        <section class="panel panel-compact" id="cmapssPanel">
-          <div class="panel-header">
-            <h2>Research · Turbofan RUL (NASA C-MAPSS)</h2>
-            <span class="badge-sim" style="font-size:10px;">EXPERIMENTAL</span>
-          </div>
-          <div id="cmapssBody" class="rl-body"><div class="formula-hint">Loading…</div></div>
-        </section>
+      </div>
       </div>
     </div>
-  </main>
+  </section>
 
-  <!-- Modal: Onboarding Wizard -->
-  <div class="modal-overlay" id="onboardingModal">
-    <div class="modal">
-      <h3>Onboard New Machine Asset</h3>
-      <p style="font-size:12px; color:var(--text-secondary);">
-        Select an asset class template and enter nameplate ratings. The self-calibrating digital twin will initialize from class defaults and begin online parameter estimation.
-      </p>
-      <form onsubmit="submitOnboardingForm(event)">
-        <div class="form-group">
-          <label>Machine Class Template</label>
-          <select id="onboardTemplate" class="form-control">
-            <option value="air_compressor">Air Compressor (Screw/Piston Utility)</option>
-            <option value="cnc_mill">CNC Vertical Machining Center (VMC)</option>
-            <option value="cnc_lathe">CNC Turning Lathe</option>
-            <option value="bar_saw">Horizontal Metal Bar Saw</option>
+  <!-- ========================================================================
+       SECTION H — HOW IT WORKS ("A Better Way to Watch Your Factory.")
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="how-it-works">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">SIMPLE ARCHITECTURE</span>
+        <h2 class="section-title">A Better Way to Watch Your Factory.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          How sensor data becomes actionable manufacturing knowledge in three transparent steps.
+        </p>
+      </div>
+
+      <div class="steps-grid">
+        <!-- Step 1 -->
+        <article class="step-card reveal-on-scroll">
+          <div class="step-number">01</div>
+          <h3 class="step-title">See your factory</h3>
+          <p class="step-desc">
+            Clamp-on sensors read motor current, vibration, and temperature non-invasively. Real-time readings stream into an interactive 3D model that reflects your actual shop floor.
+          </p>
+        </article>
+
+        <!-- Step 2 -->
+        <article class="step-card reveal-on-scroll">
+          <div class="step-number">02</div>
+          <h3 class="step-title">Understand machine status</h3>
+          <p class="step-desc">
+            The software compares incoming readings with calibrated physics models. It detects tool wear and cooling degradation early—before parts are cut out of tolerance.
+          </p>
+        </article>
+
+        <!-- Step 3 -->
+        <article class="step-card reveal-on-scroll">
+          <div class="step-number">03</div>
+          <h3 class="step-title">Decide what needs attention</h3>
+          <p class="step-desc">
+            Instead of confusing graphs, you receive plain-English guidance. You know whether to stop a machine now, check it at shift change, or continue running safely.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION I — ABOUT, FAQS & UNDERSTATED FOOTER
+       ======================================================================== -->
+  <section class="section bg-white" id="about">
+    <div class="section-container">
+      <div class="about-hero-block reveal-on-scroll">
+        <span class="section-eyebrow">PURPOSE & MISSION</span>
+        <h2 class="section-title">Designed for Independent Machine Shops.</h2>
+        <p class="about-statement">
+          Small and medium factories form the backbone of industrial manufacturing. UDYAM-TWIN gives family-owned machine shops the same digital-twin intelligence used by aerospace primes—clean, affordable, and easy to use.
+        </p>
+      </div>
+
+      <!-- Accessible Accordion FAQs -->
+      <div class="faq-container reveal-on-scroll" role="region" aria-label="Frequently Asked Questions">
+        <!-- FAQ 1 -->
+        <div class="faq-item">
+          <button class="faq-question-btn" aria-expanded="false">
+            <span>What is UDYAM-TWIN?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer-pane">
+            UDYAM-TWIN is a browser-based digital twin platform designed specifically for MSME machine shops. It visualizes an interconnected 4-machine CNC production line in photorealistic 3D, continuously compares machine telemetry with physics models, and alerts owners in plain English before tools break or parts drift out of tolerance.
+          </div>
+        </div>
+
+        <!-- FAQ 2 -->
+        <div class="faq-item">
+          <button class="faq-question-btn" aria-expanded="false">
+            <span>Can I view my machines in one place?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer-pane">
+            Yes. The interactive 3D digital twin showcases a unified factory floor environment featuring all four machines: the Bar Saw (SAW-01), the CNC Turning Lathe (LATHE-01), the Vertical Machining Center (VMC-01), and the Shared Screw Air Compressor (COMP-01). You can view the entire floor overview or switch camera focus directly to any individual machine.
+          </div>
+        </div>
+
+        <!-- FAQ 3 -->
+        <div class="faq-item">
+          <button class="faq-question-btn" aria-expanded="false">
+            <span>Are these readings live?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer-pane">
+            In Testing mode, every reading comes live from the UDYAM-TWIN simulation (a physics model of the four machines, with the AI4I 2020 failure model). In Real Data mode the twin shows the Wokwi virtual devices; no real machine is connected yet.</div>
+        </div>
+
+        <!-- FAQ 4 -->
+        <div class="faq-item">
+          <button class="faq-question-btn" aria-expanded="false">
+            <span>Does UDYAM-TWIN connect to real machines?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer-pane">
+            Not yet. Today it runs on its simulation and on Wokwi virtual ESP32 devices over MQTT. The path to real machines (clamp-on current and vibration sensors on an ESP32 or a PLC, over MQTT) is built but not yet used with hardware; it never controls a machine on its own.</div>
+        </div>
+
+        <!-- FAQ 5 -->
+        <div class="faq-item">
+          <button class="faq-question-btn" aria-expanded="false">
+            <span>How can I understand a machine alert?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer-pane">
+            Every alert in UDYAM-TWIN is written in plain English, avoiding confusing error codes. Each advisory answers three practical questions: <b>What happened</b> (e.g. blade wear reached 42%), <b>Why it matters</b> (cutting remains accurate, but teeth will need changing in 80 cuts), and <b>What you should do next</b> (inspect during the next scheduled shift change).
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       SECTION J — RESEARCH, DATASETS & INDUSTRIAL REFERENCES
+       ======================================================================== -->
+  <section class="section bg-light-grey" id="references">
+    <div class="section-container">
+      <div class="section-header text-center reveal-on-scroll">
+        <span class="section-eyebrow">ACADEMIC & INDUSTRIAL RIGOR</span>
+        <h2 class="section-title">Research, Datasets & Standards.</h2>
+        <p class="section-desc" style="margin:0 auto;">
+          Primary scientific citations, engineering standards, and public datasets referenced in the UDYAM-TWIN digital twin project.
+        </p>
+      </div>
+
+      <div class="references-grid reveal-on-scroll">
+        <!-- Reference 1: AI4I 2020 Dataset -->
+        <article class="reference-card">
+          <div class="ref-category">MACHINE LEARNING DATASET</div>
+          <h3 class="ref-title">Explainable Artificial Intelligence for Predictive Maintenance Applications</h3>
+          <p class="ref-authors">Stephan Matzka · School of Engineering — Technology and Life, HTW Berlin</p>
+          <p class="ref-meta">Third International Conference on Artificial Intelligence for Industries (AI4I 2020) · UC Irvine Machine Learning Repository</p>
+          <div class="ref-links">
+            <a href="https://doi.org/10.24432/C5HS5C" target="_blank" rel="noopener noreferrer" class="ref-link">DOI: 10.24432/C5HS5C ↗</a>
+            <span class="ref-licence">Licence: CC BY 4.0</span>
+          </div>
+        </article>
+
+        <!-- Reference 2: ISO 23247 Framework -->
+        <article class="reference-card">
+          <div class="ref-category">DIGITAL TWIN STANDARD</div>
+          <h3 class="ref-title">ISO 23247: Automation Systems and Integration — Digital Twin Framework for Manufacturing</h3>
+          <p class="ref-authors">International Organization for Standardization (ISO / IEC TC 184 / SC 4)</p>
+          <p class="ref-meta">ISO 23247-1:2021 (Overview and Principles) & ISO 23247-2:2021 (Reference Architecture for Observable Manufacturing Elements)</p>
+          <div class="ref-links">
+            <a href="https://www.iso.org/standard/75066.html" target="_blank" rel="noopener noreferrer" class="ref-link">ISO 23247 Standard ↗</a>
+            <span class="ref-licence">Conceptual Mapping</span>
+          </div>
+        </article>
+
+        <!-- Reference 3: ISO 20816 Vibration -->
+        <article class="reference-card">
+          <div class="ref-category">VIBRATION STANDARDS</div>
+          <h3 class="ref-title">ISO 20816-1: Mechanical Vibration — Measurement and Evaluation of Machine Vibration</h3>
+          <p class="ref-authors">International Organization for Standardization (ISO / TC 108)</p>
+          <p class="ref-meta">Part 1: General Guidelines · Vibration Severity Bands (Zone A: Newly Commissioned, Zone B: Unrestricted, Zone C: Restricted, Zone D: Trip)</p>
+          <div class="ref-links">
+            <a href="https://www.iso.org/standard/63092.html" target="_blank" rel="noopener noreferrer" class="ref-link">ISO 20816-1 Standard ↗</a>
+            <span class="ref-licence">Demo Thresholds</span>
+          </div>
+        </article>
+
+        <!-- Reference 4: CEA Grid Emission -->
+        <article class="reference-card">
+          <div class="ref-category">CARBON ACCOUNTING</div>
+          <h3 class="ref-title">CO₂ Baseline Database for the Indian Power Sector (User Guide Version 20.0)</h3>
+          <p class="ref-authors">Central Electricity Authority (CEA) · Ministry of Power, Government of India</p>
+          <p class="ref-meta">Published 2024–2025 · Weighted Average Emission Factor for National Indian Power Grid: 0.716 kg CO₂ / kWh</p>
+          <div class="ref-links">
+            <a href="https://cea.nic.in/" target="_blank" rel="noopener noreferrer" class="ref-link">CEA Official Portal ↗</a>
+            <span class="ref-licence">Official National Factor</span>
+          </div>
+        </article>
+
+        <!-- Reference 5: TseNC 3D Geometry -->
+        <article class="reference-card">
+          <div class="ref-category">3D OPEN HARDWARE GEOMETRY</div>
+          <h3 class="ref-title">TseNC — Open-Source 3-Axis Desktop CNC Milling Machine</h3>
+          <p class="ref-authors">FabLab Kamp-Lintfort · Rhine-Waal University of Applied Sciences</p>
+          <p class="ref-meta">CERN Open Hardware Licence Version 2 (CERN-OHL-W) · Parametric CAD geometry adapted into WebGL 3-axis VMC</p>
+          <div class="ref-links">
+            <a href="https://github.com/fab-machines/TseNC" target="_blank" rel="noopener noreferrer" class="ref-link">GitHub: fab-machines/TseNC ↗</a>
+            <span class="ref-licence">CERN-OHL-W</span>
+          </div>
+        </article>
+
+        <!-- Reference 6: INAE Hackathon -->
+        <article class="reference-card">
+          <div class="ref-category">HACKATHON THEME</div>
+          <h3 class="ref-title">INAE Youth Conclave 2026 (YEISS-2026) — Hackathon Theme HT14</h3>
+          <p class="ref-authors">Indian National Academy of Engineering (INAE) & National Institute of Technology (NIT) Raipur</p>
+          <p class="ref-meta">Theme HT14: Digital Twin Applications for MSMEs and Smart Factories · Team: Tech Titans, NIT Raipur</p>
+          <div class="ref-links">
+            <a href="#hero" class="ref-link">UDYAM-TWIN ↗</a>
+            <span class="ref-licence">Tech Titans, NIT Raipur</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       UNDERSTATED APPLE-STYLE FOOTER
+       ======================================================================== -->
+  <footer class="site-footer">
+    <div class="section-container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <h3>UDYAM-TWIN</h3>
+          <p>
+            Self-Calibrating Digital Twin Platform for MSME Machine Shops.<br>
+            Developed by Tech Titans (NIT Raipur) for INAE Youth Conclave 2026, Theme HT14.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="#hero">Overview</a></li>
+            <li><a href="#problem">The Problem</a></li>
+            <li><a href="#factory">Factory</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Experience</h4>
+          <ul class="footer-links">
+            <li><a href="#predictive-ai">Predictive AI & RL</a></li>
+            <li><a href="#status">Machine Status</a></li>
+            <li><a href="#dashboard">Dashboard</a></li>
+            <li><a href="#what-if">What-If Sandbox</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#references">Research & References</a></li>
+            <li><a href="#about">About & FAQ</a></li>
+            <li><a href="javascript:void(0)" onclick="replayIntro()">↺ Replay Cinematic Tour</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          © 2026 Tech Titans, NIT Raipur. Open academic digital twin architecture.
+        </div>
+        <div>
+          Clean industrial presentation inspired by Apple product design principles.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================
+       MACHINE DETAILS MODAL / DRAWER (Apple Sheet Style)
+       ======================================================================== -->
+  <div class="modal-overlay" id="machineModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modalMachineTitle">Machine Title</h3>
+          <div style="font-size:13px; color:var(--text-secondary);" id="modalMachineStation">Station Info</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeMachineModal()" aria-label="Close details modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="status-indicator-pill normal" id="modalStatusPill">✓ NORMAL</span>
+          <span style="font-size:12px; color:var(--text-muted); font-family:var(--font-mono);">LIVE · SIMULATION</span>
+        </div>
+
+        <div>
+          <h4 style="font-size:13px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:6px;">Current Operational Status</h4>
+          <p id="modalPlainDesc" style="font-size:17px; color:var(--text-primary); line-height:1.5;">
+            Operational status explanation.
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size:13px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:10px;">Live Readings</h4>
+          <div id="modalReadingsList" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
+        </div>
+
+        <div>
+          <h4 style="font-size:13px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:6px;">Owner Guidance</h4>
+          <p id="modalOwnerAction" style="font-size:16px; color:var(--text-primary); line-height:1.5;">
+            Recommended owner action.
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size:13px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:6px;">Technical Specifications</h4>
+          <p id="modalSpecs" style="font-size:14px; color:var(--text-secondary); line-height:1.5; font-family:var(--font-mono);">
+            Equipment specifications.
+          </p>
+        </div>
+
+        <!-- Interactive Machine Action Triggers -->
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-light);">
+          <button class="op-btn" onclick="openVibrationModal(CURRENT_MACHINE_ID)">📊 Vibration Spectrum (FFT)</button>
+          <button class="op-btn" onclick="triggerProposeRLAction(CURRENT_MACHINE_ID)">🧠 Propose RL Derate</button>
+          <button class="op-btn" onclick="triggerToolChange(CURRENT_MACHINE_ID)">🔧 Replace Tool / Reset Wear</button>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:12px;">
+          <button class="btn-card-ghost" onclick="closeMachineModal()">Close</button>
+          <button class="btn-primary" id="modalInspect3DBtn" style="padding:10px 24px; font-size:14px;">Inspect in 3D ↗</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ========================================================================
+       AI ASSISTANT MODAL DIALOG (UI Skeleton Only — Frontend Demonstration)
+       ======================================================================== -->
+  <div class="ai-assistant-modal" id="aiAssistantModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="ai-assistant-backdrop" onclick="closeAiAssistant()"></div>
+    <div class="ai-assistant-panel" role="document">
+      <!-- Modal Header -->
+      <div class="ai-assistant-header">
+        <div class="ai-header-title-group">
+          <div class="ai-avatar-badge">✨</div>
+          <div>
+            <div class="ai-header-title-row">
+              <h3 class="ai-assistant-title">Factory AI Assistant</h3>
+              <span class="ai-preview-pill">PREVIEW · COMING SOON</span>
+            </div>
+            <p class="ai-assistant-sub">UDYAM Intelligent Shop-Floor Copilot</p>
+          </div>
+        </div>
+        <button class="ai-close-btn" onclick="closeAiAssistant()" aria-label="Close AI Assistant">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="ai-assistant-body">
+        <!-- Scrollable Chat Message History -->
+        <div class="ai-chat-log" id="aiChatLog" style="display:flex; flex-direction:column; gap:12px; padding:8px 0; max-height:360px; overflow-y:auto;">
+          <!-- Empty State Illustration -->
+          <div class="ai-empty-state" id="aiEmptyState">
+            <div class="ai-empty-illustration">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                <circle cx="12" cy="12" r="4"/>
+              </svg>
+            </div>
+            <h4 class="ai-empty-heading">How can I help with your factory?</h4>
+            <p class="ai-empty-desc">
+              Ask questions about machine status, maintenance alerts, energy consumption, or shop-floor scheduling.
+            </p>
+          </div>
+        </div>
+
+        <!-- 4 Prompt Suggestion Cards -->
+        <div class="ai-suggestions-grid">
+          <button class="ai-suggestion-card" type="button" onclick="handleAiInputSubmit(event)">
+            <div class="ai-card-icon">📊</div>
+            <div class="ai-card-text">
+              <div class="ai-card-title">Factory Health Summary</div>
+              <div class="ai-card-sub">Overview of all 4 work centres</div>
+            </div>
+          </button>
+          <button class="ai-suggestion-card" type="button" onclick="handleAiInputSubmit(event)">
+            <div class="ai-card-icon">⚙️</div>
+            <div class="ai-card-text">
+              <div class="ai-card-title">Machine Status Check</div>
+              <div class="ai-card-sub">Review current demo metrics</div>
+            </div>
+          </button>
+          <button class="ai-suggestion-card" type="button" onclick="handleAiInputSubmit(event)">
+            <div class="ai-card-icon">⚠️</div>
+            <div class="ai-card-text">
+              <div class="ai-card-title">Maintenance Risks</div>
+              <div class="ai-card-sub">Check preventive alert queues</div>
+            </div>
+          </button>
+          <button class="ai-suggestion-card" type="button" onclick="closeAiAssistant(); handleExploreFactory(event);">
+            <div class="ai-card-icon">🏢</div>
+            <div class="ai-card-text">
+              <div class="ai-card-title">Explore 3D Factory</div>
+              <div class="ai-card-sub">Jump directly to the 3D floor</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer / Input Container -->
+      <div class="ai-assistant-footer">
+        <form class="ai-input-form" onsubmit="handleAiInputSubmit(event)">
+          <div class="ai-input-wrapper">
+            <button type="button" class="ai-attachment-btn" title="Attach file or drawing (Demo)" aria-label="Attachment">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+              </svg>
+            </button>
+            <input type="text"
+                   class="ai-text-input"
+                   placeholder="Ask about your factory…"
+                   aria-label="Message input for Factory AI Assistant">
+            <button type="submit" class="ai-send-btn" title="Send message" aria-label="Send message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </form>
+        <p class="ai-disclaimer-note">
+          Answers come from the twin's own data. Actions are only proposals: nothing changes until an operator approves it.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       ADD MACHINE MODAL (Digital Twin Machine Onboarding)
+       ======================================================================== -->
+  <div class="modal-overlay" id="addMachineModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Add Your Machine</h3>
+          <div style="font-size:13px; color:var(--text-secondary);">Register custom equipment to the digital twin command center</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeAddMachineModal()" aria-label="Close modal">✕</button>
+      </div>
+
+      <form onsubmit="handleAddMachineSubmit(event)">
+        <div class="modal-body">
+          <div class="apple-form-group">
+            <label class="apple-form-label">Equipment Template</label>
+            <select class="apple-select" name="newMachineTemplate" required>
+              <option value="cnc_mill">CNC Vertical Milling Center (BT40/BT50)</option>
+              <option value="cnc_lathe">CNC Slant-Bed Turning Lathe</option>
+              <option value="bar_saw">Horizontal Metal Band Saw</option>
+              <option value="air_compressor">Rotary Screw Air Compressor</option>
+            </select>
+          </div>
+
+          <div class="apple-form-group">
+            <label class="apple-form-label">Machine Identifier & Name</label>
+            <input type="text" class="apple-input" name="newMachineName" placeholder="e.g. VMC-02 (Heavy Milling)" required>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="apple-form-group">
+              <label class="apple-form-label">Rated Motor Power (kW)</label>
+              <input type="number" step="0.1" class="apple-input" name="newMachineKw" value="11.0" required>
+            </div>
+            <div class="apple-form-group">
+              <label class="apple-form-label">Rated Spindle RPM</label>
+              <input type="number" class="apple-input" name="newMachineRpm" value="6000" required>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="apple-form-group">
+              <label class="apple-form-label">ISO 20816-3 Class</label>
+              <select class="apple-select" name="newMachineIso">
+                <option value="Class 1">Class 1 (Small Machines &lt; 15 kW)</option>
+                <option value="Class 2" selected>Class 2 (Medium Machines 15–75 kW)</option>
+                <option value="Class 3">Class 3 (Large Rigid Foundation)</option>
+                <option value="Class 4">Class 4 (Large Flexible Foundation)</option>
+              </select>
+            </div>
+            <div class="apple-form-group">
+              <label class="apple-form-label">Foundation Mounting</label>
+              <select class="apple-select" name="newMachineFoundation">
+                <option value="rigid" selected>Rigid Foundation</option>
+                <option value="flexible">Flexible / Dampened</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
+            <button type="button" class="btn-card-ghost" onclick="closeAddMachineModal()">Cancel</button>
+            <button type="submit" class="btn-primary" style="padding:10px 24px; font-size:14px;">Register Machine →</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       WORK ORDER MANAGER MODAL (Maintenance Lifecycle)
+       ======================================================================== -->
+  <div class="modal-overlay" id="workOrderModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog" style="max-width:680px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Maintenance Work Orders</h3>
+          <div style="font-size:13px; color:var(--text-secondary);">Manage maintenance tasks, tool replacements, and repair lifecycles</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeWorkOrdersModal()" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Work Orders List Container -->
+        <div id="workOrdersList" style="max-height:320px; overflow-y:auto; margin-bottom:20px;"></div>
+
+        <!-- Create Manual Work Order Form -->
+        <details style="background:var(--bg-section-alt); padding:16px; border-radius:var(--radius-sm); border:1px solid var(--border-light);">
+          <summary style="font-weight:700; font-size:13px; color:var(--text-primary); cursor:pointer;">+ Create Manual Work Order</summary>
+          <form onsubmit="handleCreateWorkOrderSubmit(event)" style="margin-top:14px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="apple-form-group">
+                <label class="apple-form-label">Target Machine</label>
+                <select class="apple-select" name="woMachineId">
+                  <option value="VMC-01">VMC-01 (CNC Mill)</option>
+                  <option value="LATHE-01">LATHE-01 (CNC Lathe)</option>
+                  <option value="SAW-01">SAW-01 (Bar Saw)</option>
+                  <option value="COMP-01">COMP-01 (Compressor)</option>
+                </select>
+              </div>
+              <div class="apple-form-group">
+                <label class="apple-form-label">Priority</label>
+                <select class="apple-select" name="woPriority">
+                  <option value="Low">Low Priority</option>
+                  <option value="Medium" selected>Medium Priority</option>
+                  <option value="High">High Priority</option>
+                  <option value="Critical">Critical Emergency</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="apple-form-group">
+              <label class="apple-form-label">Work Order Title</label>
+              <input type="text" class="apple-input" name="woTitle" placeholder="e.g. Inspect spindle runout and clean collet" required>
+            </div>
+
+            <div class="apple-form-group">
+              <label class="apple-form-label">Recommended Action Instructions</label>
+              <textarea class="apple-input" name="woAction" rows="2" placeholder="Step-by-step instructions for technician…"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+              <button type="submit" class="op-btn primary">Create Order</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       FAULT LAB & SCENARIOS MODAL
+       ======================================================================== -->
+  <div class="modal-overlay" id="faultLabModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog" style="max-width:620px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Fault Injection & Scenario Lab</h3>
+          <div style="font-size:13px; color:var(--text-secondary);">Test digital twin detection, residual drift, and auto-derate protection</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeFaultLabModal()" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="apple-form-group">
+          <label class="apple-form-label">Target Station For Injected Fault</label>
+          <select class="apple-select" id="faultTargetMachineSelect">
+            <option value="VMC-01" selected>VMC-01 · CNC Milling Machine (Hero)</option>
+            <option value="LATHE-01">LATHE-01 · CNC Turning Lathe</option>
+            <option value="SAW-01">SAW-01 · Bar-Cutting Band Saw</option>
+            <option value="COMP-01">COMP-01 · Air Compressor</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Machine Display Name</label>
-          <input type="text" id="onboardName" class="form-control" value="Rotary Screw Compressor 2" required>
+
+        <label class="apple-form-label">9 Production Injected Faults</label>
+        <div class="fault-lab-grid">
+          <button class="fault-btn" onclick="triggerFault('coolant_degradation')">Coolant Loss</button>
+          <button class="fault-btn" onclick="triggerFault('bearing_defect')">Bearing Defect</button>
+          <button class="fault-btn" onclick="triggerFault('overload')">Torque Overload</button>
+          <button class="fault-btn" onclick="triggerFault('tool_wear_accel')">Tool Wear Accel</button>
+          <button class="fault-btn" onclick="triggerFault('sensor_dropout')">Sensor Dropout</button>
+          <button class="fault-btn" onclick="triggerFault('sensor_stuck')">Sensor Stuck</button>
+          <button class="fault-btn" onclick="triggerFault('order_surge')">Order Surge</button>
+          <button class="fault-btn" onclick="triggerFault('pressure_drop')">Pressure Drop</button>
+          <button class="fault-btn" onclick="triggerFault('blade_wear')">Blade Dull</button>
         </div>
-        <div class="form-group">
-          <label>Rated Motor Power (kW)</label>
-          <input type="number" id="onboardKw" class="form-control" value="7.5" step="0.1" required>
+
+        <label class="apple-form-label" style="margin-top:14px;">Pre-Built Demonstration Scenarios</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+          <button class="op-btn" onclick="triggerScenario('vibration_fault')">Vibration Zone Escalation</button>
+          <button class="op-btn" onclick="triggerScenario('over_temperature')">Over-Temp &amp; Auto-Derate</button>
+          <button class="op-btn" onclick="triggerScenario('tool_wear')">Accelerated Tool Wear</button>
+          <button class="op-btn" onclick="triggerScenario('overload')">Spindle 97% Overload</button>
         </div>
-        <div class="form-group">
-          <label>Rated Operating Envelope (Max RPM / Rated Pressure Bar)</label>
-          <input type="number" id="onboardRpm" class="form-control" value="8.0" step="0.5" required>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
+          <button class="op-btn danger" onclick="triggerClearFaults()">Clear All Faults</button>
+          <button class="op-btn primary" onclick="triggerSimulateResolution()">✓ Simulate Resolution</button>
         </div>
-        <div class="modal-actions">
-          <button type="button" class="btn" onclick="closeOnboardingModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Add Machine to Floor</button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
 
-  <!-- Modal: Tool Wear Measurement Feedback -->
-  <div class="modal-overlay" id="toolWearModal">
-    <div class="modal">
-      <h3>Operator Feedback: Tool Wear Entry</h3>
-      <p style="font-size:12px; color:var(--text-secondary);">
-        At cutting tool change, enter physical edge wear measurement. This human-in-the-loop observation recalibrates the twin's tool wear coefficient (k_wear).
-      </p>
-      <form onsubmit="submitToolWearForm(event)">
-        <input type="hidden" id="toolWearMachineId">
-        <div class="form-group">
-          <label>Measured Physical Flank Wear (minutes equivalent)</label>
-          <input type="number" id="toolWearValue" class="form-control" value="135.0" step="0.5" min="0" max="300" required>
+  <!-- ========================================================================
+       VIBRATION DIAGNOSTIC CENTER MODAL (ISO 20816-3)
+       ======================================================================== -->
+  <div class="modal-overlay" id="vibrationModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="vibModalTitle">ISO 20816-3 Vibration Center</h3>
+          <div style="font-size:13px; color:var(--text-secondary);">Harmonic decomposition &amp; velocity zone boundaries</div>
         </div>
-        <div class="modal-actions">
-          <button type="button" class="btn" onclick="closeToolWearModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Submit to Calibrator</button>
+        <button class="modal-close-btn" onclick="closeVibrationModal()" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="text-align:center; margin:10px 0;">
+          <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase;">Overall Spindle Vibration RMS</div>
+          <div style="font-size:32px; font-weight:800; color:var(--text-primary);" id="vibCurrentVal">2.30 mm/s RMS</div>
         </div>
-      </form>
+
+        <!-- Gauge Bar -->
+        <div class="vib-zone-bar">
+          <div class="zone a" title="Zone A: Newly Commissioned (&lt; 1.4 mm/s)"></div>
+          <div class="zone b" title="Zone B: Unrestricted Operation (1.4–2.8 mm/s)"></div>
+          <div class="zone c" title="Zone C: Restricted Operation (2.8–4.5 mm/s)"></div>
+          <div class="zone d" title="Zone D: Critical Danger (&gt; 4.5 mm/s)"></div>
+        </div>
+        <div class="vib-marker-container">
+          <div class="vib-marker-pin" id="vibMarkerPin" style="left:38%;"></div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); font-family:var(--font-mono); margin-top:2px;">
+          <span>Zone A (&lt;1.4)</span>
+          <span>Zone B (1.4-2.8)</span>
+          <span>Zone C (2.8-4.5)</span>
+          <span>Zone D (&gt;4.5)</span>
+        </div>
+
+        <!-- Harmonic Decomposition Table -->
+        <div style="margin-top:20px;">
+          <h4 style="font-size:13px; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Harmonic Peak Breakdown</h4>
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <tr style="border-bottom:1px solid var(--border-light); color:var(--text-secondary); text-align:left;">
+              <th style="padding:6px 0;">Harmonic</th>
+              <th>Frequency</th>
+              <th>Amplitude</th>
+              <th>Diagnostic Attribution</th>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border-light);">
+              <td style="padding:8px 0; font-weight:600;">1× RPM</td>
+              <td style="font-family:var(--font-mono);">25.6 Hz</td>
+              <td>1.12 mm/s</td>
+              <td>Spindle Dynamic Balance (Nominal)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border-light);">
+              <td style="padding:8px 0; font-weight:600;">2× RPM</td>
+              <td style="font-family:var(--font-mono);">51.2 Hz</td>
+              <td>0.48 mm/s</td>
+              <td>Coupling Alignment (Acceptable)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border-light);">
+              <td style="padding:8px 0; font-weight:600;">BPFO/BPFI</td>
+              <td style="font-family:var(--font-mono);">&gt; 1.2 kHz</td>
+              <td>0.18 mm/s</td>
+              <td>Bearing Outer/Inner Ball Pass (Good)</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px; padding-top:14px; border-top:1px solid var(--border-light);">
+          <button class="btn-card-ghost" onclick="closeVibrationModal()">Close</button>
+          <button class="btn-primary" onclick="triggerWaveformCapture()" style="padding:10px 20px; font-size:13px;">Capture 10kHz Waveform</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Modal: Customize MSME Economics Assumptions -->
-  <div class="modal-overlay" id="economicsModal">
-    <div class="modal">
-      <h3>MSME Economic & Sustainability Assumptions</h3>
-      <p style="font-size:12px; color:var(--text-secondary);">
-        Adjust shop operating rates and financial parameters. Calculations update in real-time and persist to the platform backend database.
-      </p>
-      <form onsubmit="submitEconomicsForm(event)">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-          <div class="form-group">
-            <label>Machine Downtime Cost (₹/hr)</label>
-            <input type="number" id="inputDowntimeCost" class="form-control" value="2500" step="100" min="500" required>
-          </div>
-          <div class="form-group">
-            <label>Product Gross Margin (₹/part)</label>
-            <input type="number" id="inputPartMargin" class="form-control" value="450" step="10" min="50" required>
-          </div>
-          <div class="form-group">
-            <label>Electricity Tariff (₹/kWh)</label>
-            <input type="number" id="inputElectricityTariff" class="form-control" value="8.5" step="0.1" min="1" required>
-          </div>
-          <div class="form-group">
-            <label>IoT Sensor Node BOM (₹/machine)</label>
-            <input type="number" id="inputSensorCost" class="form-control" value="2200" step="100" min="500" required>
-          </div>
-          <div class="form-group">
-            <label>Baseline Breakdown (hrs/month)</label>
-            <input type="number" id="inputBaseHours" class="form-control" value="12" step="0.5" min="1" required>
-          </div>
-          <div class="form-group">
-            <label>CEA CO₂ Factor (kg/kWh)</label>
-            <input type="number" id="inputCeaFactor" class="form-control" value="0.716" step="0.001" min="0.1" required>
+  <!-- ========================================================================
+       BACKEND CONNECTION SETTINGS MODAL
+       ======================================================================== -->
+  <div class="modal-overlay" id="connectionModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Backend Connection</h3>
+          <div style="font-size:13px; color:var(--text-secondary);">Configure FastAPI REST host and WebSocket telemetry stream</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeConnectionModal()" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="apple-form-group">
+          <label class="apple-form-label">API Base URL</label>
+          <input type="text" class="apple-input" id="cfgApiBaseUrl" placeholder="same server (default)">
+        </div>
+
+        <div class="apple-form-group">
+          <label class="apple-form-label">Operator Authorization Token</label>
+          <input type="password" class="apple-input" id="cfgOperatorToken" placeholder="Leave empty for open local dev">
+          <span style="font-size:11px; color:var(--text-muted);">Sent via X-Operator-Token header for model promotions &amp; proposal approvals</span>
+        </div>
+
+        <div style="background:var(--bg-section-alt); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-light); margin:14px 0;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-primary);">No simulated fallback</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+            Everything shown comes from the UDYAM-TWIN backend. If it stops, the status pill says so and the data stops updating until it reconnects.
           </div>
         </div>
-        <div class="modal-actions" style="margin-top:12px;">
-          <button type="button" class="btn" onclick="closeEconomicsModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save & Recalculate</button>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:16px;">
+          <button class="btn-card-ghost" onclick="closeConnectionModal()">Close</button>
+          <button class="btn-primary" onclick="saveConnectionSettings()" style="padding:10px 20px; font-size:13px;">Save &amp; Reconnect</button>
         </div>
-      </form>
+      </div>
     </div>
   </div>
 
+  <!-- Sleek Apple Floating Toast -->
+  <div class="apple-toast" id="appleToast">Notification Message</div>
+
+  <!-- Control Center panels (existing modules) -->
   <script src="/static/dialog.js"></script>
-  <script src="/static/app.js"></script>
-  <script src="/static/mode.js"></script>
-  <script src="/static/workspace.js"></script>
   <script src="/static/sim_controls.js"></script>
-  <script src="/static/chat.js"></script>
-  <script src="/static/rl.js"></script>
-  <script src="/static/vibration_dataset.js"></script>
-  <script src="/static/cmapss.js"></script>
-  <script src="/static/reports.js"></script>
-  <script src="/static/recent.js"></script>
-  <script src="/static/wokwi.js"></script>
-  <script src="/static/synthetic.js"></script>
-  <script src="/static/whatif.js"></script>
   <script src="/static/factory_run.js"></script>
   <script src="/static/factory_dataset.js"></script>
   <script src="/static/factory_learning.js"></script>
   <script src="/static/models.js"></script>
+  <script src="/static/synthetic.js"></script>
   <script src="/static/adaptive.js"></script>
+  <script src="/static/rl.js"></script>
+  <script src="/static/wokwi.js"></script>
+  <script src="/static/reports.js"></script>
+  <script src="/static/recent.js"></script>
+  <script src="/static/chat.js"></script>
+  <script src="/static/control_center.js"></script>
 </body>
 </html>
